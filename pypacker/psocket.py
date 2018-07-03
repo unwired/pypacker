@@ -1,4 +1,4 @@
-"""Packet read and write routines using network sockets."""
+"""Simple socket wrapper for reading/writing on layer2 or layer3"""
 import socket
 import logging
 

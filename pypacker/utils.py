@@ -6,8 +6,11 @@ import re
 import os
 import logging
 import math
+import netifaces
+from socket import inet_ntoa
 
 from pypacker import pypacker as pypacker
+from pypacker.structcbs import pack_L_le
 
 log = math.log
 mac_bytes_to_str = pypacker.mac_bytes_to_str
@@ -278,3 +281,45 @@ def get_entropy(bts, granularity):
 		entropy += -log(p, symbol_amount) * p
 
 	return entropy
+
+
+def get_mac_for_iface(iface_name):
+	# Assume MAC address is always retrievable
+	try:
+		return netifaces.ifaddresses(iface_name)[netifaces.AF_LINK][0]["addr"]
+	except:
+		return None
+
+
+def get_ipv4_for_iface(iface_name):
+	try:
+		return netifaces.ifaddresses(iface_name)[netifaces.AF_INET][0]["addr"]
+	except Exception as ex:
+		return None
+
+
+def get_gwip_for_iface(iface_name):
+	gws = netifaces.gateways()
+	gws_ipv4 = gws.get(netifaces.AF_INET, None)
+
+	if gws_ipv4 is None:
+		return None
+	gw_ipv4 = None
+
+	for gw_info in gws_ipv4:
+		if iface_name in gw_info:
+			gw_ipv4 = gw_info[0]
+			break
+	return gw_ipv4
+
+
+def get_arp_cache_entry(ipaddr):
+	mac = None
+	pattern_mac = re.compile("([0-9A-Fa-f]{2}[:]){5}([0-9A-Fa-f]{2})")
+
+	with open("/proc/net/arp", "r") as fd:
+		for line in fd:
+			if ipaddr in line:
+				mac = pattern_mac.search(line).group(0)
+				break
+	return mac

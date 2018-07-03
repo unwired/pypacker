@@ -20,6 +20,8 @@ unpack_IIII = Struct(">IIII").unpack
 pack_IIII = Struct(">IIII").pack
 unpack_IIII_le = Struct("<IIII").unpack
 
+pack_L_le = Struct("<L")
+
 unpack_Q_le = Struct("<Q").unpack
 unpack_Q = Struct(">Q").unpack
 pack_Q = Struct(">Q").pack
