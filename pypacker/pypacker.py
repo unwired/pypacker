@@ -380,7 +380,7 @@ class Packet(object, metaclass=MetaPacket):
 
 		return current
 
-	def _highest_layer(self):
+	def _get_highest_layer(self):
 		current = self
 
 		# unpack all layer, assuming string class will be never found
@@ -391,10 +391,22 @@ class Packet(object, metaclass=MetaPacket):
 
 		return current
 
+	def _set_highest_layer(self, layer):
+		"""
+		Replaces the current highest layer with a new one,
+		eg with new layer "D" A.B.C becomes A.B.D.
+		"""
+		layer_to_change = self.highest_layer.lower_layer
+
+		if layer_to_change is None:
+			return
+
+		layer_to_change.upper_layer = layer
+
 	# get lowest layer
 	lowest_layer = property(_lowest_layer)
 	# get top layer
-	highest_layer = property(_highest_layer)
+	highest_layer = property(_get_highest_layer)
 
 	def __getattr__(self, varname):
 		"""
