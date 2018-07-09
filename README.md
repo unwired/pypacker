@@ -32,7 +32,7 @@ ICMP(type=8, code=0, sum=C03F, handler=echo)
 Echo(id=7B, seq=1, ts=0, bytes=b'foobar')
 ```
 
-Read packets from file (pcap/tcpdump format), analyze it and write them back:
+Read/write packets from/to file (pcap/tcpdump format):
 
 ```python
 from pypacker import ppcap
@@ -89,7 +89,7 @@ time.sleep(999)
 ictor.stop()
 ```
 
-Send and receive packets:
+Send/receive packets:
 
 ```python
 # send/receive raw bytes
