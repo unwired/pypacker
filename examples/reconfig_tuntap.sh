@@ -1,3 +1,4 @@
+# Example script to configure two tun interfaces
 for iface in tun0 tun1; do
 ip tuntap del dev $iface mode tun
 ip tuntap add dev $iface mode tun
@@ -18,8 +19,10 @@ ip rule del iif tun0 lookup 13
 ip rule del iif tun1 lookup 13
 
 # pointopoint creates implicit rule in "main"
-# The problem is that our packets pop out of tun1 (on tun1 ingress), but the kernel does not recognize them as being addressed to the local host. (we removed the rule above)
-# Solution: distinct routing decisions and configure routing in such a way that the local type routes are only "seen" by the input routing decision
+# The problem is that our packets pop out of tun1 (on tun1 ingress), but the kernel
+# does not recognize them as being addressed to the local host. (we removed the rule above)
+# Solution: distinct routing decisions and configure routing in such a way that the local
+# type routes are only "seen" by the input routing decision
 ip route add local $IP1 dev tun0 table 13
 ip rule add iif tun0 lookup 13
 
