@@ -173,16 +173,6 @@ try:
 	udpcon[udp.UDP].body_bytes = b"udpdata"
 	psock.send(udpcon.bin())
 	psock.close()
-	#
-	# send and receive packets on layer 3 (assumes running HTTP-server on port 80)
-	#
-	packet_ip = ip.IP(src_s="127.0.0.1", dst_s="127.0.0.1") + tcp.TCP(dport=80)
-	psock = psocket.SocketHndl(mode=psocket.SocketHndl.MODE_LAYER_3, timeout=10)
-	packets = psock.sr(packet_ip, max_packets_recv=1)
-
-	for p in packets:
-		print("got layer 3 packet: %s" % p)
-	psock.close()
 except socket.timeout as e:
 	print("timeout!")
 except socket.error as e:

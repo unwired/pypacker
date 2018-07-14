@@ -2307,14 +2307,6 @@ class SocketTestCase(unittest.TestCase):
 			print(">>> %s" % p)
 		socket.close()
 
-		# Layer 3 Socket
-		socket = SocketHndl(iface_name="eth1", mode=SocketHndl.MODE_LAYER_3)
-		# socket.send(packet_ip.bin())
-		packets = socket.sr(packet_ip)
-		for p in packets:
-			print(">>> %s" % p)
-		socket.close()
-
 
 class BGPTestCase(unittest.TestCase):
 	def test_bgp(self):

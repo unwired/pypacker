@@ -89,7 +89,7 @@ time.sleep(999)
 ictor.stop()
 ```
 
-Send/receive packets:
+Send/receive packets (via raw sockets):
 
 ```python
 # send/receive raw bytes
@@ -97,7 +97,7 @@ from pypacker import psocket
 from pypacker.layer12 import ethernet
 from pypacker.layer3 import ip
 
-psock = psocket.SocketHndl(mode=psocket.SocketHndl.MODE_LAYER_2, timeout=10)
+psock = psocket.SocketHndl(timeout=10)
 
 for raw_bytes in psock:
 	eth = ethernet.Ethernet(raw_bytes)
@@ -118,7 +118,7 @@ from pypacker.layer3 import ip
 from pypacker.layer4 import tcp
 
 packet_ip = ip.IP(src_s="127.0.0.1", dst_s="127.0.0.1") + tcp.TCP(dport=80)
-psock = psocket.SocketHndl(mode=psocket.SocketHndl.MODE_LAYER_3, timeout=10)
+psock = psocket.SocketHndl(timeout=10)
 
 def filter_pkt(pkt):
 	return pkt.ip.tcp.sport == 80
@@ -140,7 +140,7 @@ from pypacker.layer3 import ip
 from pypacker.layer4 import tcp
 
 packet_ip = ip.IP(src_s="127.0.0.1", dst_s="127.0.0.1") + tcp.TCP(dport=80)
-psock = psocket.SocketHndl(mode=psocket.SocketHndl.MODE_LAYER_3, timeout=10)
+psock = psocket.SocketHndl(timeout=10)
 packets = psock.sr(packet_ip, max_packets_recv=1)
 
 for p in packets:
