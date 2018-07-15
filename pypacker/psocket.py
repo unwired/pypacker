@@ -1,7 +1,8 @@
 """
 Simple socket wrapper for reading/writing on layer 2.
 For all other use cases standard python sockets
-should be used."""
+should be used.
+"""
 import socket
 import logging
 
@@ -13,7 +14,7 @@ logger = logging.getLogger("pypacker")
 
 class SocketHndl(object):
 	"""
-	Simple socket handler for layer 2 and 3 reading/writing.
+	Simple socket handler for layer 2 reading/writing.
 	"""
 	ETH_P_ALL		= 0x0003
 	ETH_P_IPV4		= 0x0800
@@ -23,8 +24,6 @@ class SocketHndl(object):
 		buffersize_recv=None,
 		buffersize_send=None, **params):
 		"""
-		Initialize a socket of the given type.
-
 		iface_name -- Bind to the given interface
 		timeout -- read timeout in seconds
 		buffersize_recv, buffersize_send -- amount of bytes used for receiving and sending
@@ -32,7 +31,8 @@ class SocketHndl(object):
 
 		self.iface_name = iface_name
 		self._socket = None
-		# This allows sending but NOT receiving
+		# man 7 raw -> Receiving of all IP protocols via IPPROTO_RAW
+		# is not possible using raw sockets.
 		# socket(AF_INET, SOCK_RAW, IPPROTO_RAW)
 
 		logger.info("creating socket, interface to bind on: %s", iface_name)
@@ -100,7 +100,6 @@ class SocketHndl(object):
 		max_amount -- maximum amount of packets to be fetched
 		return -- packets received from network as list
 		"""
-
 		received = []
 		# logger.debug("listening for packets")
 
@@ -187,7 +186,6 @@ class SocketHndl(object):
 		return received
 
 	def close(self):
-		"""Close the socket."""
 		try:
 			self._socket.close()
 		except:
