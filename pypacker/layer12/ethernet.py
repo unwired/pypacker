@@ -5,7 +5,7 @@ RFC 1042
 """
 import logging
 
-from pypacker.layer12 import lldp
+from pypacker.layer12 import lldp, slac
 from pypacker import pypacker, triggerlist
 from pypacker.pypacker import FIELD_FLAG_AUTOUPDATE, FIELD_FLAG_IS_TYPEFIELD
 from pypacker.structcbs import unpack_H
@@ -58,6 +58,7 @@ ETH_TYPE_FCOE		= 0x8914		# FCoE Initialization Protocol (FIP)
 ETH_TYPE_TUNNELING	= 0x9100		# Provider Bridging IEEE 802.1QInQ 2007
 ETH_TYPE_EFC		= 0x8808		# Ethernet flow control
 ETH_TYPE_SP		= 0x8809		# Slow Protocols
+ETH_TYPE_SLAC		= 0x88E1		# SLAC
 
 
 # MPLS label stack fields
@@ -127,6 +128,7 @@ class Ethernet(pypacker.Packet):
 		ETH_TYPE_EFC: flow_control.FlowControl,
 		ETH_TYPE_LLDP: lldp.LLDP,
 		ETH_TYPE_SP: lacp.LACP,
+		ETH_TYPE_SLAC: slac.Slac
 	}
 
 	def _dissect(self, buf):
