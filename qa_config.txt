@@ -1,5 +1,6 @@
 [pep8]
-ignore = W191,E128,E223,E265
+# E101: autoformat on pycharm creates spaces
+ignore = W191,E128,E223,E265,E101
 max-line-length = 120
 [flake8]
 indent-string=\t
