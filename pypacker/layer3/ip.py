@@ -265,10 +265,9 @@ IP_TOS_PREC_INTERNETCONTROL	= 0xc0
 IP_TOS_PREC_NETCONTROL		= 0xe0
 
 # Fragmentation flags (ip_off)
-IP_RF				= 0x8000		# reserved
-IP_DF				= 0x4000		# don't fragment
-IP_MF				= 0x2000		# more fragments (not last frag)
-IP_OFFMASK			= 0x1fff		# mask for fragment offset
+IP_RF				= 0x4			# reserved
+IP_DF				= 0x2			# don't fragment
+IP_MF				= 0x1			# more fragments (not last frag)
 
 # Time-to-live (ip_ttl), seconds
 IP_TTL_DEFAULT			= 64			# default ttl, RFC 1122, RFC 1340
