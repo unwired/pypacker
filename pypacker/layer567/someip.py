@@ -9,7 +9,7 @@ from pypacker.pypacker import FIELD_FLAG_AUTOUPDATE
 logger = logging.getLogger("pypacker")
 
 
-# TODO: needs testing
+# TODO needs testing
 class SomeIP(Packet):
 	__hdr__ = (
 		("serviceid", "H", 1),

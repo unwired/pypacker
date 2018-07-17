@@ -14,7 +14,7 @@ fi
 case "$1" in
 "stable")
 	msg "Any TODOs open?"
-	grep -ir "TODO "
+	grep -r "TODO"
 
 	msg "changing debug level to WARNING"
 	sed -r -i "s/# (logger.setLevel\(logging.WARNING\))/\1/g;s/^(logger.setLevel\(logging.DEBUG\))/# \1/g" pypacker/pypacker.py

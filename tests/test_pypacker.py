@@ -2484,7 +2484,9 @@ class SlacTestCase(unittest.TestCase):
 		self.assertEqual(slac0.typeinfo, 0x0860)
 		self.assertEqual(slac0.msgtype, 0x6008)
 		self.assertEqual(slac0.mmtypelsb, 0x0)
+		self.assertEqual(slac0.mmtypelsb, slac.MMTYPELSB_REQUEST)
 		self.assertEqual(slac0.mmtypemsb, 0x0)
+		self.assertEqual(slac0.mmtypemsb, slac.MMTYPEMSB_STA__CentralCoordinator)
 
 		print("message 2")
 		slac0 = pkts[5]
@@ -2492,7 +2494,9 @@ class SlacTestCase(unittest.TestCase):
 		self.assertEqual(slac0.typeinfo, 0x6A60)
 		self.assertEqual(slac0.msgtype, 0x6068)
 		self.assertEqual(slac0.mmtypelsb, 0x2)
+		self.assertEqual(slac0.mmtypelsb, slac.MMTYPELSB_INDICATION)
 		self.assertEqual(slac0.mmtypemsb, 0x0)
+		self.assertEqual(slac0.mmtypemsb, slac.MMTYPEMSB_STA__CentralCoordinator)
 
 		print("message 3")
 		slac0 = pkts[40]
@@ -2500,7 +2504,29 @@ class SlacTestCase(unittest.TestCase):
 		self.assertEqual(slac0.typeinfo, 0x6F60)
 		self.assertEqual(slac0.msgtype, 0x606C)
 		self.assertEqual(slac0.mmtypelsb, 0x3)
+		self.assertEqual(slac0.mmtypelsb, slac.MMTYPELSB_RESPONSE)
 		self.assertEqual(slac0.mmtypemsb, 0x0)
+		self.assertEqual(slac0.mmtypemsb, slac.MMTYPEMSB_STA__CentralCoordinator)
+
+		self.assertEqual(pkts[0].msgtype_s, "CM_SET_KEY")
+		self.assertEqual(pkts[1].msgtype_s, "CM_SET_KEY")
+		self.assertEqual(pkts[2].msgtype_s, "CM_SLAC_PARM")
+		self.assertEqual(pkts[3].msgtype_s, "CM_SLAC_PARM")
+		self.assertEqual(pkts[4].msgtype_s, "CM_SLAC_PARM")
+		self.assertEqual(pkts[5].msgtype_s, "CM_START_ATTEN_CHAR")
+		self.assertEqual(pkts[6].msgtype_s, "CM_START_ATTEN_CHAR")
+		self.assertEqual(pkts[7].msgtype_s, "CM_START_ATTEN_CHAR")
+		self.assertEqual(pkts[8].msgtype_s, "CM_MNBC_SOUND")
+		self.assertEqual(pkts[9].msgtype_s, "CM_ATTEN_PROFILE")
+
+		self.assertEqual(pkts[0].mmtypelsb_s, "MMTYPELSB_REQUEST")
+		self.assertEqual(pkts[1].mmtypelsb_s, "MMTYPELSB_REQUEST")
+		self.assertEqual(pkts[2].mmtypelsb_s, "MMTYPELSB_REQUEST")
+		self.assertEqual(pkts[3].mmtypelsb_s, "MMTYPELSB_CONFIRM")
+		self.assertEqual(pkts[4].mmtypelsb_s, "MMTYPELSB_CONFIRM")
+
+		for idx in range(5):
+			self.assertEqual(pkts[0].mmtypemsb_s, "MMTYPEMSB_STA__CentralCoordinator")
 
 
 class LACPTestCase(unittest.TestCase):
