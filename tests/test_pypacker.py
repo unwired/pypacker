@@ -1856,8 +1856,8 @@ class PerfTestCase(unittest.TestCase):
 		cnt = 10000
 		print_header("Performance Tests")
 		print("nr = new results on this machine")
-		print("orC = old results (Intel Core2 Duo CPU @ 1,866 GHz, 2GB RAM, CPython v3.6)")
-		print("orP = old results (Intel Core2 Duo CPU @ 1,866 GHz, 2GB RAM, Pypy 5.10.1)")
+		print("orC = old results (Intel Core2 Duo CPU @ 3 GHz, 8GB RAM, CPython v3.6)")
+		print("orP = old results (Intel Core2 Duo CPU @ 3 GHz, 8GB RAM, Pypy 6.0.0)")
 		print("rounds per test: %d" % cnt)
 		print("=====================================")
 
@@ -1867,8 +1867,8 @@ class PerfTestCase(unittest.TestCase):
 			ip1 = ip.IP(s)
 		print("time diff: %ss" % (time.time() - start))
 		print("nr = %d p/s" % (cnt / (time.time() - start)))
-		print("orC = 86064 p/s")
-		print("orP = 208346 p/s")
+		print("orC = 261628 p/s")
+		print("orP = 585477 p/s")
 
 		print(">>> creating/direct assigning (IP only header)")
 		start = time.time()
@@ -1879,8 +1879,8 @@ class PerfTestCase(unittest.TestCase):
 		# ip = IP(src=b"\x01\x02\x03\x04", dst=b"\x05\x06\x07\x08", p=17, len=1234, body_bytes=b"abcd")
 		print("time diff: %ss" % (time.time() - start))
 		print("nr = %d p/s" % (cnt / (time.time() - start)))
-		print("orC = 41623 p/s")
-		print("orP = 59370 p/s")
+		print("orC = 81398 p/s")
+		print("orP = 127003 p/s")
 
 		print(">>> bin() without change (IP)")
 		ip2 = ip.IP(src=b"\x01\x02\x03\x04", dst=b"\x05\x06\x07\x08", p=17, len=1234, body_bytes=b"abcd")
@@ -1891,8 +1891,8 @@ class PerfTestCase(unittest.TestCase):
 			ip2.bin()
 		print("time diff: %ss" % (time.time() - start))
 		print("nr = %d p/s" % (cnt / (time.time() - start)))
-		print("orC = 170356 p/s")
-		print("orP = 292133 p/s")
+		print("orC = 335635 p/s")
+		print("orP = 632825 p/s")
 
 		print(">>> output with change/checksum recalculation (IP)")
 		ip3 = ip.IP(src=b"\x01\x02\x03\x04", dst=b"\x05\x06\x07\x08", p=17, len=1234, body_bytes=b"abcd")
@@ -1903,8 +1903,8 @@ class PerfTestCase(unittest.TestCase):
 			ip3.bin()
 		print("time diff: %ss" % (time.time() - start))
 		print("nr = %d p/s" % (cnt / (time.time() - start)))
-		print("orC = 10104 p/s")
-		print("orP = 23851 p/s")
+		print("orC = 23355 p/s")
+		print("orP = 66935 p/s")
 
 		print(">>> basic/first layer parsing (Ethernet + IP + TCP + HTTP)")
 		start = time.time()
@@ -1913,8 +1913,8 @@ class PerfTestCase(unittest.TestCase):
 			eth = ethernet.Ethernet(BYTES_ETH_IP_TCP_HTTP)
 		print("time diff: %ss" % (time.time() - start))
 		print("nr = %d p/s" % (cnt / (time.time() - start)))
-		print("orC = 62748 p/s")
-		print("orP = 241047 p/s")
+		print("orC = 229626 p/s")
+		print("orP = 653684 p/s")
 
 		print(">>> changing Triggerlist element value (Ethernet + IP + TCP + HTTP)")
 		start = time.time()
@@ -1927,8 +1927,8 @@ class PerfTestCase(unittest.TestCase):
 			tcp1.opts[0].type = tcp.TCP_OPT_WSCALE
 		print("time diff: %ss" % (time.time() - start))
 		print("nr = %d p/s" % (cnt / (time.time() - start)))
-		print("orC = 101552 p/s")
-		print("orP = 201994 p/s")
+		print("orC = 217847 p/s")
+		print("orP = 409268 p/s")
 
 		print(">>> changing Triggerlist/text based proto (Ethernet + IP + TCP + HTTP)")
 		start = time.time()
@@ -1939,8 +1939,8 @@ class PerfTestCase(unittest.TestCase):
 			http1.startline = b"GET / HTTP/1.1"
 		print("time diff: %ss" % (time.time() - start))
 		print("nr = %d p/s" % (cnt / (time.time() - start)))
-		print("orC = 37249 p/s")
-		print("orP = 272972 p/s")
+		print("orC = 312150 p/s")
+		print("orP = 552318 p/s")
 
 		print(">>> direct assigning and concatination (Ethernet + IP + TCP + HTTP)")
 		start = time.time()
@@ -1949,8 +1949,8 @@ class PerfTestCase(unittest.TestCase):
 				src_s="127.0.0.1", dst_s="192.168.0.1") + tcp.TCP(sport=1234, dport=123) + http.HTTP()
 		print("time diff: %ss" % (time.time() - start))
 		print("nr = %d p/s" % (cnt / (time.time() - start)))
-		print("orC = 7428 p/s")
-		print("orP = 14315 p/s")
+		print("orC = 17246 p/s")
+		print("orP = 34661 p/s")
 
 		print(">>> full packet parsing (Ethernet + IP + TCP + HTTP)")
 
@@ -1961,8 +1961,8 @@ class PerfTestCase(unittest.TestCase):
 
 		print("time diff: %ss" % (time.time() - start))
 		print("nr = %d p/s" % (cnt / (time.time() - start)))
-		print("orC = 6886 p/s")
-		print("orP = 17040 p/s")
+		print("orC = 15337 p/s")
+		print("orP = 40100 p/s")
 
 		print(">>> Scapy and dpkt comparison: see dedicated performance scripts (Scapy needs Python 2)")
 

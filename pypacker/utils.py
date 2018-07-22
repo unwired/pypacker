@@ -6,7 +6,12 @@ import re
 import os
 import logging
 import math
-import netifaces
+logger = logging.getLogger("pypacker")
+
+try:
+	import netifaces
+except:
+	logger.warning("Couldn't load netifaces, some utils won't work")
 from socket import inet_ntoa
 
 from pypacker import pypacker as pypacker
@@ -15,7 +20,6 @@ from pypacker.structcbs import pack_L_le
 log = math.log
 mac_bytes_to_str = pypacker.mac_bytes_to_str
 
-logger = logging.getLogger("pypacker")
 
 
 def switch_wlan_channel(iface, channel, shutdown_prior=False):
