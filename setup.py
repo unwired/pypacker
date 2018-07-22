@@ -32,5 +32,8 @@ setup(name="pypacker",
 		"Programming Language :: Python :: Implementation :: CPython",
 		"Programming Language :: Python :: Implementation :: PyPy"
 	],
+	#install_requires=[
+	#	"netifaces",
+	#],
 	python_requires=">=3.3.*"
 )

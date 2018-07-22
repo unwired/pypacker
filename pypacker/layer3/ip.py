@@ -244,7 +244,6 @@ class IP(pypacker.Packet):
 	def reverse_address(self):
 		self.src, self.dst = self.dst, self.src
 
-
 # Type of service (ip_tos), RFC 1349 ("obsoleted by RFC 2474")
 IP_TOS_DEFAULT			= 0x00			# default
 IP_TOS_LOWDELAY			= 0x10			# low delay

@@ -3,6 +3,8 @@ import logging
 
 logger = logging.getLogger("pypacker")
 
+TRIGGERLIST_CONTENT_SIMPLE = {bytes, tuple}
+
 
 class TriggerList(list):
 	"""
@@ -13,6 +15,7 @@ class TriggerList(list):
 	to this: b"somebytes" + mypacket.bin() + ("tuplekey", "tuplevalue")[1].
 	Custom reassemblation for tuples can be done by overwriting "_pack()".
 	"""
+
 	def __init__(self, packet, dissect_callback=None, buffer=b"", headerfield_name=""):
 		"""
 		packet -- packet where this TriggerList gets ingegrated
@@ -23,8 +26,8 @@ class TriggerList(list):
 		# TODO: needed?
 		super().__init__()
 		# set by external Packet
-		#logger.debug(">>> init of TriggerList (contained in %s): %s" %
-		#(packet.__class__.__name__, buffer))
+		# logger.debug(">>> init of TriggerList (contained in %s): %s" %
+		# (packet.__class__.__name__, buffer))
 		self._packet = packet
 		self._dissect_callback = dissect_callback
 		self._cached_result = buffer
@@ -53,11 +56,11 @@ class TriggerList(list):
 		for v in self:
 			try:
 				v._add_change_listener(self._notify_change)
-				#logger.debug("amount changelistener: %d" % len(self._packet._changelistener))
-				#logger.debug("amount changelistener: %d" % len(v._changelistener))
+			# logger.debug("amount changelistener: %d" % len(self._packet._changelistener))
+			# logger.debug("amount changelistener: %d" % len(v._changelistener))
 			except AttributeError:
 				# this will fail if val is not a packet
-				#logger.debug(e)
+				# logger.debug(e)
 				pass
 
 	# Python predefined overwritten methods
@@ -84,7 +87,7 @@ class TriggerList(list):
 		self.__refresh_listener([v])
 
 	def __delitem__(self, k):
-		#logger.debug("removing elements: %r" % k)
+		# logger.debug("removing elements: %r" % k)
 		self._lazy_dissect()
 		if type(k) is int:
 			itemlist = [self[k]]
@@ -92,9 +95,10 @@ class TriggerList(list):
 			# assume slice: [x:y]
 			itemlist = self[k]
 		super().__delitem__(k)
-		#logger.debug("removed, handle mod")
+		# logger.debug("removed, handle mod")
 		self.__refresh_listener(itemlist, add_listener=False)
-		#logger.debug("finished removing")
+
+	# logger.debug("finished removing")
 
 	def __len__(self):
 		self._lazy_dissect()
@@ -107,9 +111,10 @@ class TriggerList(list):
 	def append(self, v):
 		self._lazy_dissect()
 		super().append(v)
-		#logger.debug("handling mod")
+		# logger.debug("handling mod")
 		self.__refresh_listener([v])
-		#logger.debug("finished")
+
+	# logger.debug("finished")
 
 	def extend(self, v):
 		self._lazy_dissect()
@@ -145,9 +150,9 @@ class TriggerList(list):
 					v._add_change_listener(self._notify_change)
 			except AttributeError:
 				# this will fail if val is not a packet
-				#logger.debug(e)
+				# logger.debug(e)
 				pass
-		#logger.debug("refreshed listener!")
+		# logger.debug("refreshed listener!")
 		self._notify_change()
 
 	def _notify_change(self):
@@ -156,15 +161,15 @@ class TriggerList(list):
 		this TriggerList as field and _cached_result.
 		Called by: this list on changes or Packets in this list
 		"""
-		#logger.debug("!!! Packet notified about update: %r -> %r" % (self._packet.__class__, self))
+		# logger.debug("!!! Packet notified about update: %r -> %r" % (self._packet.__class__, self))
 
 		try:
 			self._packet._header_changed = True
 			self._packet._header_format_changed = True
-			#logger.debug(">>> TriggerList changed!!!")
+		# logger.debug(">>> TriggerList changed!!!")
 		except AttributeError:
 			# this only works on Packets
-			#logger.debug(e)
+			# logger.debug(e)
 			pass
 
 		# list changed: old cache of TriggerList not usable anymore
@@ -177,8 +182,8 @@ class TriggerList(list):
 		Output the TriggerLists elements as concatenated bytestring.
 		Custom implementations for tuple-handling can be set by overwriting _pack().
 		"""
-		#logger.debug("packing triggerlist content")
-		#logger.debug("sep in TriggerList: %r" % self._packet.sep)
+		# logger.debug("packing triggerlist content")
+		# logger.debug("sep in TriggerList: %r" % self._packet.sep)
 
 		if self._cached_result is None:
 			result_arr = []
@@ -186,7 +191,7 @@ class TriggerList(list):
 
 			for entry in self:
 				entry_type = type(entry)
-				#logger.debug("type is: %r" % entry_type)
+				# logger.debug("type is: %r" % entry_type)
 
 				if entry_type is bytes:
 					result_arr.append(entry)
@@ -197,11 +202,12 @@ class TriggerList(list):
 						# this must be a packet, otherthise invalid entry!
 						result_arr.append(entry.bin())
 					except:
-						logger.warning("Exception when getting bytes from packet: field=%r, value=%r, in packet: %r",
+						logger.warning(
+							"Exception when getting bytes from packet: field=%r, value=%r, in packet: %r",
 							self._headerfield_name, entry, self._packet.__class__)
 
 			self._cached_result = b"".join(result_arr)
-			#logger.debug("new cached result: %s" % self._cached_result)
+		# logger.debug("new cached result: %s" % self._cached_result)
 
 		return self._cached_result
 
@@ -223,7 +229,7 @@ class TriggerList(list):
 				# error on callback (unknown fields etc), ignore
 				pass
 			offset += 1
-		#logger.debug("position not found")
+		# logger.debug("position not found")
 		return None
 
 	def find_value(self, search_cb, offset=0):
@@ -250,7 +256,17 @@ class TriggerList(list):
 
 	def __str__(self):
 		self._lazy_dissect()
-		return super().__str__()
+		tl_descr_l = []
+
+		for val_tl in self:
+			if type(val_tl) in TRIGGERLIST_CONTENT_SIMPLE:
+				tl_descr_l.append("%s" % str(val_tl))
+			else:
+				# assume packet
+				pkt_fqn = val_tl.__module__[9:] + "." + val_tl.__class__.__name__
+				tl_descr_l.append(pkt_fqn)
+
+		return "[" + ", ".join(tl_descr_l) + "]"
 
 	def get_by_key(self, key_needle, idx_startat=0):
 		"""

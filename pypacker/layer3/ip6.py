@@ -110,8 +110,8 @@ class IP6(pypacker.Packet):
 		# Set type value in nxt OR in last opts element (if present)
 		# Updating is a bit more complicated so we can't use FIELD_FLAG_IS_TYPEFIELD
 		# idval is None if body handler is None
-		# logger.debug("handler %r -> %r", self.__class__, self.body_handler.__class__)
-		idval = pypacker.Packet.get_id_for_handlerclass(self.__class__, self.body_handler.__class__)
+		# logger.debug("handler %r -> %r", self.__class__, self.upper_layer.__class__)
+		idval = pypacker.Packet.get_id_for_handlerclass(self.__class__, self.upper_layer.__class__)
 		#logger.debug("nxt will be %r", idval)
 
 		if idval is not None:

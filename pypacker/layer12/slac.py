@@ -6,7 +6,8 @@ import logging
 import sys
 
 from pypacker.pypacker import Packet
-from pypacker.structcbs import pack_H_le, unpack_H
+from pypacker.structcbs import pack_H_le, unpack_H, unpack_H_le
+from pypacker.triggerlist import TriggerList
 
 logger = logging.getLogger("pypacker")
 
@@ -98,7 +99,8 @@ TYPEINFO_DESCRIPTION = {
 	0x6078: "CM_VALIDATE",
 	0x607C: "CM_SLAC_MATCH",
 	0x6080: "CM_SLAC_USER_DATA",
-	0x6084: "CM_ATTEN_PROFILE"
+	0x6084: "CM_ATTEN_PROFILE",
+	0xA0B8: "VS_PL_LNK_STATUS"
 }
 
 # reverse access of message IDs
@@ -129,12 +131,226 @@ for msgid, name in MMTYPE_MSB_DESCRIPTION.items():
 	setattr(module_this, name, msgid)
 
 
+class CMSetKeyReq(Packet):
+	__hdr__ = (
+		("keytype", "B", 0),
+		("mynonce", "I", 0),
+		("yournonce", "I", 0),
+		("pid", "B", 0),
+		("prn", "H", 0),
+		("pwm", "B", 0),
+		("ccocapa", "B", 0),
+		("nid", "7s", b"\x00" * 7),
+		("neweks", "B", 0),
+		# length = 0, 16
+		("newkey", None, None),
+	)
+
+
+class CMSetKeyICnf(Packet):
+	__hdr__ = (
+		("result", "B", 0),
+		("mynonce", "I", 0),
+		("yournonce", "I", 0),
+		("pid", "B", 0),
+		("prn", "H", 0),
+		("pwm", "B", 0),
+		("ccocapa", "B", 0)
+	)
+
+
+class CMAttenCharInd(Packet):
+	__hdr__ = (
+		("apptype", "B", 0),
+		("sectype", "B", 0),
+		("sourceaddr", "6s", b"\x00" * 6),
+		("runid", "8s", b"\x00" * 8),
+		("sourceid", "17s", b"\x00" * 17),
+		("respid", "17s", b"\x00" * 17),
+		("numsounds", "B", 0)
+	)
+
+
+class CMAttenCharRsp(Packet):
+	__hdr__ = (
+		("apptype", "B", 0),
+		("sectype", "B", 0),
+		("sourceaddr", "6s", b"\x00" * 6),
+		("runid", "8s", b"\x00" * 8),
+		("sourceid", "17s", b"\x00" * 17),
+		("respid", "17s", b"\x00" * 17),
+		("result", "B", 0)
+	)
+
+
+class CMSlacParmReq(Packet):
+	__hdr__ = (
+		("apptype", "B", 0),
+		("sectype", "B", 0),
+		("runid", "8s", b"\x00" * 8),
+			# Only present if security type is 1
+		("ciphersuitesize", "B", None),
+		("ciphersuites", None, TriggerList)
+	)
+
+
+class CMSlacParmCnf(Packet):
+	__hdr__ = (
+		("msoundtarget", "6s", b"\x00" * 6),
+		("numsounds", "B", 0),
+		("timeout", "B", 0),
+		("resptype", "B", 0),
+		("forwardingsta", "6s", b"\x00" * 6),
+		("apptype", "B", 0),
+		("sectype", "B", 0),
+		("runid", "8s", b"\x00" * 8),
+			# Only present if security type is 1
+		("ciphersuite", "H", None)
+	)
+
+
+class CMSlacMatchReq(Packet):
+	__hdr__ = (
+		("apptype", "B", 0),
+		("sectype", "B", 0),
+		("mvflen", "H", 0),
+		("pevid", "17s", b"\x00" * 17),
+		("pevmac", "6s", b"\x00" * 6),
+		("evseid", "17s", b"\x00" * 17),
+		("evsemac", "6s", b"\x00" * 6),
+		("runid", "8s", b"\x00" * 8),
+		("rsvd", "8s", b"\x00" * 8),
+	)
+
+
+class CMStartAttenCharInd(Packet):
+	__hdr__ = (
+		("apptype", "B", 0),
+		("sectype", "B", 0),
+		("numsounds", "B", 0),
+		("timeout", "B", 0),
+		("resptype", "B", 0),
+		("forwardingsta", "6s", b"\x00" * 6),
+		("runid", "8s", b"\x00" * 8)
+	)
+
+
+class CMStartAttenCharRsp(Packet):
+	__hdr__ = (
+		("apptype", "B", 0),
+		("sectype", "B", 0),
+		("numsounds", "B", 0),
+		("timeout", "B", 0),
+		("resptype", "B", 0),
+		("forwardingsta", "6s", b"\x00" * 6),
+		("runid", "8s", b"\x00" * 8)
+	)
+
+
+class CMMnbcSoundInd(Packet):
+	__hdr__ = (
+		("apptype", "B", 0),
+		("sectype", "B", 0),
+		("senderid", "17s", b"\x00" * 17),
+		("cnt", "B", 0),
+		("runid", "Q", 0),
+		("rsvd", "8s", b"\x00" * 8),
+		("rnd", "16s", b"\x00" * 16)
+	)
+
+
+class CMSlacMatchReq(Packet):
+	__hdr__ = (
+		("apptype", "B", 0),
+		("sectype", "B", 0),
+		("mvflen", "H", 0),
+		("pevid", "17s", b"\x00" * 17),
+		("pevmac", "6s", b"\x00" * 6),
+		("evseid", "17s", b"\x00" * 17),
+		("evsemac", "6s", b"\x00" * 6),
+		("runid", "8s", b"\x00" * 8),
+		("rsvd", "8s", b"\x00" * 8)
+	)
+
+
+class CMSlacMatchCnf(Packet):
+	__hdr__ = (
+		("apptype", "B", 0),
+		("sectype", "B", 0),
+		("mvflen", "H", 0),
+		("pevid", "17s", b"\x00" * 17),
+		("pevmac", "6s", b"\x00" * 6),
+		("evseid", "17s", b"\x00" * 17),
+		("evsemac", "6s", b"\x00" * 6),
+		("runid", "8s", b"\x00" * 8),
+		("rsvd1", "8s", b"\x00" * 8),
+		("nid", "7s", b"\x00" * 7),
+		("rsvd2", "B", 0),
+		("nmk", "16s", b"\x00" * 16),
+	)
+
+
+class CMLinkStatsReq(Packet):
+	__hdr__ = (
+		("reqtype", "B", 0),
+		("reqid", "B", 0),
+		("nid", "7s", b"\x00" * 7),
+		("lid", "B", 0),
+		("tlflag", "B", 0),
+		("mgmtflag", "B", 0),
+		("dasa", "6s", b"\x00" * 6)
+	)
+
+
+# TODO: LinkStats payload as handler for CMLinkStatsCnf, how to differentiate?
+
+class CMLinkStatsCnf(Packet):
+	__hdr__ = (
+		("reqid", "B", 0),
+		("restype", "B", 0),
+		("linkstats", "H", 0)
+	)
+
+class VSPLLinkStatusReq(Packet):
+	__hdr__ = (
+		("oui", "3s", b"\x00" * 3),
+	)
+
+class VSPLLinkStatusCnf(Packet):
+	__hdr__ = (
+		("oui", "3s", b"\x00" * 3),
+		("link", "H", 0),
+	)
+
 class Slac(Packet):
 	__hdr__ = (
 		("version", "B", 1),
 		("typeinfo", "H", 0),
 		("frag", "H", 0)
 	)
+
+	__handler__ = {
+		CM_SET_KEY | MMTYPELSB_REQUEST: CMSetKeyReq,
+		CM_SET_KEY | MMTYPELSB_CONFIRM: CMSetKeyICnf,
+		CM_SLAC_MATCH | MMTYPELSB_REQUEST: CMSlacMatchReq,
+		CM_SLAC_MATCH | MMTYPELSB_CONFIRM: CMSlacMatchCnf,
+		CM_ATTEN_CHAR | MMTYPELSB_INDICATION: CMAttenCharInd,
+		CM_ATTEN_CHAR | MMTYPELSB_RESPONSE: CMAttenCharRsp,
+		CM_SLAC_PARM | MMTYPELSB_REQUEST: CMSlacParmReq,
+		CM_SLAC_PARM | MMTYPELSB_CONFIRM: CMSlacParmCnf,
+		CM_START_ATTEN_CHAR | MMTYPELSB_INDICATION: CMStartAttenCharRsp,
+		CM_MNBC_SOUND | MMTYPELSB_INDICATION: CMMnbcSoundInd,
+		CM_LINK_STATS | MMTYPELSB_REQUEST: CMLinkStatsReq,
+		CM_LINK_STATS | MMTYPELSB_CONFIRM: CMLinkStatsCnf,
+		VS_PL_LNK_STATUS | MMTYPELSB_REQUEST: VSPLLinkStatusReq,
+		VS_PL_LNK_STATUS | MMTYPELSB_CONFIRM: VSPLLinkStatusCnf
+	}
+
+	def _dissect(self, buf):
+		typeinfo_le = unpack_H_le(buf[1: 3])[0]
+		# logger.debug("Got type %X", typeinfo_le)
+		self._init_handler(typeinfo_le, buf[5:])
+		return 5
 
 	def _get_msgtype(self):
 		typetmp = self.typeinfo & MASK_MSGTYPE_LE
@@ -144,6 +360,7 @@ class Slac(Packet):
 		typetmp = unpack_H(pack_H_le(msgtype))[0]
 		self.typeinfo = typetmp & MASK_MSGTYPE_LE
 
+	# base message type
 	msgtype = property(_get_msgtype, _set_msgtype)
 
 	def _get_msgtype_s(self):

@@ -140,12 +140,27 @@ def configure_packet_header(t, hdrs, header_fmt):
 	# This way we get informed about get-access (needed to check for unpack)
 	# more efficiently than using __getattribute__ (slow access for header
 	# fields vs. slow access for ALL class members).
+	# every header field will get two additional values set:
+	# var_active = indicates if header is active
+	# var_format = indicates the header format
 	for hdr in hdrs:
-		# every header field will get two additional values set:
-		# var_active = indicates if header is active
-		# var_format = indicates the header format
+		# Sanity checks
 		if len(hdr) > 4:
-			logger.warning("field definition length > 4: %s has length %d", hdr[0], len(hdr))
+			logger.warning("Field definition length > 4: %s has length %d", hdr[0], len(hdr))
+
+		if hdr[1] is not None:
+			try:
+				struct.Struct(hdr[1])
+			except struct.error:
+				raise Exception("Invalid format specified in class %s for header '%s': '%s'" %
+					(t.__module__ + "." + t.__name__, hdr[0], hdr[1]))
+
+			if hdr[2] is not None:
+				try:
+					struct.Struct(hdr[1]).pack(hdr[2])
+				except struct.error:
+					raise Exception("Invalid value specified in class %s for header '%s' with format '%s': '%s'" %
+						(t.__module__ + "." + t.__name__, hdr[0], hdr[1], hdr[2]))
 
 		shadowed_name = "_%s" % hdr[0]
 		t._header_field_names.append(shadowed_name)
@@ -329,10 +344,9 @@ class MetaPacket(type):
 		# logger.debug("formatstring is: %s" % header_fmt)
 		# body as raw byte string (None if handler is present)
 		t._body_bytes = b""
-		# name of the attribute which holds the object representing the body aka the body handler
-		t._bodytypename = None
 		# next lower layer: a = b + c -> b will be lower layer for c
 		t._lower_layer = None
+		t._upper_layer = None
 		# track changes to header values: This is needed for layers like TCP for
 		# checksum-recalculation. Set to "True" on changes to header/body values, set to False on "bin()"
 		# track changes to header values
@@ -341,7 +355,6 @@ class MetaPacket(type):
 		t._body_changed = False
 		# objects which get notified on changes on header or body (shared)
 		# needs to be None do identify none-initialized variable
-		# TODO: use sets here
 		t._changelistener = None
 		# lazy handler data: [name, class, bytes]
 		t._lazy_handler_data = None

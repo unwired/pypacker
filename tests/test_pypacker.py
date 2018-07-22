@@ -105,7 +105,7 @@ class MyPacket(pypacker.Packet):
 
 
 class GeneralTestCase(unittest.TestCase):
-	def Xtest_onlybody(self):
+	def test_onlybody(self):
 		bts = b"abcd"
 		p = MyPacket(bts)
 		self.assertEqual(p.bin(), bts)
@@ -135,16 +135,16 @@ class GeneralTestCase(unittest.TestCase):
 		bts = get_pcap("tests/packets_ether.pcap")[13]
 		eth = ethernet.Ethernet(bts)
 		eth_src, eth_dst = eth.src_s, eth.dst_s
-		ip_src, ip_dst = eth.ip.src_s, eth.ip.dst_s
-		tcp_src, tcp_dst = eth.ip.tcp.sport, eth.ip.tcp.dport
+		ip_src, ip_dst = eth.upper_layer.src_s, eth.upper_layer.dst_s
+		tcp_src, tcp_dst = eth[tcp.TCP].sport, eth[tcp.TCP].dport
 		eth.reverse_all_address()
 
 		self.assertEqual(eth.src_s, eth_dst)
 		self.assertEqual(eth.dst_s, eth_src)
-		self.assertEqual(eth.ip.src_s, ip_dst)
-		self.assertEqual(eth.ip.dst_s, ip_src)
-		self.assertEqual(eth.ip.tcp.sport, tcp_dst)
-		self.assertEqual(eth.ip.tcp.dport, tcp_src)
+		self.assertEqual(eth.upper_layer.src_s, ip_dst)
+		self.assertEqual(eth.upper_layer.dst_s, ip_src)
+		self.assertEqual(eth[tcp.TCP].sport, tcp_dst)
+		self.assertEqual(eth[tcp.TCP].dport, tcp_src)
 
 	def test_lowest_layer(self):
 		print_header("Lowest layer")
@@ -190,9 +190,8 @@ class GeneralTestCase(unittest.TestCase):
 			print("%d = %d" % (len(bts), len(eth)))
 			self.assertEqual(len(bts), len(eth))
 
-	def test_repr(self):
-		# TODO: activate
-		print_header("__repr__")
+	def test_str(self):
+		print_header("__str__")
 		bts_list = get_pcap("tests/packets_ssl.pcap")
 
 		for bts in bts_list:
@@ -201,15 +200,17 @@ class GeneralTestCase(unittest.TestCase):
 
 		eth1 = ethernet.Ethernet(bts)
 		eth1[tcp.TCP].body_bytes = b"qwertz"
+		print("calling bin()")
 		eth1.bin()
 		tcp_sum_original = eth1[tcp.TCP].sum
 		eth1[tcp.TCP].body_bytes = b"asdfgh"
 		# ip checksum should be recalculated
-		tmp = "%r" % eth1
+		print("calling __str__")
+		tmp = "%s" % eth1
 		self.assertNotEqual(tcp_sum_original, eth1[tcp.TCP].sum)
 		# original checksum value should be calculated
 		eth1[tcp.TCP].body_bytes = b"qwertz"
-		tmp = "%r" % eth1
+		tmp = "%s" % eth1
 		self.assertEqual(tcp_sum_original, eth1[tcp.TCP].sum)
 
 	def test_headerupate(self):
@@ -221,9 +222,9 @@ class GeneralTestCase(unittest.TestCase):
 		# Must be same as A.bin() but we are testing...
 		for layer in layers:
 			layer.bin()
-		sum_ip = pkt1.ip.sum
-		sum_tcp = pkt1.ip.tcp.sum
-		dns1 = pkt1.ip.tcp.dns
+		sum_ip = pkt1.upper_layer.sum
+		sum_tcp = pkt1.upper_layer.upper_layer.sum
+		dns1 = pkt1.upper_layer.upper_layer.upper_layer
 		dns_amounts = dns1.questions_amount + dns1.answers_amount + dns1.authrr_amount + dns1.addrr_amount
 		self.assertEqual(dns_amounts, 0)
 		# change highest layer and check checksums
@@ -235,8 +236,8 @@ class GeneralTestCase(unittest.TestCase):
 		# writer = ppcap.Writer(filename="headerupdate.pcap")
 		bts1 = pkt1.bin()
 		# writer.write(bts1)
-		self.assertEqual(pkt1.ip.sum, 0x7A79)
-		self.assertEqual(pkt1.ip.tcp.sum, 0xA41E)
+		self.assertEqual(pkt1.upper_layer.sum, 0x7A79)
+		self.assertEqual(pkt1[tcp.TCP].sum, 0xA41E)
 		self.assertEqual(dns1.questions_amount, 1)
 		self.assertEqual(dns1.answers_amount, 1)
 		self.assertEqual(dns1.authrr_amount, 1)
@@ -248,8 +249,8 @@ class GeneralTestCase(unittest.TestCase):
 		bts1 = pkt1.bin()
 		# writer.write(bts1)
 		# original state restored -> same checksum and auto-update values as before
-		self.assertEqual(pkt1.ip.sum, sum_ip)
-		self.assertEqual(pkt1.ip.tcp.sum, sum_tcp)
+		self.assertEqual(pkt1[ip.IP].sum, sum_ip)
+		self.assertEqual(pkt1[tcp.TCP].sum, sum_tcp)
 		self.assertEqual(dns1.questions_amount, 0)
 		self.assertEqual(dns1.answers_amount, 0)
 		self.assertEqual(dns1.authrr_amount, 0)
@@ -290,7 +291,7 @@ class GeneralTestCase(unittest.TestCase):
 		# ip not present until accessing
 		self.assertRaises(AttributeError, getattr_ip)
 
-		ip1 = eth.ip
+		ip1 = eth.upper_layer
 
 		print(">>> checking status")
 		self.assertIsNone(eth._body_bytes)
@@ -300,7 +301,7 @@ class GeneralTestCase(unittest.TestCase):
 		self.assertIsNotNone(ip1._lazy_handler_data)
 
 		print(">>> getting tcp")
-		tcp1 = eth.ip.tcp
+		tcp1 = eth.upper_layer.upper_layer
 
 		print("getting opts")
 		opts = tcp1.opts
@@ -333,7 +334,7 @@ class GeneralTestCase(unittest.TestCase):
 		# print(pkt)
 		pkt_bts = pkt.bin()
 		pkt_re = ethernet.Ethernet(pkt_bts)
-		ipopts_re = pkt_re.ip.opts
+		ipopts_re = pkt_re.upper_layer.opts
 
 		for idx, ipopt_new in enumerate(ipopts_re):
 			print(ipopt_new)
@@ -351,7 +352,7 @@ class GeneralTestCase(unittest.TestCase):
 		self.assertIsNone(pkt_tcp)
 
 		pkt1 = ethernet.Ethernet(pkt1_bts)
-		pkt_tcp = pkt1.ip.tcp
+		pkt_tcp = pkt1[tcp.TCP]
 		print("TCP for dissectfail #2: %r" % pkt_tcp)
 		self.assertIsNone(pkt_tcp)
 
@@ -361,7 +362,7 @@ class GeneralTestCase(unittest.TestCase):
 		self.assertRaises(Exception, lambda: pkt1.ip.tcp)
 
 		ip_bytes_orig = pkt1_bts[-len(tcp_bytes_fail):]
-		ip_bytes = pkt1.ip.body_bytes
+		ip_bytes = pkt1.upper_layer.body_bytes
 		self.assertEqual(ip_bytes, ip_bytes_orig)
 
 	def test_handlerid_update(self):
@@ -424,6 +425,15 @@ class GeneralTestCase(unittest.TestCase):
 		pkt1_none = pkt1[ethernet.Ethernet, ip.IP, tcp.TCP, telnet.Telnet]
 		self.assertEqual(pkt1_none, None)
 
+	def test_output(self):
+		pkt = ethernet.Ethernet() + ip.IP() + tcp.TCP()
+		ipopt = ip.IPOptMulti()
+		pkt.upper_layer.ttl = None
+		pkt.upper_layer.opts.append(ipopt)
+		pkt.upper_layer.opts.append(b"XXXX")
+		pkt.upper_layer.opts.append(("A", b"dsfdsf"))
+		print(pkt)
+
 
 class PacketDumpTestCase(unittest.TestCase):
 	def test_exdump(self):
@@ -451,8 +461,8 @@ class EthTestCase(unittest.TestCase):
 		eth2 = ethernet.Ethernet(s)
 		# parsing
 		self.assertEqual(eth2.bin(), s)
-		self.assertEqual(type(eth2.ip).__name__, "IP")
-		print("Ethernet with IP: %s -> %s" % (eth2.ip.src, eth2.ip.dst))
+		self.assertEqual(type(eth2.upper_layer).__name__, "IP")
+		print("Ethernet with IP: %s -> %s" % (eth2.upper_layer.src, eth2.upper_layer.dst))
 		# reconstruate macs
 		eth1.src = b"\x52\x54\x00\x12\x35\x02"
 		eth1.dst = b"\x08\x00\x27\xa9\x93\x9e"
@@ -483,7 +493,7 @@ class EthTestCase(unittest.TestCase):
 		self.assertEqual(eth1.vlan[0].prio, 0)
 		self.assertEqual(eth1.vlan[0].cfi, 0)
 		self.assertEqual(eth1.vlan[0].vid, 5)
-		self.assertEqual(type(eth1.arp).__name__, "ARP")
+		self.assertEqual(type(eth1.upper_layer).__name__, "ARP")
 
 		# Ethernet + QinQ(double tags, type 0x8100 ) + IP
 		# Outer tag: type=0x81A8, prio=1, cfi=1, vid=5
@@ -506,7 +516,7 @@ class EthTestCase(unittest.TestCase):
 		self.assertEqual(eth1.vlan[1].prio, 2)
 		self.assertEqual(eth1.vlan[1].cfi, 0)
 		self.assertEqual(eth1.vlan[1].vid, 99)
-		self.assertEqual(type(eth1.ip).__name__, "IP")
+		self.assertEqual(type(eth1.upper_layer).__name__, "IP")
 
 		# Ethernet + QinQ(double tags, type 0x9100 ) + IP
 		# Outer tag: type=0x8100, prio=7, cfi=1, vid=4000
@@ -529,7 +539,7 @@ class EthTestCase(unittest.TestCase):
 		self.assertEqual(eth1.vlan[1].prio, 0)
 		self.assertEqual(eth1.vlan[1].cfi, 0)
 		self.assertEqual(eth1.vlan[1].vid, 1)
-		self.assertEqual(type(eth1.ip).__name__, "IP")
+		self.assertEqual(type(eth1.upper_layer).__name__, "IP")
 
 
 class AOETestCase(unittest.TestCase):
@@ -553,10 +563,10 @@ class LinuxCookedCapture(unittest.TestCase):
 
 		lcc1 = linuxcc.LinuxCC(bts[0])
 		self.assertEqual(lcc1.dir, linuxcc.PACKET_DIR_FROM_US)
-		self.assertEqual(lcc1.ip.src_s, "10.50.247.1")
-		self.assertEqual(lcc1.ip.dst_s, "91.240.77.140")
-		self.assertEqual(lcc1.ip.tcp.sport, 56060)
-		self.assertEqual(lcc1.ip.tcp.dport, 80)
+		self.assertEqual(lcc1.upper_layer.src_s, "10.50.247.1")
+		self.assertEqual(lcc1.upper_layer.dst_s, "91.240.77.140")
+		self.assertEqual(lcc1.upper_layer.upper_layer.sport, 56060)
+		self.assertEqual(lcc1.upper_layer.upper_layer.dport, 80)
 		lcc2 = linuxcc.LinuxCC(bts[2])
 		self.assertEqual(lcc2.dir, linuxcc.PACKET_DIR_TO_US)
 
@@ -588,19 +598,19 @@ class CANTestCase(unittest.TestCase):
 
 		# UDS packet
 		print("1: %r" % can_pkts[0])
-		self.assertEqual(can_pkts[0].isotpsingleframe.dl, 2)
-		self.assertEqual(can_pkts[0].isotpsingleframe.uds.bin()[: 2], b"\x10\x01")
+		self.assertEqual(can_pkts[0].upper_layer.dl, 2)
+		self.assertEqual(can_pkts[0].upper_layer.upper_layer.bin()[: 2], b"\x10\x01")
 
 		# UDS packet
 		print("2: %r" % can_pkts[1])
-		self.assertEqual(can_pkts[1].isotpsingleframe.dl, 0)
+		self.assertEqual(can_pkts[1].upper_layer.dl, 0)
 
 		# OBD2 packet
 		print("3: %r" % can_pkts[2])
-		self.assertEqual(can_pkts[2].isotpfirstframe.dl, 0x40)
-		self.assertEqual(can_pkts[2].isotpfirstframe.obd2.mode, 0x01)
-		self.assertEqual(can_pkts[2].isotpfirstframe.obd2.pid, 0x04)
-		self.assertEqual(can_pkts[2].isotpfirstframe.obd2.bin(), b"\x01\x04\x00\x00\x00\x00")
+		self.assertEqual(can_pkts[2].upper_layer.dl, 0x40)
+		self.assertEqual(can_pkts[2].upper_layer.upper_layer.mode, 0x01)
+		self.assertEqual(can_pkts[2].upper_layer.upper_layer.pid, 0x04)
+		self.assertEqual(can_pkts[2].upper_layer.upper_layer.bin(), b"\x01\x04\x00\x00\x00\x00")
 
 		can_pkts[0].id = 0x123
 		can_pkts[0].bin()
@@ -902,13 +912,13 @@ class IP6TestCase(unittest.TestCase):
 
 		pkt_eth_ip_tcp = ethernet.Ethernet() + ip6.IP6() + tcp.TCP()
 		pkt_eth_ip_tcp.bin()
-		ip6len_real = len(pkt_eth_ip_tcp.ip6.opts.bin()) + len(pkt_eth_ip_tcp.ip6.tcp.bin())
+		ip6len_real = len(pkt_eth_ip_tcp.upper_layer.opts.bin()) + len(pkt_eth_ip_tcp[tcp.TCP].bin())
 		# length should be updated
-		self.assertEqual(pkt_eth_ip_tcp.ip6.dlen, ip6len_real)
+		self.assertEqual(pkt_eth_ip_tcp.upper_layer.dlen, ip6len_real)
 		# header type should be updated
-		self.assertEqual(pkt_eth_ip_tcp.ip6.nxt,
-			pypacker.Packet.get_id_for_handlerclass(pkt_eth_ip_tcp.ip6.__class__,
-				pkt_eth_ip_tcp.ip6.tcp.__class__))
+		self.assertEqual(pkt_eth_ip_tcp.upper_layer.nxt,
+			pypacker.Packet.get_id_for_handlerclass(pkt_eth_ip_tcp.upper_layer.__class__,
+				pkt_eth_ip_tcp[tcp.TCP].__class__))
 
 
 class ChecksumTestCase(unittest.TestCase):
@@ -1023,9 +1033,9 @@ class HTTPTestCase(unittest.TestCase):
 		      b'\x0e\xcffF\xf8\x07\xb5r8\x15Cy\n\'[\xab\xe07jU^;I\x9c\xd6\xe3\x134?\x91\x93S7\xfb\x0f\xf3'\
 		      b'\'\x1e\xa4j\x16\r\n--aAbBcCdDv1234567890VxXyYzZ--'
 		eth = ethernet.Ethernet(raw)
-		pkt_ip = eth.ip
-		pkt_tcp = pkt_ip.tcp
-		pkt_http = pkt_tcp.http
+		pkt_ip = eth.upper_layer
+		pkt_tcp = pkt_ip.upper_layer
+		pkt_http = pkt_tcp.upper_layer
 
 
 class AccessConcatTestCase(unittest.TestCase):
@@ -1208,7 +1218,7 @@ class ICMPTestCase(unittest.TestCase):
 		# checksum handling
 		print("sum 1: %d" % icmp1.sum)  # 0xEC66 = 22213
 		self.assertEqual(icmp1.sum, 0x425c)
-		self.assertEqual(icmp1.echo.seq, 2304)
+		self.assertEqual(icmp1.upper_layer.seq, 2304)
 		print("code 1: %d" % icmp1.code)
 		icmp1.code = 123
 		print("code 2: %d" % icmp1.code)
@@ -1235,9 +1245,9 @@ class ICMP6TestCase(unittest.TestCase):
 			eth1.dissect_full()
 			self.assertEqual(bts, eth1.bin())
 
-			eth1.ip6.src = eth1.ip6.src
+			eth1.upper_layer.src = eth1.upper_layer.src
 			if cnt > 0:
-				self.assertEqual(eth1.ip6.src, eth1.ip6.dst)
+				self.assertEqual(eth1.upper_layer.src, eth1.upper_layer.dst)
 
 			self.assertEqual(bts, eth1.bin())
 
@@ -1992,7 +2002,7 @@ class IEEE80211TestCase(unittest.TestCase):
 		self.assertEqual(ieee.protected, 0)
 		self.assertEqual(ieee.order, 0)
 		# print(ieee)
-		self.assertEqual(ieee.ack.dst, b"\x00\xa0\x0b\x21\x37\x84")
+		self.assertEqual(ieee.upper_layer.dst, b"\x00\xa0\x0b\x21\x37\x84")
 
 	def test_beacon(self):
 		print_header("Beacon")
@@ -2034,12 +2044,12 @@ class IEEE80211TestCase(unittest.TestCase):
 		self.assertEqual(ieee.type, ieee80211.DATA_TYPE)
 		self.assertEqual(ieee.subtype, ieee80211.D_NORMAL)
 		self.assertEqual(ieee.protected, 1)
-		self.assertEqual(ieee.dataframe.dst, b"\x01\x00\x5e\x7f\xff\xfa")
-		self.assertEqual(ieee.dataframe.src, b"\x00\x1e\xe5\xe0\x8c\x06")
-		self.assertEqual(ieee.dataframe.bssid, b"\x00\x22\x3f\x89\x0d\xd4")
-		self.assertEqual(ieee.dataframe.seq_frag, 0x501e)
-		print(ieee.dataframe.body_bytes)
-		self.assertEqual(ieee.dataframe.body_bytes,
+		self.assertEqual(ieee.upper_layer.dst, b"\x01\x00\x5e\x7f\xff\xfa")
+		self.assertEqual(ieee.upper_layer.src, b"\x00\x1e\xe5\xe0\x8c\x06")
+		self.assertEqual(ieee.upper_layer.bssid, b"\x00\x22\x3f\x89\x0d\xd4")
+		self.assertEqual(ieee.upper_layer.seq_frag, 0x501e)
+		print(ieee.upper_layer.body_bytes)
+		self.assertEqual(ieee.upper_layer.body_bytes,
 			b"\x62\x22\x39\x61\x98\xd1\xff\x34" +
 			b"\x65\xab\xc1\x3c\x8e\xcb\xec\xef\xef\xf6\x25\xab\xe5\x89\x86\xdf\x74\x19\xb0" +
 			b"\xa4\x86\xc2\xdb\x38\x20\x59\x08\x1f\x04\x1b\x96\x6b\x01\xd7\x6a\x85\x73\xf5" +
@@ -2069,12 +2079,12 @@ class IEEE80211TestCase(unittest.TestCase):
 		self.assertEqual(ieee.bin(), self.packet_bytes[3][rlen:])
 		self.assertEqual(ieee.type, ieee80211.DATA_TYPE)
 		self.assertEqual(ieee.subtype, ieee80211.D_QOS_DATA)
-		self.assertEqual(ieee.dataframe.bssid, b"\x24\x65\x11\x85\xe9\xae")
-		self.assertEqual(ieee.dataframe.src, b"\x00\xa0\x0b\x21\x37\x84")
-		self.assertEqual(ieee.dataframe.dst, b"\x24\x65\x11\x85\xe9\xac")
-		self.assertEqual(ieee.dataframe.seq_frag, 0xd008)
-		print(ieee.dataframe.body_bytes)
-		self.assertEqual(ieee.dataframe.body_bytes,
+		self.assertEqual(ieee.upper_layer.bssid, b"\x24\x65\x11\x85\xe9\xae")
+		self.assertEqual(ieee.upper_layer.src, b"\x00\xa0\x0b\x21\x37\x84")
+		self.assertEqual(ieee.upper_layer.dst, b"\x24\x65\x11\x85\xe9\xac")
+		self.assertEqual(ieee.upper_layer.seq_frag, 0xd008)
+		print(ieee.upper_layer.body_bytes)
+		self.assertEqual(ieee.upper_layer.body_bytes,
 			b"\xaa\xaa\x03\x00\x00\x00\x08\x06\x00\x01" +
 			b"\x08\x00\x06\x04\x00\x01\x00\xa0\x0b\x21\x37\x84\xc0\xa8\xb2\x16\x00\x00\x00\x00" +
 			b"\x00\x00\xc0\xa8\xb2\x01")
@@ -2186,14 +2196,14 @@ class SSLTestCase(unittest.TestCase):
 
 		# search first segment of SSL Hello containing certs
 		for bts in packet_bytes_iter:
-			print("=" * 100)
+			#print("=" * 100)
 			eth1 = ethernet.Ethernet(bts)
 			ssl1 = eth1[ssl.SSL]
-			print("checking for cert: %r" % ssl1)
+			#print("checking for cert: %r" % ssl1)
 			cert_length = ssl1.get_cert_length()
 
 			if ssl1 is not None and cert_length > 0:
-				first_segment = eth1.ip.tcp
+				first_segment = eth1.upper_layer.upper_layer
 				print("certificate length: %d" % ssl1.get_cert_length())
 				break
 
@@ -2205,7 +2215,7 @@ class SSLTestCase(unittest.TestCase):
 
 			if eth1[tcp.TCP] is None:
 				continue
-			assembled, final = first_segment.ra_collect(eth1.ip.tcp)
+			assembled, final = first_segment.ra_collect(eth1[tcp.TCP])
 			assembled_cnt += assembled
 
 			if assembled_cnt >= cert_length:
@@ -2220,8 +2230,8 @@ class SSLTestCase(unittest.TestCase):
 		# for rec in ssl_certs.records:
 		#	print("%r" % rec)
 
-		self.assertEqual(ssl_certs.records[1].handshake.type, ssl.HNDS_CERTIFICATE)
-		certs = ssl_certs.records[1].handshake.extract_certificates()
+		self.assertEqual(ssl_certs.records[1].upper_layer.type, ssl.HNDS_CERTIFICATE)
+		certs = ssl_certs.records[1].upper_layer.extract_certificates()
 		self.assertEqual(len(certs), 3)
 		self.assertEqual(len(certs[0]), 1934)
 		self.assertEqual(len(certs[1]), 1068)
@@ -2376,23 +2386,23 @@ class FlowControlTestCase(unittest.TestCase):
 		# parsing
 		self.assertEqual(pkt.bin(), raw_pkt)
 		self.assertEqual(pkt.opcode, flow_control.PFC_OPCODE)
-		self.assertEqual(type(pkt.pfc).__name__, "PFC")
-		self.assertEqual(pkt.pfc.ms, 0)
-		self.assertEqual(pkt.pfc.ls, 221)
-		self.assertEqual(type(pkt.pfc.time).__name__, "TriggerList")
-		self.assertEqual(pkt.pfc.time, bytes_time_list)
-		self.assertEqual(pkt.pfc.ls_list, [1, 1, 0, 1, 1, 1, 0, 1])
-		self.assertEqual(pkt.pfc.time_list, [0, 1, 0, 20, 3, 40, 3, 500])
+		self.assertEqual(type(pkt.upper_layer).__name__, "PFC")
+		self.assertEqual(pkt.upper_layer.ms, 0)
+		self.assertEqual(pkt.upper_layer.ls, 221)
+		self.assertEqual(type(pkt.upper_layer.time).__name__, "TriggerList")
+		self.assertEqual(pkt.upper_layer.time, bytes_time_list)
+		self.assertEqual(pkt.upper_layer.ls_list, [1, 1, 0, 1, 1, 1, 0, 1])
+		self.assertEqual(pkt.upper_layer.time_list, [0, 1, 0, 20, 3, 40, 3, 500])
 		# update ls and time fields via list
-		pkt.pfc.ls_list = [1, 1, 1, 0, 1, 1, 1, 0]
-		self.assertEqual(pkt.pfc.ls_list, [1, 1, 1, 0, 1, 1, 1, 0])
-		self.assertEqual(pkt.pfc.ls, 238)
+		pkt.upper_layer.ls_list = [1, 1, 1, 0, 1, 1, 1, 0]
+		self.assertEqual(pkt.upper_layer.ls_list, [1, 1, 1, 0, 1, 1, 1, 0])
+		self.assertEqual(pkt.upper_layer.ls, 238)
 		time_list = [10, 20, 1, 2, 3, 100, 255, 65535]
 		raw_time_list = [b'\x00\n', b'\x00\x14', b'\x00\x01', b'\x00\x02', b'\x00\x03', b'\x00d', b'\x00\xff',
 			b'\xff\xff']
-		pkt.pfc.time_list = time_list
-		self.assertEqual(pkt.pfc.time_list, time_list)
-		self.assertEqual(pkt.pfc.time, raw_time_list)
+		pkt.upper_layer.time_list = time_list
+		self.assertEqual(pkt.upper_layer.time_list, time_list)
+		self.assertEqual(pkt.upper_layer.time, raw_time_list)
 
 	def test_pause(self):
 		print_header("FLOW CONTROL PAUSE")
@@ -2403,8 +2413,8 @@ class FlowControlTestCase(unittest.TestCase):
 		self.assertEqual(pkt.bin(), raw_pkt)
 		self.assertEqual(pkt.dst_s, "01:80:C2:00:00:01")
 		self.assertEqual(pkt[flow_control.FlowControl].opcode, flow_control.PAUSE_OPCODE)
-		self.assertEqual(type(pkt[flow_control.FlowControl].pause).__name__, "Pause")
-		self.assertEqual(pkt[flow_control.FlowControl].pause.ptime, 3)
+		self.assertEqual(type(pkt[flow_control.FlowControl].upper_layer).__name__, "Pause")
+		self.assertEqual(pkt[flow_control.FlowControl].upper_layer.ptime, 3)
 
 
 class LLDPTestCase(unittest.TestCase):
@@ -2415,56 +2425,56 @@ class LLDPTestCase(unittest.TestCase):
 		# parsing
 		self.assertEqual(pkt.bin(), raw_pkt)
 		self.assertEqual(pkt.type, ethernet.ETH_TYPE_LLDP)
-		self.assertEqual(type(pkt.lldp).__name__, "LLDP")
-		self.assertEqual(type(pkt.lldp.tlvlist).__name__, "TriggerList")
-		self.assertEqual(len(pkt.lldp.tlvlist), 17)
+		self.assertEqual(type(pkt.upper_layer).__name__, "LLDP")
+		self.assertEqual(type(pkt.upper_layer.tlvlist).__name__, "TriggerList")
+		self.assertEqual(len(pkt.upper_layer.tlvlist), 17)
 		# check standard TLVs class
-		self.assertEqual(type(pkt.lldp.tlvlist[0]).__name__, "LLDPChassisId")
-		self.assertEqual(pkt.lldp.tlvlist[0].tlv_type, 1)
-		tlv_value_len = len(pkt.lldp.tlvlist[0].value) + 1
-		self.assertEqual(pkt.lldp.tlvlist[0].tlv_len, tlv_value_len)
-		self.assertEqual(pkt.lldp.tlvlist[0].subtype, 4)
-		self.assertEqual(pkt.lldp.tlvlist[0].value_s, "00:01:30:F9:AD:A0")
-		self.assertEqual(type(pkt.lldp.tlvlist[1]).__name__, "LLDPPortId")
-		self.assertEqual(pkt.lldp.tlvlist[1].tlv_type, 2)
-		tlv_value_len = len(pkt.lldp.tlvlist[1].value) + 1
-		self.assertEqual(pkt.lldp.tlvlist[1].tlv_len, tlv_value_len)
-		self.assertEqual(pkt.lldp.tlvlist[1].subtype, 5)
-		self.assertEqual(pkt.lldp.tlvlist[1].value_s, b"1/1")
-		self.assertEqual(type(pkt.lldp.tlvlist[2]).__name__, "LLDPTTL")
-		self.assertEqual(pkt.lldp.tlvlist[2].tlv_type, 3)
-		self.assertEqual(pkt.lldp.tlvlist[2].seconds, 120)
-		self.assertEqual(type(pkt.lldp.tlvlist[3]).__name__, "LLDPPortDescription")
-		self.assertEqual(pkt.lldp.tlvlist[3].tlv_type, 4)
-		tlv_value_len = len(pkt.lldp.tlvlist[3].value)
-		self.assertEqual(pkt.lldp.tlvlist[3].tlv_len, tlv_value_len)
-		self.assertEqual(type(pkt.lldp.tlvlist[4]).__name__, "LLDPSystemName")
-		self.assertEqual(pkt.lldp.tlvlist[4].tlv_type, 5)
-		tlv_value_len = len(pkt.lldp.tlvlist[4].value)
-		self.assertEqual(pkt.lldp.tlvlist[4].tlv_len, tlv_value_len)
-		self.assertEqual(type(pkt.lldp.tlvlist[5]).__name__, "LLDPSystemDescription")
-		self.assertEqual(pkt.lldp.tlvlist[5].tlv_type, 6)
-		tlv_value_len = len(pkt.lldp.tlvlist[5].value)
-		self.assertEqual(pkt.lldp.tlvlist[5].tlv_len, tlv_value_len)
-		self.assertEqual(type(pkt.lldp.tlvlist[6]).__name__, "LLDPSystemCapabilities")
-		self.assertEqual(pkt.lldp.tlvlist[6].tlv_type, 7)
-		self.assertEqual(pkt.lldp.tlvlist[6].tlv_len, 4)
-		self.assertEqual(pkt.lldp.tlvlist[6].capabilities, 20)
-		self.assertEqual(pkt.lldp.tlvlist[6].enabled, 20)
-		self.assertEqual(type(pkt.lldp.tlvlist[7]).__name__, "LLDPManagementAddress")
-		self.assertEqual(pkt.lldp.tlvlist[7].tlv_type, 8)
-		tlv_len = len(pkt.lldp.tlvlist[7].bin())
-		self.assertEqual(pkt.lldp.tlvlist[7].tlv_len, tlv_len - 2)
-		self.assertEqual(pkt.lldp.tlvlist[7].addrlen, 7)
-		self.assertEqual(pkt.lldp.tlvlist[7].addrsubtype, 6)
-		self.assertEqual(pkt.lldp.tlvlist[7].addrval_s, "00:01:30:F9:AD:A0")
-		self.assertEqual(pkt.lldp.tlvlist[7].ifsubtype, 2)
-		self.assertEqual(pkt.lldp.tlvlist[7].ifnumber, 1001)
-		self.assertEqual(pkt.lldp.tlvlist[7].oidlen, 0)
-		self.assertEqual(pkt.lldp.tlvlist[7].oid, b"")
-		self.assertEqual(type(pkt.lldp.tlvlist[-1]).__name__, "LLDPDUEnd")
-		self.assertEqual(pkt.lldp.tlvlist[-1].tlv_type, 0)
-		self.assertEqual(pkt.lldp.tlvlist[-1].tlv_len, 0)
+		self.assertEqual(type(pkt.upper_layer.tlvlist[0]).__name__, "LLDPChassisId")
+		self.assertEqual(pkt.upper_layer.tlvlist[0].tlv_type, 1)
+		tlv_value_len = len(pkt.upper_layer.tlvlist[0].value) + 1
+		self.assertEqual(pkt.upper_layer.tlvlist[0].tlv_len, tlv_value_len)
+		self.assertEqual(pkt.upper_layer.tlvlist[0].subtype, 4)
+		self.assertEqual(pkt.upper_layer.tlvlist[0].value_s, "00:01:30:F9:AD:A0")
+		self.assertEqual(type(pkt.upper_layer.tlvlist[1]).__name__, "LLDPPortId")
+		self.assertEqual(pkt.upper_layer.tlvlist[1].tlv_type, 2)
+		tlv_value_len = len(pkt.upper_layer.tlvlist[1].value) + 1
+		self.assertEqual(pkt.upper_layer.tlvlist[1].tlv_len, tlv_value_len)
+		self.assertEqual(pkt.upper_layer.tlvlist[1].subtype, 5)
+		self.assertEqual(pkt.upper_layer.tlvlist[1].value_s, b"1/1")
+		self.assertEqual(type(pkt.upper_layer.tlvlist[2]).__name__, "LLDPTTL")
+		self.assertEqual(pkt.upper_layer.tlvlist[2].tlv_type, 3)
+		self.assertEqual(pkt.upper_layer.tlvlist[2].seconds, 120)
+		self.assertEqual(type(pkt.upper_layer.tlvlist[3]).__name__, "LLDPPortDescription")
+		self.assertEqual(pkt.upper_layer.tlvlist[3].tlv_type, 4)
+		tlv_value_len = len(pkt.upper_layer.tlvlist[3].value)
+		self.assertEqual(pkt.upper_layer.tlvlist[3].tlv_len, tlv_value_len)
+		self.assertEqual(type(pkt.upper_layer.tlvlist[4]).__name__, "LLDPSystemName")
+		self.assertEqual(pkt.upper_layer.tlvlist[4].tlv_type, 5)
+		tlv_value_len = len(pkt.upper_layer.tlvlist[4].value)
+		self.assertEqual(pkt.upper_layer.tlvlist[4].tlv_len, tlv_value_len)
+		self.assertEqual(type(pkt.upper_layer.tlvlist[5]).__name__, "LLDPSystemDescription")
+		self.assertEqual(pkt.upper_layer.tlvlist[5].tlv_type, 6)
+		tlv_value_len = len(pkt.upper_layer.tlvlist[5].value)
+		self.assertEqual(pkt.upper_layer.tlvlist[5].tlv_len, tlv_value_len)
+		self.assertEqual(type(pkt.upper_layer.tlvlist[6]).__name__, "LLDPSystemCapabilities")
+		self.assertEqual(pkt.upper_layer.tlvlist[6].tlv_type, 7)
+		self.assertEqual(pkt.upper_layer.tlvlist[6].tlv_len, 4)
+		self.assertEqual(pkt.upper_layer.tlvlist[6].capabilities, 20)
+		self.assertEqual(pkt.upper_layer.tlvlist[6].enabled, 20)
+		self.assertEqual(type(pkt.upper_layer.tlvlist[7]).__name__, "LLDPManagementAddress")
+		self.assertEqual(pkt.upper_layer.tlvlist[7].tlv_type, 8)
+		tlv_len = len(pkt.upper_layer.tlvlist[7].bin())
+		self.assertEqual(pkt.upper_layer.tlvlist[7].tlv_len, tlv_len - 2)
+		self.assertEqual(pkt.upper_layer.tlvlist[7].addrlen, 7)
+		self.assertEqual(pkt.upper_layer.tlvlist[7].addrsubtype, 6)
+		self.assertEqual(pkt.upper_layer.tlvlist[7].addrval_s, "00:01:30:F9:AD:A0")
+		self.assertEqual(pkt.upper_layer.tlvlist[7].ifsubtype, 2)
+		self.assertEqual(pkt.upper_layer.tlvlist[7].ifnumber, 1001)
+		self.assertEqual(pkt.upper_layer.tlvlist[7].oidlen, 0)
+		self.assertEqual(pkt.upper_layer.tlvlist[7].oid, b"")
+		self.assertEqual(type(pkt.upper_layer.tlvlist[-1]).__name__, "LLDPDUEnd")
+		self.assertEqual(pkt.upper_layer.tlvlist[-1].tlv_type, 0)
+		self.assertEqual(pkt.upper_layer.tlvlist[-1].tlv_len, 0)
 
 
 class SlacTestCase(unittest.TestCase):
@@ -2538,37 +2548,37 @@ class LACPTestCase(unittest.TestCase):
 		self.assertEqual(pkt.bin(), raw_pkt)
 		self.assertEqual(pkt.type, ethernet.ETH_TYPE_SP)
 		self.assertEqual(pkt.dst_s, "01:80:C2:00:00:02")
-		self.assertEqual(type(pkt.lacp).__name__, "LACP")
-		self.assertEqual(pkt.lacp.subtype, 1)
-		self.assertEqual(pkt.lacp.version, 1)
-		self.assertEqual(type(pkt.lacp.tlvlist).__name__, "TriggerList")
-		self.assertEqual(len(pkt.lacp.tlvlist), 5)
-		self.assertEqual(type(pkt.lacp.tlvlist[0]).__name__, "LACPActorInfoTlv")
-		self.assertEqual(pkt.lacp.tlvlist[0].type, 1)
-		self.assertEqual(pkt.lacp.tlvlist[0].len, 20)
-		self.assertEqual(pkt.lacp.tlvlist[0].sys_s, pkt.src_s)
-		self.assertEqual(pkt.lacp.tlvlist[0].reserved, b"\x00" * 3)
-		self.assertEqual(pkt.lacp.tlvlist[0].expired, 0)
-		self.assertEqual(pkt.lacp.tlvlist[0].defaulted, 1)
-		self.assertEqual(pkt.lacp.tlvlist[0].distribute, 0)
-		self.assertEqual(pkt.lacp.tlvlist[0].collect, 0)
-		self.assertEqual(pkt.lacp.tlvlist[0].synch, 0)
-		self.assertEqual(pkt.lacp.tlvlist[0].aggregate, 1)
-		self.assertEqual(pkt.lacp.tlvlist[0].timeout, 1)
-		self.assertEqual(pkt.lacp.tlvlist[0].activity, 1)
-		self.assertEqual(type(pkt.lacp.tlvlist[1]).__name__, "LACPPartnerInfoTlv")
-		self.assertEqual(pkt.lacp.tlvlist[1].type, 2)
-		self.assertEqual(pkt.lacp.tlvlist[1].len, 20)
-		self.assertEqual(pkt.lacp.tlvlist[1].reserved, b"\x00" * 3)
-		self.assertEqual(type(pkt.lacp.tlvlist[2]).__name__, "LACPCollectorInfoTlv")
-		self.assertEqual(pkt.lacp.tlvlist[2].type, 3)
-		self.assertEqual(pkt.lacp.tlvlist[2].len, 16)
-		self.assertEqual(pkt.lacp.tlvlist[2].reserved, b"\x00" * 12)
-		self.assertEqual(type(pkt.lacp.tlvlist[3]).__name__, "LACPTerminatorTlv")
-		self.assertEqual(pkt.lacp.tlvlist[3].type, 0)
-		self.assertEqual(pkt.lacp.tlvlist[3].len, 0)
-		self.assertEqual(type(pkt.lacp.tlvlist[4]).__name__, "LACPReserved")
-		self.assertEqual(pkt.lacp.tlvlist[4].reserved, b"\x00" * 50)
+		self.assertEqual(type(pkt.upper_layer).__name__, "LACP")
+		self.assertEqual(pkt.upper_layer.subtype, 1)
+		self.assertEqual(pkt.upper_layer.version, 1)
+		self.assertEqual(type(pkt.upper_layer.tlvlist).__name__, "TriggerList")
+		self.assertEqual(len(pkt.upper_layer.tlvlist), 5)
+		self.assertEqual(type(pkt.upper_layer.tlvlist[0]).__name__, "LACPActorInfoTlv")
+		self.assertEqual(pkt.upper_layer.tlvlist[0].type, 1)
+		self.assertEqual(pkt.upper_layer.tlvlist[0].len, 20)
+		self.assertEqual(pkt.upper_layer.tlvlist[0].sys_s, pkt.src_s)
+		self.assertEqual(pkt.upper_layer.tlvlist[0].reserved, b"\x00" * 3)
+		self.assertEqual(pkt.upper_layer.tlvlist[0].expired, 0)
+		self.assertEqual(pkt.upper_layer.tlvlist[0].defaulted, 1)
+		self.assertEqual(pkt.upper_layer.tlvlist[0].distribute, 0)
+		self.assertEqual(pkt.upper_layer.tlvlist[0].collect, 0)
+		self.assertEqual(pkt.upper_layer.tlvlist[0].synch, 0)
+		self.assertEqual(pkt.upper_layer.tlvlist[0].aggregate, 1)
+		self.assertEqual(pkt.upper_layer.tlvlist[0].timeout, 1)
+		self.assertEqual(pkt.upper_layer.tlvlist[0].activity, 1)
+		self.assertEqual(type(pkt.upper_layer.tlvlist[1]).__name__, "LACPPartnerInfoTlv")
+		self.assertEqual(pkt.upper_layer.tlvlist[1].type, 2)
+		self.assertEqual(pkt.upper_layer.tlvlist[1].len, 20)
+		self.assertEqual(pkt.upper_layer.tlvlist[1].reserved, b"\x00" * 3)
+		self.assertEqual(type(pkt.upper_layer.tlvlist[2]).__name__, "LACPCollectorInfoTlv")
+		self.assertEqual(pkt.upper_layer.tlvlist[2].type, 3)
+		self.assertEqual(pkt.upper_layer.tlvlist[2].len, 16)
+		self.assertEqual(pkt.upper_layer.tlvlist[2].reserved, b"\x00" * 12)
+		self.assertEqual(type(pkt.upper_layer.tlvlist[3]).__name__, "LACPTerminatorTlv")
+		self.assertEqual(pkt.upper_layer.tlvlist[3].type, 0)
+		self.assertEqual(pkt.upper_layer.tlvlist[3].len, 0)
+		self.assertEqual(type(pkt.upper_layer.tlvlist[4]).__name__, "LACPReserved")
+		self.assertEqual(pkt.upper_layer.tlvlist[4].reserved, b"\x00" * 50)
 
 
 class StateMachineTestCase(unittest.TestCase):
@@ -2616,7 +2626,7 @@ class ReassembleTestCase(unittest.TestCase):
 		print_header("Reassemble")
 		bts_l = get_pcap("tests/packets_ssl2_certs.pcap")
 		pkts = [ethernet.Ethernet(bts) for bts in bts_l]
-		pkts_tcp = [pkt.ip.tcp for pkt in pkts]
+		pkts_tcp = [pkt.upper_layer.upper_layer for pkt in pkts]
 		print("tcp packets: %d" % len(pkts_tcp))
 
 		for pkt in pkts_tcp:

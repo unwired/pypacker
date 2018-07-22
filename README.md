@@ -21,15 +21,33 @@ Create Packets giving specific values or take the defaults:
 from pypacker.layer3.ip import IP
 from pypacker.layer3.icmp import ICMP
 
-ip = IP(src_s="127.0.0.1", dst_s="192.168.0.1", p=1) +\
+ip0 = IP(src_s="127.0.0.1", dst_s="192.168.0.1", p=1) +\
 	ICMP(type=8) +\
 	ICMP.Echo(id=123, seq=1, body_bytes=b"foobar")
 
 # output packet
-print("%s" % ip)
-IP(v_hl=45, tos=0, len=2A, id=0, off=0, ttl=40, p=1, sum=3B29, src=b'\x7f\x00\x00\x01', dst=b'\xc0\xa8\x00\x01', opts=[], handler=icmp)
-ICMP(type=8, code=0, sum=C03F, handler=echo)
-Echo(id=7B, seq=1, ts=0, bytes=b'foobar')
+print("%s" % ip0)
+layer3.ip.IP
+        v_hl        : 0x45 = 69 = 0b1000101
+        tos         : 0x0 = 0 = 0b0
+        len         : 0x2A = 42 = 0b101010
+        id          : 0x0 = 0 = 0b0
+        off         : 0x0 = 0 = 0b0
+        ttl         : 0x40 = 64 = 0b1000000
+        p           : 0x1 = 1 = 0b1
+        sum         : 0x3B29 = 15145 = 0b11101100101001
+        src         : b'\x7f\x00\x00\x01'
+        dst         : b'\xc0\xa8\x00\x01'
+        opts        : []
+layer3.icmp.ICMP
+        type        : 0x8 = 8 = 0b1000
+        code        : 0x0 = 0 = 0b0
+        sum         : 0xC03F = 49215 = 0b1100000000111111
+layer3.icmp.Echo
+        id          : 0x7B = 123 = 0b1111011
+        seq         : 0x1 = 1 = 0b1
+        ts          : 0x0 = 0 = 0b0
+        body_bytes: b'foobar'
 ```
 
 Read/write packets from/to file (pcap/tcpdump format):
@@ -89,7 +107,7 @@ time.sleep(999)
 ictor.stop()
 ```
 
-Send/receive packets (via raw sockets):
+Send/receive packets layer 2 packets:
 
 ```python
 # send/receive raw bytes
@@ -99,52 +117,22 @@ from pypacker.layer3 import ip
 
 psock = psocket.SocketHndl(timeout=10)
 
+def filter_pkt(pkt):
+	return pkt.ip.tcp.sport == 80
+
 for raw_bytes in psock:
 	eth = ethernet.Ethernet(raw_bytes)
 	print("Got packet: %r" % eth)
 	eth.reverse_address()
-	eth.ip.reverse_address()
+	eth.upper_layer.reverse_address()
 	psock.send(eth.bin())
+	# Send/receive based on source/destination data
+	pkts = psock.sr(packet_ip)
+	# Use filter to get specific packets
+	pkts = psock.recvp(filter_match_recv=filter_pkt)
 	# stop on first packet
 	break
 
-psock.close()
-```
-
-```python
-# send/receive using filter
-from pypacker import psocket
-from pypacker.layer3 import ip
-from pypacker.layer4 import tcp
-
-packet_ip = ip.IP(src_s="127.0.0.1", dst_s="127.0.0.1") + tcp.TCP(dport=80)
-psock = psocket.SocketHndl(timeout=10)
-
-def filter_pkt(pkt):
-	return pkt.ip.tcp.sport == 80
-
-psock.send(packet_ip.bin(), dst=packet_ip.dst_s)
-pkts = psock.recvp(filter_match_recv=filter_pkt)
-
-for pkt in pkts:
-	print("got answer: %r" % pkt)
-
-psock.close()
-
-```
-
-```python
-# Send/receive based on source/destination data
-from pypacker import psocket
-from pypacker.layer3 import ip
-from pypacker.layer4 import tcp
-
-packet_ip = ip.IP(src_s="127.0.0.1", dst_s="127.0.0.1") + tcp.TCP(dport=80)
-psock = psocket.SocketHndl(timeout=10)
-packets = psock.sr(packet_ip, max_packets_recv=1)
-
-for p in packets:
-    print("got layer 3 packet: %s" % p)
 psock.close()
 ```
 
@@ -152,7 +140,7 @@ psock.close()
 
 - Create network packets on different OSI layers using keywords like MyPacket(value=123) or raw bytes MyPacket(b"value")
 - Concatination of layers via "+" like packet = layer1 + layer2
-- Fast access to layers via packet[tcp.TCP] or packet.sublayerXYZ.tcp notation
+- Fast access to layers via packet[tcp.TCP]
 - Readable packet structure using print(packet) or similar statements
 - Read/store packets via Pcap/tcpdump file reader/writer
 - Live packet reading/writing using a wrapped socket API
@@ -163,6 +151,7 @@ psock.close()
 
 ## Prerequisites
 - Python 3.x (CPython, Pypy, Jython or whatever Interpreter)
+- Optional: netifaces >=0.10.6 (for utils)
 - Optional (for interceptor):
   - CPython
   - Linux based system
