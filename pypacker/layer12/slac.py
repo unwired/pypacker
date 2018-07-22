@@ -188,7 +188,7 @@ class CMSlacParmReq(Packet):
 		("apptype", "B", 0),
 		("sectype", "B", 0),
 		("runid", "8s", b"\x00" * 8),
-			# Only present if security type is 1
+		# Only present if security type is 1
 		("ciphersuitesize", "B", None),
 		("ciphersuites", None, TriggerList)
 	)
@@ -204,7 +204,7 @@ class CMSlacParmCnf(Packet):
 		("apptype", "B", 0),
 		("sectype", "B", 0),
 		("runid", "8s", b"\x00" * 8),
-			# Only present if security type is 1
+		# Only present if security type is 1
 		("ciphersuite", "H", None)
 	)
 
@@ -311,16 +311,19 @@ class CMLinkStatsCnf(Packet):
 		("linkstats", "H", 0)
 	)
 
+
 class VSPLLinkStatusReq(Packet):
 	__hdr__ = (
 		("oui", "3s", b"\x00" * 3),
 	)
+
 
 class VSPLLinkStatusCnf(Packet):
 	__hdr__ = (
 		("oui", "3s", b"\x00" * 3),
 		("link", "H", 0),
 	)
+
 
 class Slac(Packet):
 	__hdr__ = (

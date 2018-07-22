@@ -173,7 +173,7 @@ class TCP(pypacker.Packet):
 			update = False
 
 		if update and self.sum_au_active:
-			logger.debug(">>> updating checksum")
+			# logger.debug(">>> updating checksum")
 			self._calc_sum()
 
 	def _dissect(self, buf):
