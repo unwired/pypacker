@@ -22,6 +22,7 @@ import struct
 import time
 import threading
 import subprocess
+# no try/except: we need this in any case
 import netifaces
 import logging
 

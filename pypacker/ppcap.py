@@ -6,6 +6,7 @@ import logging
 import types
 
 from pypacker import pypacker
+from pypacker.structcbs import pack_I, unpack_I_le
 from pypacker.structcbs import pack_IIII, unpack_IIII, unpack_IIII_le
 from pypacker.layer12 import ethernet, linuxcc, radiotap, btle, can
 
@@ -69,21 +70,6 @@ class PcapFileHdr(pypacker.Packet):
 	)
 
 
-class PcapLEFileHdr(pypacker.Packet):
-	"""pcap file header."""
-	# header length = 24
-	__hdr__ = (
-		("magic", "I", TCPDUMP_MAGIC),
-		("v_major", "H", PCAP_VERSION_MAJOR),
-		("v_minor", "H", PCAP_VERSION_MINOR),
-		("thiszone", "I", 0),
-		("sigfigs", "I", 0),
-		("snaplen", "I", 1500),
-		("linktype", "I", 1),
-	)
-	__byte_order__ = "<"
-
-
 class PcapPktHdr(pypacker.Packet):
 	"""pcap packet header."""
 	# header length: 16
@@ -94,20 +80,6 @@ class PcapPktHdr(pypacker.Packet):
 		("caplen", "I", 0),
 		("len", "I", 0),
 	)
-
-
-class PcapLEPktHdr(pypacker.Packet):
-	"""pcap packet header."""
-	# header length: 16
-	__hdr__ = (
-		("tv_sec", "I", 0),
-		# this can be either microseconds or nanoseconds: check magic number
-		("tv_usec", "I", 0),
-		("caplen", "I", 0),
-		("len", "I", 0),
-	)
-
-	__byte_order__ = "<"
 
 
 # PCAP callbacks
@@ -142,6 +114,7 @@ def pcap_cb_init_read(self, **initdata):
 
 	if fhdr.magic not in [TCPDUMP_MAGIC, TCPDUMP_MAGIC_NANO, TCPDUMP_MAGIC_SWAPPED, TCPDUMP_MAGIC_NANO_SWAPPED]:
 		return False
+	is_le = False
 
 	# handle file types
 	if fhdr.magic == TCPDUMP_MAGIC:
@@ -153,17 +126,18 @@ def pcap_cb_init_read(self, **initdata):
 		self._resolution_factor = 1
 		self._callback_unpack_meta = unpack_IIII
 	elif fhdr.magic == TCPDUMP_MAGIC_SWAPPED:
-		fhdr = PcapLEFileHdr(buf)
+		is_le = True
 		self._resolution_factor = 1000
 		self._callback_unpack_meta = unpack_IIII_le
 	elif fhdr.magic == TCPDUMP_MAGIC_NANO_SWAPPED:
-		fhdr = PcapLEFileHdr(buf)
+		is_le = True
 		self._resolution_factor = 1
 		self._callback_unpack_meta = unpack_IIII_le
 	else:
 		raise ValueError("invalid tcpdump header, magic value: %s" % fhdr.magic)
 
-	self._lowest_layer_new = PCAPTYPE_CLASS.get(fhdr.linktype, None)
+	linktype = fhdr.linktype if not is_le else unpack_I_le(pack_I(fhdr.linktype))[0]
+	self._lowest_layer_new = PCAPTYPE_CLASS.get(linktype, None)
 
 	def is_resolution_nano(obj):
 		"""return -- True if resolution is in Nanoseconds, False if milliseconds."""

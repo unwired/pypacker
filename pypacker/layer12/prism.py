@@ -25,8 +25,6 @@ class Did(pypacker.Packet):
 		("value", "I", 0),
 	)
 
-	__byte_order__ = "<"
-
 
 class Prism(pypacker.Packet):
 	__hdr__ = (

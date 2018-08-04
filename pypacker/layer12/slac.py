@@ -164,7 +164,7 @@ class CMAttenCharInd(Packet):
 		("apptype", "B", 0),
 		("sectype", "B", 0),
 		("sourceaddr", "6s", b"\x00" * 6),
-		("runid", "8s", b"\x00" * 8),
+		("runid", "Q", 0),
 		("sourceid", "17s", b"\x00" * 17),
 		("respid", "17s", b"\x00" * 17),
 		("numsounds", "B", 0)
@@ -176,7 +176,7 @@ class CMAttenCharRsp(Packet):
 		("apptype", "B", 0),
 		("sectype", "B", 0),
 		("sourceaddr", "6s", b"\x00" * 6),
-		("runid", "8s", b"\x00" * 8),
+		("runid", "Q", 0),
 		("sourceid", "17s", b"\x00" * 17),
 		("respid", "17s", b"\x00" * 17),
 		("result", "B", 0)
@@ -187,7 +187,7 @@ class CMSlacParmReq(Packet):
 	__hdr__ = (
 		("apptype", "B", 0),
 		("sectype", "B", 0),
-		("runid", "8s", b"\x00" * 8),
+		("runid", "Q", 0),
 		# Only present if security type is 1
 		("ciphersuitesize", "B", None),
 		("ciphersuites", None, TriggerList)
@@ -203,7 +203,7 @@ class CMSlacParmCnf(Packet):
 		("forwardingsta", "6s", b"\x00" * 6),
 		("apptype", "B", 0),
 		("sectype", "B", 0),
-		("runid", "8s", b"\x00" * 8),
+		("runid", "Q", 0),
 		# Only present if security type is 1
 		("ciphersuite", "H", None)
 	)
@@ -218,8 +218,8 @@ class CMSlacMatchReq(Packet):
 		("pevmac", "6s", b"\x00" * 6),
 		("evseid", "17s", b"\x00" * 17),
 		("evsemac", "6s", b"\x00" * 6),
-		("runid", "8s", b"\x00" * 8),
-		("rsvd", "8s", b"\x00" * 8),
+		("runid", "Q", 0),
+		("rsvd", "Q", 0)
 	)
 
 
@@ -231,7 +231,7 @@ class CMStartAttenCharInd(Packet):
 		("timeout", "B", 0),
 		("resptype", "B", 0),
 		("forwardingsta", "6s", b"\x00" * 6),
-		("runid", "8s", b"\x00" * 8)
+		("runid", "Q", 0),
 	)
 
 
@@ -243,7 +243,7 @@ class CMStartAttenCharRsp(Packet):
 		("timeout", "B", 0),
 		("resptype", "B", 0),
 		("forwardingsta", "6s", b"\x00" * 6),
-		("runid", "8s", b"\x00" * 8)
+		("runid", "Q", 0),
 	)
 
 
@@ -259,20 +259,6 @@ class CMMnbcSoundInd(Packet):
 	)
 
 
-class CMSlacMatchReq(Packet):
-	__hdr__ = (
-		("apptype", "B", 0),
-		("sectype", "B", 0),
-		("mvflen", "H", 0),
-		("pevid", "17s", b"\x00" * 17),
-		("pevmac", "6s", b"\x00" * 6),
-		("evseid", "17s", b"\x00" * 17),
-		("evsemac", "6s", b"\x00" * 6),
-		("runid", "8s", b"\x00" * 8),
-		("rsvd", "8s", b"\x00" * 8)
-	)
-
-
 class CMSlacMatchCnf(Packet):
 	__hdr__ = (
 		("apptype", "B", 0),
@@ -282,7 +268,7 @@ class CMSlacMatchCnf(Packet):
 		("pevmac", "6s", b"\x00" * 6),
 		("evseid", "17s", b"\x00" * 17),
 		("evsemac", "6s", b"\x00" * 6),
-		("runid", "8s", b"\x00" * 8),
+		("runid", "Q", 0),
 		("rsvd1", "8s", b"\x00" * 8),
 		("nid", "7s", b"\x00" * 7),
 		("rsvd2", "B", 0),
@@ -350,10 +336,16 @@ class Slac(Packet):
 	}
 
 	def _dissect(self, buf):
-		typeinfo_le = unpack_H_le(buf[1: 3])[0]
-		# logger.debug("Got type %X", typeinfo_le)
-		self._init_handler(typeinfo_le, buf[5:])
-		return 5
+		typeinfo_be = unpack_H_le(buf[1: 3])[0]
+		hlen = 5
+
+		# VS_PL_LNK_STATUS does not have frag
+		if typeinfo_be in {0xA0B8, 0xA0B9}:
+			self.frag = None
+			hlen = 3
+		# logger.debug("Got type %X", typeinfo_be)
+		self._init_handler(typeinfo_be, buf[hlen:])
+		return hlen
 
 	def _get_msgtype(self):
 		typetmp = self.typeinfo & MASK_MSGTYPE_LE

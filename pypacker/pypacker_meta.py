@@ -197,8 +197,8 @@ def configure_packet_header(t, hdrs, header_fmt):
 				header_fmt.append(fmt)
 				t._header_cached.append(hdr[2])
 				# logger.debug("--------> field is active: %r" % hdr[0])
-			else:
-				setattr(t, shadowed_name + "_active", False)
+			#else:
+			#	setattr(t, shadowed_name + "_active", False)
 
 			# only simple fields can get deactivated
 			setattr(t, shadowed_name + "_active", True if hdr[2] is not None else False)
@@ -307,9 +307,8 @@ class MetaPacket(type):
 		t._header_cached = []
 		# all header names
 		t._header_field_names = []
-		t._header_format_order = getattr(t, "__byte_order__", ">")
 		# all header formats including byte order
-		header_fmt = [t._header_format_order]
+		header_fmt = [">"]
 
 		# varname holding the fieldname containing the id associated with body handler
 		# eg Ethernet -> "type" or IP -> "p"

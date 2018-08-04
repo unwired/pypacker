@@ -541,15 +541,21 @@ class Packet(object, metaclass=MetaPacket):
 		for name in self._header_field_names:
 			name_real = name[1:]
 			val = getattr(self, name_real)
+			name_s = ""
 
+			try:
+				# try to get convenient name
+				name_s = " = " + getattr(self, name_real + "_s")
+			except AttributeError:
+				pass
 			# values: int, None, bytes, Triggerlist (Packets, tuples, bytes)
 			if type(val) is int:
-				layer_sums_l.append("%-12s: 0x%X = %d = %s" % (name_real, val, val, bin(val)))
+				layer_sums_l.append("%-12s: 0x%X = %d = %s" % (name_real, val, val, bin(val)) + name_s)
 			elif val is None:
 				layer_sums_l.append("%-12s: (inactive)" % name_real)
 			# bytes, triggerlist
 			else:
-				layer_sums_l.append("%-12s: %s" % (name_real, val))
+				layer_sums_l.append("%-12s: %s" % (name_real, val) + name_s)
 
 		if self._upper_layer is None:
 			# no upper layer present
@@ -850,7 +856,7 @@ class Packet(object, metaclass=MetaPacket):
 		"""
 		Update format of this packet header. Needs to be called on changes to dynamic fields.
 		"""
-		header_format = [self._header_format_order]
+		header_format = [">"]
 		header_format_append = header_format.append
 		self_getattr = self.__getattribute__
 
