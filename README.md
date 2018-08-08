@@ -36,8 +36,8 @@ layer3.ip.IP
         ttl         : 0x40 = 64 = 0b1000000
         p           : 0x1 = 1 = 0b1
         sum         : 0x3B29 = 15145 = 0b11101100101001
-        src         : b'\x7f\x00\x00\x01'
-        dst         : b'\xc0\xa8\x00\x01'
+        src         : b'\x7f\x00\x00\x01' = 127.0.0.1
+        dst         : b'\xc0\xa8\x00\x01' = 192.168.0.1
         opts        : []
 layer3.icmp.ICMP
         type        : 0x8 = 8 = 0b1000

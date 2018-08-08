@@ -22,7 +22,7 @@ logger_streamhandler.setFormatter(logger_formatter)
 
 logger.addHandler(logger_streamhandler)
 
-PROG_VISIBLE_CHARS	= re.compile(b"[^\x20-\x7e]")
+PROG_NONVISIBLE_CHARS	= re.compile(b"[^\x21-\x7e]")
 HEADER_TYPES_SIMPLE	= {int, bytes}
 
 DIR_SAME		= 1
@@ -1071,7 +1071,7 @@ class Packet(object, metaclass=MetaPacket):
 			line = buf[bytepos: bytepos + length]
 			hexa = " ".join(["%02x" % x for x in line])
 			# line = line.translate(__vis_filter)
-			line = re.sub(PROG_VISIBLE_CHARS, b".", line)
+			line = re.sub(PROG_NONVISIBLE_CHARS, b".", line)
 			res.append("  %04d:      %-*s %s" % (bytepos, length * 3, hexa, line))
 			bytepos += length
 		return "\n".join(res)
