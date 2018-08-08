@@ -7,6 +7,7 @@ Requirements:
 - iptables
 """
 import ctypes
+import errno
 import threading
 import logging
 import socket
@@ -122,6 +123,10 @@ nfq_fd = netfilter.nfnl_fd
 nfq_fd.restype = ctypes.c_int
 nfq_fd.argtypes = ctypes.POINTER(NfnlHandle),
 
+nfnl_rcvbufsiz = netfilter.nfnl_rcvbufsiz
+nfnl_rcvbufsiz.restype = ctypes.c_int
+nfnl_rcvbufsiz.argtypes = ctypes.POINTER(NfnlHandle), ctypes.c_uint
+
 # This function obtains a netfilter queue connection handle
 ll_open_queue = netfilter.nfq_open
 ll_open_queue.restype = ctypes.POINTER(NfqHandle)
@@ -172,9 +177,9 @@ set_mode.argtypes = ctypes.POINTER(NfqQHandler), ctypes.c_uint8, ctypes.c_uint
 # Sets the size of the queue in kernel. This fixes the maximum number
 # of packets the kernel will store before internally before dropping
 # upcoming packets.
-#set_queue_maxlen = netfilter.nfq_set_queue_maxlen
-#set_queue_maxlen.restype = ctypes.c_int
-#set_queue_maxlen.argtypes = ctypes.POINTER(NfqQHandler), ctypes.c_uint32
+set_queue_maxlen = netfilter.nfq_set_queue_maxlen
+set_queue_maxlen.restype = ctypes.c_int
+set_queue_maxlen.argtypes = ctypes.POINTER(NfqQHandler), ctypes.c_uint32
 
 # Responses from hook functions.
 NF_DROP, NF_ACCEPT, NF_STOLEN = 0, 1, 2
@@ -241,6 +246,8 @@ class Interceptor(object):
 	def __init__(self):
 		self._netfilterqueue_configs = []
 		self._is_running = False
+		self.nfqueue_size = 2048
+		self.pkt_size = 4096
 
 	@staticmethod
 	def verdict_trigger_cycler(recv, nfq_handle, obj):
@@ -250,15 +257,19 @@ class Interceptor(object):
 					bts = recv(65535)
 				except socket_timeout:
 					continue
+				except OSError as e:
+					if e.errno != errno.ENOBUFS:
+						raise e
+					continue
 
 				#handle_packet(nfq_handle, bts, 65535)
 				handle_packet(nfq_handle, bts, len(bts))
 		except OSError as ex:
 			# eg "Bad file descriptor": started and nothing read yet
-			#logger.debug(ex)
+			logger.error(ex)
 			pass
 		except Exception as ex:
-			logger.debug("Exception while reading: %r", ex)
+			logger.error("Exception while reading: %r", ex)
 		#finally:
 		#	logger.debug("verdict_trigger_cycler finished, stopping Interceptor")
 		#	obj.stop()
@@ -308,6 +319,10 @@ class Interceptor(object):
 		fd = nfq_fd(nf)
 		# fd, family, sockettype
 		nfq_socket = socket.fromfd(fd, 0, 0)  # 3
+
+		set_queue_maxlen(queue, self.nfqueue_size)
+		nfnl_rcvbufsiz(nf, self.nfqueue_size * self.pkt_size)
+
 		# TODO: better solution to check for running state? close socket and raise exception does not work in stop()
 		nfq_socket.settimeout(1)
 
