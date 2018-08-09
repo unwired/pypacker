@@ -15,8 +15,8 @@ logger = logging.getLogger("pypacker")
 
 try:
 	import netifaces
-except ImportError as importerror:
-	raise Exception("Couldn't load netifaces, some utils won't work (catch this Exception if you don't care)") from importerror
+except ImportError:
+	logger.debug("Couldn't load netifaces, some utils won't work")
 
 log = math.log
 mac_bytes_to_str = pypacker.mac_bytes_to_str

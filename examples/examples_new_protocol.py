@@ -30,9 +30,7 @@ class NewProtocol(pypacker.Packet):
 	The whole structure is oriented	at the ISO/OSI protocol layers where
 	every layer contains a reference to the next upper layer. As an example this layer
 	'NewProtocol', when parsing from raw bytes, will have a reference to the next upper
-	layer 'IP' which can be access via '.' like 'newprotoinstance.ip' (access name is the
-	lower case name of the class). Even higher layers can be accessed via
-	'newprot# oinstance.ip.tcp' (when available) or via the '[]' notation like 'newprotoinstance[TCP]'."""
+	layer 'IP' which can be access via pkt[UpperLayerClass]"""
 
 	# The protocol header is basically defined by the static field
 	# "__hdr__" (see layer12/ethernet.Ethernet). See code documentation
@@ -190,9 +188,8 @@ print()
 print(">>> Layers of packet:")
 print("Output all layers: %s" % newproto_pkt)
 print("Access some fields: 0x%X %s %s" % (newproto_pkt.type, newproto_pkt.src, newproto_pkt.dst))
-print("Access next upper layer (IP): %s" % newproto_pkt.ip)
-print("A layer above IP: %s" % newproto_pkt.ip.tcp)
-print("Same as above: %s" % newproto_pkt[tcp.TCP])
+print("Access next upper layer (IP): %s" % newproto_pkt[ip.IP])
+print("A layer above IP (TCP): %s" % newproto_pkt[tcp.TCP])
 
 
 # Create new Packet by defining every single header and adding higher layers
@@ -205,6 +202,5 @@ print()
 print(">>> Layers of packet:")
 print("Output all layers: %s" % newproto_pkt)
 print("Access some fields: 0x%X %s %s" % (newproto_pkt.type, newproto_pkt.src, newproto_pkt.dst))
-print("Access next upper layer (IP): %s" % newproto_pkt.ip)
-print("A layer above IP: %s" % newproto_pkt.ip.tcp)
-print("Same as above: %s" % newproto_pkt[tcp.TCP])
+print("Access next upper layer (IP): %s" % newproto_pkt[ip.IP])
+print("A layer above IP (TCP): %s" % newproto_pkt[tcp.TCP])

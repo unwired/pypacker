@@ -1,5 +1,5 @@
 # set this to the NEXT (not yet published) version
-VERSION="4.4"
+VERSION="4.5"
 
 function msg {
 	echo ""

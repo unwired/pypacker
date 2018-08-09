@@ -107,7 +107,7 @@ time.sleep(999)
 ictor.stop()
 ```
 
-Send/receive packets layer 2 packets:
+Send/receive layer 2 packets:
 
 ```python
 # send/receive raw bytes

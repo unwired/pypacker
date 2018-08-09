@@ -235,18 +235,6 @@ class CMStartAttenCharInd(Packet):
 	)
 
 
-class CMStartAttenCharRsp(Packet):
-	__hdr__ = (
-		("apptype", "B", 0),
-		("sectype", "B", 0),
-		("numsounds", "B", 0),
-		("timeout", "B", 0),
-		("resptype", "B", 0),
-		("forwardingsta", "6s", b"\x00" * 6),
-		("runid", "Q", 0),
-	)
-
-
 class CMMnbcSoundInd(Packet):
 	__hdr__ = (
 		("apptype", "B", 0),
@@ -257,6 +245,28 @@ class CMMnbcSoundInd(Packet):
 		("rsvd", "8s", b"\x00" * 8),
 		("rnd", "16s", b"\x00" * 16)
 	)
+
+
+class CMSlacMatchReq(Packet):
+	__hdr__ = (
+		("apptype", "B", 0),
+		("sectype", "B", 0),
+		("mvflen", "H", 0),
+		("pevid", "17s", b"\x00" * 17),
+		("pevmac", "6s", b"\x00" * 6),
+		("evseid", "17s", b"\x00" * 17),
+		("evsemac", "6s", b"\x00" * 6),
+		("runid", "Q", 0),
+		("rsvd", "8s", b"\x00" * 8)
+	)
+
+	def _get_mvflen_be(self):
+		return unpack_H(pack_H_le(self.mvflen))[0]
+
+	def _set_mvflen_be(self, val):
+		self.mvflen = unpack_H(pack_H_le(val))[0]
+
+	mvflen_be = property(_get_mvflen_be, _set_mvflen_be)
 
 
 class CMSlacMatchCnf(Packet):
@@ -311,11 +321,28 @@ class VSPLLinkStatusCnf(Packet):
 	)
 
 
+class AMPMapReq(Packet):
+	__hdr__ = (
+		("amlen", "H", 0),
+	)
+
+
+class AMPMapCnf(Packet):
+	__hdr__ = (
+		("restype", "B", 0),
+	)
+
+
+MASK_FRAGINFO = 0xF0
+MASK_FRAGNUMBER = 0x0F
+
+
 class Slac(Packet):
 	__hdr__ = (
 		("version", "B", 1),
-		("typeinfo", "H", 0),
-		("frag", "H", 0)
+		("typeinfo", "H", 0),  #
+		("frag_info", "B", 0),
+		("frag_seq", "B", 0)
 	)
 
 	__handler__ = {
@@ -327,12 +354,15 @@ class Slac(Packet):
 		CM_ATTEN_CHAR | MMTYPELSB_RESPONSE: CMAttenCharRsp,
 		CM_SLAC_PARM | MMTYPELSB_REQUEST: CMSlacParmReq,
 		CM_SLAC_PARM | MMTYPELSB_CONFIRM: CMSlacParmCnf,
-		CM_START_ATTEN_CHAR | MMTYPELSB_INDICATION: CMStartAttenCharRsp,
+		# MS:new
+		CM_START_ATTEN_CHAR | MMTYPELSB_INDICATION: CMStartAttenCharInd,
 		CM_MNBC_SOUND | MMTYPELSB_INDICATION: CMMnbcSoundInd,
 		CM_LINK_STATS | MMTYPELSB_REQUEST: CMLinkStatsReq,
 		CM_LINK_STATS | MMTYPELSB_CONFIRM: CMLinkStatsCnf,
 		VS_PL_LNK_STATUS | MMTYPELSB_REQUEST: VSPLLinkStatusReq,
-		VS_PL_LNK_STATUS | MMTYPELSB_CONFIRM: VSPLLinkStatusCnf
+		VS_PL_LNK_STATUS | MMTYPELSB_CONFIRM: VSPLLinkStatusCnf,
+		CM_AMP_MAP | MMTYPELSB_REQUEST: AMPMapReq,
+		CM_AMP_MAP | MMTYPELSB_CONFIRM: AMPMapCnf
 	}
 
 	def _dissect(self, buf):
@@ -341,11 +371,29 @@ class Slac(Packet):
 
 		# VS_PL_LNK_STATUS does not have frag
 		if typeinfo_be in {0xA0B8, 0xA0B9}:
-			self.frag = None
+			# logger.debug("disabling frag")
+			self.frag_info = None
+			self.frag_seq = None
 			hlen = 3
 		# logger.debug("Got type %X", typeinfo_be)
 		self._init_handler(typeinfo_be, buf[hlen:])
 		return hlen
+
+	def _get_fraginfo(self):
+		return (self.frag_info & MASK_FRAGINFO) >> 4
+
+	def _set_fraginfo(self, fraginfo):
+		self.frag_info = (self.frag_info & ~MASK_FRAGINFO) | ((fraginfo << 4) & MASK_FRAGINFO)
+
+	fraginfo = property(_get_fraginfo, _set_fraginfo)
+
+	def _get_fragnumber(self):
+		return self.frag_info & MASK_FRAGNUMBER
+
+	def _set_fragnumber(self, fragnum):
+		self.frag_info = (self.frag_info & ~MASK_FRAGNUMBER) | (fragnum & MASK_FRAGNUMBER)
+
+	fragnum = property(_get_fragnumber, _set_fragnumber)
 
 	def _get_msgtype(self):
 		typetmp = self.typeinfo & MASK_MSGTYPE_LE
@@ -355,8 +403,17 @@ class Slac(Packet):
 		typetmp = unpack_H(pack_H_le(msgtype))[0]
 		self.typeinfo = typetmp & MASK_MSGTYPE_LE
 
-	# base message type
+	# base message type given as BE
 	msgtype = property(_get_msgtype, _set_msgtype)
+
+	def _get_msgtype_full(self):
+		return unpack_H(pack_H_le(self.typeinfo))[0]
+
+	def _set_msgtype_full(self, msgtype):
+		self.typeinfo = unpack_H(pack_H_le(msgtype))[0]
+
+	# set full typeinfo given as BE
+	msgtype_full_be = property(_get_msgtype_full, _set_msgtype_full)
 
 	def _get_msgtype_s(self):
 		return TYPEINFO_DESCRIPTION.get(self.msgtype, None)
