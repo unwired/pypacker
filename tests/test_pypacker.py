@@ -435,6 +435,14 @@ class GeneralTestCase(unittest.TestCase):
 		pkt.upper_layer.opts.append(("A", b"dsfdsf"))
 		print(pkt)
 
+	def test_operator_in(self):
+		print_header("Operator: in")
+		tcp_bytes = b"pypacker"
+		pkt = ethernet.Ethernet() + ip.IP() + tcp.TCP() + tcp_bytes
+
+		for clz in [ethernet.Ethernet, ip.IP, tcp.TCP]:
+			self.assertTrue(clz in pkt)
+
 	def test_equal(self):
 		print_header("Equal")
 		tcp_bytes = b"pypacker"
