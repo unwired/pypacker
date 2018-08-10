@@ -209,20 +209,6 @@ class CMSlacParmCnf(Packet):
 	)
 
 
-class CMSlacMatchReq(Packet):
-	__hdr__ = (
-		("apptype", "B", 0),
-		("sectype", "B", 0),
-		("mvflen", "H", 0),
-		("pevid", "17s", b"\x00" * 17),
-		("pevmac", "6s", b"\x00" * 6),
-		("evseid", "17s", b"\x00" * 17),
-		("evsemac", "6s", b"\x00" * 6),
-		("runid", "Q", 0),
-		("rsvd", "Q", 0)
-	)
-
-
 class CMStartAttenCharInd(Packet):
 	__hdr__ = (
 		("apptype", "B", 0),

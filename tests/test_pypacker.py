@@ -476,6 +476,7 @@ class GeneralTestCase(unittest.TestCase):
 		eth_tcp = layers_split[0] + layers_split[2]
 		self.assertEqual(eth_tcp.higher_layer, tcp.TCP)
 
+
 class PacketDumpTestCase(unittest.TestCase):
 	def test_exdump(self):
 		bts = get_pcap("tests/packets_ether.pcap")[7]
