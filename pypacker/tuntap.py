@@ -176,6 +176,9 @@ class TunInterface(object):
 
 
 class LocalTunnel(object):
+	"""
+	Local Back-to-back tunnel based on tun interfaces: local <-> tun1 <-> tun2 <-> local
+	"""
 	def __init__(self, ip_src="12.34.56.1", ip_dst="12.34.56.2"):
 		self._state_active = False
 		self._tundev0 = TunInterface(tun_iface_name="tun0", create_ondemand=True,

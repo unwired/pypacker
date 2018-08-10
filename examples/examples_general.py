@@ -177,3 +177,10 @@ except socket.timeout as e:
 	print("timeout!")
 except socket.error as e:
 	print("you need to be root to execute the raw socket-examples!")
+
+"""
+>>> IPv6 TCP connection
+sock_tcp = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+iface_index = socket.if_nametoindex(IFACE_NAME)
+sock_tcp.connect(("[IPv6-address]", target_port, 0, iface_index))
+"""

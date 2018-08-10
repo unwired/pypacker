@@ -426,6 +426,7 @@ class GeneralTestCase(unittest.TestCase):
 		self.assertEqual(pkt1_none, None)
 
 	def test_output(self):
+		print_header("Output")
 		pkt = ethernet.Ethernet() + ip.IP() + tcp.TCP()
 		ipopt = ip.IPOptMulti()
 		pkt.upper_layer.ttl = None
@@ -434,6 +435,24 @@ class GeneralTestCase(unittest.TestCase):
 		pkt.upper_layer.opts.append(("A", b"dsfdsf"))
 		print(pkt)
 
+	def test_splitlayers(self):
+		print_header("Split")
+		tcp_bytes = b"pypacker"
+		pkt = ethernet.Ethernet() + ip.IP() + tcp.TCP() + tcp_bytes
+		self.assertIsNotNone(pkt)
+		self.assertIsNotNone(pkt.upper_layer)
+		self.assertIsNotNone(pkt.upper_layer.upper_layer)
+		self.assertIsNone(pkt.upper_layer.upper_layer.upper_layer)
+		layers_split = pkt.split_layers()
+
+		self.assertEqual(layers_split[0].__class__, ethernet.Ethernet)
+		self.assertEqual(layers_split[1].__class__, ip.IP)
+		self.assertEqual(layers_split[2].__class__, tcp.TCP)
+
+		for layer in layers_split:
+			self.assertIsNone(layer.upper_layer)
+			self.assertIsNone(layer.lower_layer)
+		self.assertEqual(layers_split[-1].body_bytes, tcp_bytes)
 
 class PacketDumpTestCase(unittest.TestCase):
 	def test_exdump(self):

@@ -288,21 +288,40 @@ def get_entropy(bts, granularity):
 
 
 def get_mac_for_iface(iface_name):
-	# Assume MAC address is always retrievable
+	"""
+	return -- MAC address of the interface iface_name
+	Assume MAC address is always retrievable
+	"""
 	try:
 		return netifaces.ifaddresses(iface_name)[netifaces.AF_LINK][0]["addr"]
 	except:
 		return None
 
 
-def get_ipv4_for_iface(iface_name):
+def get_ipv4_for_iface(iface_name, idx=0):
+	"""
+	return -- IPv4 address found for interface iface_name at index idx
+	"""
 	try:
-		return netifaces.ifaddresses(iface_name)[netifaces.AF_INET][0]["addr"]
+		return netifaces.ifaddresses(iface_name)[netifaces.AF_INET][idx]["addr"]
+	except Exception as ex:
+		return None
+
+
+def get_ipv6_for_iface(iface_name, idx=0):
+	"""
+	return -- IPv6 address found for interface iface_name at index idx
+	"""
+	try:
+		return netifaces.ifaddresses(iface_name)[netifaces.AF_INET6][idx]["addr"]
 	except Exception as ex:
 		return None
 
 
 def get_gwip_for_iface(iface_name):
+	"""
+	return -- IPv4 address of the default gateway for interface iface_name
+	"""
 	gws = netifaces.gateways()
 	gws_ipv4 = gws.get(netifaces.AF_INET, None)
 
@@ -318,6 +337,9 @@ def get_gwip_for_iface(iface_name):
 
 
 def get_arp_cache_entry(ipaddr):
+	"""
+	return -- MAC address for IP addess ipaddr
+	"""
 	mac = None
 	pattern_mac = re.compile("([0-9A-Fa-f]{2}[:]){5}([0-9A-Fa-f]{2})")
 

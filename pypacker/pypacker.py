@@ -13,8 +13,8 @@ from pypacker.pypacker_meta import MetaPacket, FIELD_FLAG_AUTOUPDATE, FIELD_FLAG
 from pypacker.structcbs import pack_mac, unpack_mac, pack_ipv4, unpack_ipv4
 
 logger = logging.getLogger("pypacker")
-# logger.setLevel(logging.DEBUG)
-logger.setLevel(logging.WARNING)
+logger.setLevel(logging.DEBUG)
+#logger.setLevel(logging.WARNING)
 
 logger_streamhandler = logging.StreamHandler()
 logger_formatter = logging.Formatter("%(levelname)s (%(funcName)s): %(message)s")
@@ -344,8 +344,10 @@ class Packet(object, metaclass=MetaPacket):
 		#logger.debug("notify after setting handler")
 		self._notify_changelistener()
 
-	# Get/set body handler. Note: this will force lazy dissecting when reading
+	# deprecated, wording "higher_layer/highest_layer layer is more consistent
 	upper_layer = property(_get_upperlayer, _set_upperlayer)
+	# Get/set body handler. Note: this will force lazy dissecting when reading
+	higher_layer = property(_get_upperlayer, _set_upperlayer)
 
 	def _set_lower_layer(self, val):
 		try:
@@ -487,6 +489,18 @@ class Packet(object, metaclass=MetaPacket):
 			if p_instance is None:
 				break
 
+	def __contains__(self, clz):
+		return self[clz] is not None
+
+	def __eq__(self, clz):
+		"""
+		Compare class of this object to the given class/object
+		"""
+		# convert object to its class
+		if not type(clz) == MetaPacket:
+			clz = clz.__class__
+		return self.__class__ == clz
+
 	def dissect_full(self):
 		"""
 		Recursive unpack ALL data inlcuding lazy header etc up to highest layer inlcuding danymic fields.
@@ -503,7 +517,7 @@ class Packet(object, metaclass=MetaPacket):
 	def __add__(self, packet_or_bytes_to_add):
 		"""
 		Handle concatination of layers like "Ethernet + IP + TCP" and make them accessible
-		via "ethernet.ip.tcp" (class names as lowercase).
+		via "ethernet[IP] or ethernet[TCP]".
 		This is the same as "pkt.highest_layer.upper_layer = pkt_to_set"
 
 		packet_or_bytes_to_add -- The packet or bytes to be added as highest layer
@@ -516,8 +530,8 @@ class Packet(object, metaclass=MetaPacket):
 
 	def __iadd__(self, packet_or_bytes_to_add):
 		"""
-		Handle concatination of layers like "Ethernet += IP" and make them accessible
-		via "ethernet.ip" (class names as lowercase).
+		Handle concatination of layers like "Ethernet + IP + TCP" and make them accessible
+		via "ethernet[IP] or ethernet[TCP]".
 		This is the same as "pkt.highest_layer.upper_layer = pkt_to_set"
 
 		packet_or_bytes_to_add -- The packet or bytes to be added as highest layer
@@ -528,6 +542,21 @@ class Packet(object, metaclass=MetaPacket):
 			self.highest_layer.body_bytes = packet_or_bytes_to_add
 		return self
 
+	def split_layers(self):
+		"""
+		Splits all layers to indepent ones starting from this one not connectedto each other
+		e.g. A.B.C -> [A, B, C]
+		return -- [layer1, layer2, ...]
+		"""
+		layers = [layer for layer in self]
+
+		for layer in layers:
+			# avoid overwriting bytes, only reset handler
+			if layer._body_bytes is None:
+				layer.higher_layer = None
+			layer.lower_layer = None
+		return layers
+
 	def _summarize(self):
 		"""
 		Print a summary of this layer state. Shows all header, even deactivated ones.
@@ -536,6 +565,8 @@ class Packet(object, metaclass=MetaPacket):
 		if not self._unpacked:
 			self._unpack()
 
+		# create key=value descriptions
+		# show all header even deactivated ones
 		layer_sums_l = []
 
 		for name in self._header_field_names:
@@ -559,7 +590,7 @@ class Packet(object, metaclass=MetaPacket):
 
 		if self._upper_layer is None:
 			# no upper layer present
-			layer_sums_l.append("body_bytes: %s" % self.body_bytes)
+			layer_sums_l.append("bodybytes: %s" % self.body_bytes)
 
 		layer_sums = "%s\n\t%s" % (
 			self.__module__[9:] + "." + self.__class__.__name__,
