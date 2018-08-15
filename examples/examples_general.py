@@ -179,8 +179,14 @@ except socket.error as e:
 	print("you need to be root to execute the raw socket-examples!")
 
 """
->>> IPv6 TCP connection
+>>> Code snippets
+>> IPv6 TCP connection
 sock_tcp = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
 iface_index = socket.if_nametoindex(IFACE_NAME)
 sock_tcp.connect(("[IPv6-address]", target_port, 0, iface_index))
+
+>> iptables rules
+> nfqueue
+iptables -A INPUT -j NFQUEUE --queue-num 0
+iptables -I INPUT 1 -p icmp -j NFQUEUE --queue-balance 0:2
 """

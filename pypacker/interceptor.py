@@ -18,17 +18,7 @@ from collections import namedtuple
 
 logger = logging.getLogger("pypacker")
 
-MSG_NO_NFQUEUE = """Could not load netfilter_queue library. Make sure that...
-- You are using a linux based system
-- The library libnetfilter_queue is installed (see http://www.netfilter.org/projects/libnetfilter_queue/)
-- NFQUEUE target is supported by your Kernel. The config option is at:
-	Networking Options
-		Network packet filtering ...
-			Core Netfilter ...
-				NFQUEUE target
-- iptables is installed and callable via "iptables"
-- NFQUEUE related rulez can be added eg "iptables -I INPUT 1 -j NFQUEUE --queue-num 0"
-"""
+MSG_NO_NFQUEUE = "Could not load netfilter_queue library. See README.md for interceptor requirements."
 
 netfilter = None
 
@@ -243,26 +233,38 @@ class Interceptor(object):
 	QueueConfig = namedtuple("QueueConfig",
 		["queue", "queue_id", "nfq_handle", "nfq_socket", "verdictthread", "handler"])
 
-	def __init__(self):
+	def __init__(self, nfqueue_size=2048, rcvbufsiz=2048):
+		"""
+		nfqueue_size -- Sets the size of the queue in kernel. This fixes the maximum number of packets the
+			kernel will store before internally before dropping upcoming packets.
+		rcvbufsiz -- Sets the new size of the socket buffer. Use this setting to increase the socket buffer
+			size if your system is reporting ENOBUFS errors.
+		See: https://www.netfilter.org/projects/libnetfilter_queue/doxygen/
+
+		WARNING: Set nfqueue_size and rcvbufsiz to None (or lower values) if there are any problems on receiving
+		"""
 		self._netfilterqueue_configs = []
 		self._is_running = False
-		self.nfqueue_size = 2048
-		self.pkt_size = 4096
+		self._nfqueue_size = nfqueue_size
+		self._rcvbufsiz = rcvbufsiz
 
 	@staticmethod
 	def verdict_trigger_cycler(recv, nfq_handle, obj):
 		try:
 			while obj._is_running:
 				try:
+					# max IP packet size = 65535 bytes
 					bts = recv(65535)
 				except socket_timeout:
 					continue
 				except OSError as e:
-					if e.errno != errno.ENOBUFS:
-						raise e
-					continue
+					# Ignore ENOBUFS errors, we can't handle this anyway
+					# TODO: alternative is to set NETLINK_NO_ENOBUFS socket option
+					if e.errno == errno.ENOBUFS:
+						#logger.debug("Droppin' a packet, consider increasing receive buffer")
+						continue
+					raise e
 
-				#handle_packet(nfq_handle, bts, 65535)
 				handle_packet(nfq_handle, bts, len(bts))
 		except OSError as ex:
 			# eg "Bad file descriptor": started and nothing read yet
@@ -320,8 +322,14 @@ class Interceptor(object):
 		# fd, family, sockettype
 		nfq_socket = socket.fromfd(fd, 0, 0)  # 3
 
-		set_queue_maxlen(queue, self.nfqueue_size)
-		nfnl_rcvbufsiz(nf, self.nfqueue_size * self.pkt_size)
+		if self._nfqueue_size is not None:
+			ret = set_queue_maxlen(queue, self._nfqueue_size)
+			if ret == -1:
+				logger.warning("Could not set queue_maxlen to %d", self._nfqueue_size)
+
+		if self._rcvbufsiz is not None:
+			ret = nfnl_rcvbufsiz(nf, self._rcvbufsiz)
+			logger.debug("Update rcvbufsiz: %d", ret)
 
 		# TODO: better solution to check for running state? close socket and raise exception does not work in stop()
 		nfq_socket.settimeout(1)

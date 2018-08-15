@@ -154,9 +154,10 @@ psock.close()
 - Optional: netifaces >=0.10.6 (for utils)
 - Optional (for interceptor):
   - CPython
-  - Linux based system
+  - Linux based system with kernel support for NFQUEUE target. The config option is at:
+	- Networking Options -> Network packet filtering -> Core Netfilter -> NFQUEUE target
   - iptables
-  - NFQUEUE target support in kernel for packet intercepting
+    - NFQUEUE related rulez can be added eg "iptables -I INPUT 1 -j NFQUEUE --queue-num 0"
   - libnetfilter_queue library (see http://www.netfilter.org/projects/libnetfilter_queue)
 
 ## Installation

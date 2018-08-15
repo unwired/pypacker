@@ -190,3 +190,14 @@ class SocketHndl(object):
 			self._socket.close()
 		except:
 			pass
+
+
+def get_sslsocket(hostname, port, timeout=5, **sslparams):
+	"""
+	return -- SSL wrapped TCP socket, not complaining about any server certificates
+	"""
+	context = ssl.create_default_context()
+	socket_simple = socket.create_connection((hostname, port))
+	socket_ssl = context.wrap_socket(socket_simple, server_hostname=hostname, **sslparams)
+	socket_ssl.settimeout(timeout)
+	return socket_ssl
