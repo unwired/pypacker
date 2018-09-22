@@ -209,6 +209,28 @@ class CMSlacParmCnf(Packet):
 	)
 
 
+class CMSlacMatchReq(Packet):
+	__hdr__ = (
+		("apptype", "B", 0),
+		("sectype", "B", 0),
+		("mvflen", "H", 0),
+		("pevid", "17s", b"\x00" * 17),
+		("pevmac", "6s", b"\x00" * 6),
+		("evseid", "17s", b"\x00" * 17),
+		("evsemac", "6s", b"\x00" * 6),
+		("runid", "Q", 0),
+		("rsvd", "Q", 0)
+	)
+
+	def _get_mvflen_be(self):
+		return unpack_H(pack_H_le(self.mvflen))[0]
+
+	def _set_mvflen_be(self, val):
+		self.mvflen = unpack_H(pack_H_le(val))[0]
+
+	mvflen_be = property(_get_mvflen_be, _set_mvflen_be)
+
+
 class CMStartAttenCharInd(Packet):
 	__hdr__ = (
 		("apptype", "B", 0),
@@ -231,28 +253,6 @@ class CMMnbcSoundInd(Packet):
 		("rsvd", "8s", b"\x00" * 8),
 		("rnd", "16s", b"\x00" * 16)
 	)
-
-
-class CMSlacMatchReq(Packet):
-	__hdr__ = (
-		("apptype", "B", 0),
-		("sectype", "B", 0),
-		("mvflen", "H", 0),
-		("pevid", "17s", b"\x00" * 17),
-		("pevmac", "6s", b"\x00" * 6),
-		("evseid", "17s", b"\x00" * 17),
-		("evsemac", "6s", b"\x00" * 6),
-		("runid", "Q", 0),
-		("rsvd", "8s", b"\x00" * 8)
-	)
-
-	def _get_mvflen_be(self):
-		return unpack_H(pack_H_le(self.mvflen))[0]
-
-	def _set_mvflen_be(self, val):
-		self.mvflen = unpack_H(pack_H_le(val))[0]
-
-	mvflen_be = property(_get_mvflen_be, _set_mvflen_be)
 
 
 class CMSlacMatchCnf(Packet):
@@ -319,8 +319,53 @@ class AMPMapCnf(Packet):
 	)
 
 
-MASK_FRAGINFO = 0xF0
-MASK_FRAGNUMBER = 0x0F
+class CMPKCSCertReq(Packet):
+	__hdr__ = (
+		("targetmac", "6s", b"\x00" * 6),
+		("ciphersuitesize", "B", 0),
+		("cipersuite", None, TriggerList)
+	)
+
+
+class CMPKCSCertCnf(Packet):
+	__hdr__ = (
+		("targetmac", "6s", b"\x00" * 6),
+		("status", "B", 0),
+		("cipersuite", "H", 0),
+		("certlen", "H", 0),
+		("certpackage", None, TriggerList)
+	)
+
+
+class CMPKCSCertInd(Packet):
+	"""
+	When the CM_SLAC_PARM.CNF indicates that Secure SLAC is required, the PEV-HLE
+	shall send a CM_PKCS_CERT.IND message. The Target MAC address for this message
+	shall be set to MAC address of the PEV Green PHY station. To ensure reliable
+	reception of this message at all EVSEs, it is recommended that this message be
+	transmitted at least three times by the PEV-HLE. If the CM_PKCS_CERT.IND message is
+	larger than 502 Octets, the message shall be fragmented by the HLE (refer to
+	Section 11.1.7).
+	"""
+	__hdr__ = (
+		("targetmac", "6s", b"\x00" * 6),
+		("cipersuite", "H", 0),
+		("certlen", "H", 0),
+		("certpackage", None, TriggerList)
+	)
+
+
+class CMPKCSCertRsp(Packet):
+	__hdr__ = (
+		("targetmac", "6s", b"\x00" * 6),
+		("status", "B", 0),
+		("ciphersuitesize", "B", 0),  # optional
+		("cipersuite", None, TriggerList)
+	)
+
+
+MASK_FRAGINDEX = 0xF0
+MASK_FRAGCOUNT = 0x0F
 
 
 class Slac(Packet):
@@ -348,7 +393,11 @@ class Slac(Packet):
 		VS_PL_LNK_STATUS | MMTYPELSB_REQUEST: VSPLLinkStatusReq,
 		VS_PL_LNK_STATUS | MMTYPELSB_CONFIRM: VSPLLinkStatusCnf,
 		CM_AMP_MAP | MMTYPELSB_REQUEST: AMPMapReq,
-		CM_AMP_MAP | MMTYPELSB_CONFIRM: AMPMapCnf
+		CM_AMP_MAP | MMTYPELSB_CONFIRM: AMPMapCnf,
+		CM_PKCS_CERT | MMTYPELSB_REQUEST: CMPKCSCertReq,
+		CM_PKCS_CERT | MMTYPELSB_CONFIRM: CMPKCSCertCnf,
+		CM_PKCS_CERT | MMTYPELSB_INDICATION: CMPKCSCertInd,
+		CM_PKCS_CERT | MMTYPELSB_RESPONSE: CMPKCSCertRsp
 	}
 
 	def _dissect(self, buf):
@@ -365,21 +414,21 @@ class Slac(Packet):
 		self._init_handler(typeinfo_be, buf[hlen:])
 		return hlen
 
-	def _get_fraginfo(self):
-		return (self.frag_info & MASK_FRAGINFO) >> 4
+	def _get_fragcount(self):
+		return (self.frag_info & MASK_FRAGCOUNT)
 
-	def _set_fraginfo(self, fraginfo):
-		self.frag_info = (self.frag_info & ~MASK_FRAGINFO) | ((fraginfo << 4) & MASK_FRAGINFO)
+	def _set_fragcount(self, fragcount):
+		self.frag_info = (self.frag_info & ~MASK_FRAGCOUNT) | (fragcount & MASK_FRAGCOUNT)
 
-	fraginfo = property(_get_fraginfo, _set_fraginfo)
+	fragcount = property(_get_fragcount, _set_fragcount)
 
-	def _get_fragnumber(self):
-		return self.frag_info & MASK_FRAGNUMBER
+	def _get_fragindex(self):
+		return (self.frag_info & MASK_FRAGINDEX) >> 4
 
-	def _set_fragnumber(self, fragnum):
-		self.frag_info = (self.frag_info & ~MASK_FRAGNUMBER) | (fragnum & MASK_FRAGNUMBER)
+	def _set_fragindex(self, fragindex):
+		self.frag_info = (self.frag_info & ~MASK_FRAGINDEX) | ((fragindex << 4) & MASK_FRAGINDEX)
 
-	fragnum = property(_get_fragnumber, _set_fragnumber)
+	fragindex = property(_get_fragindex, _set_fragindex)
 
 	def _get_msgtype(self):
 		typetmp = self.typeinfo & MASK_MSGTYPE_LE
@@ -387,7 +436,7 @@ class Slac(Packet):
 
 	def _set_msgtype(self, msgtype):
 		typetmp = unpack_H(pack_H_le(msgtype))[0]
-		self.typeinfo = typetmp & MASK_MSGTYPE_LE
+		self.typeinfo = (self.typeinfo & ~MASK_MSGTYPE_LE) | (typetmp & MASK_MSGTYPE_LE)
 
 	# base message type given as BE
 	msgtype = property(_get_msgtype, _set_msgtype)
