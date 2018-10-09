@@ -1192,21 +1192,37 @@ def get_property_ip6(var):
 
 
 # DNS names
-def dns_name_decode(name):
+def dns_name_decode(name, dns_bytes=b''):
 	"""
 	DNS domain name decoder (bytes to string)
 
 	name -- example: b"\x03www\x07example\x03com\x00"
+	dns_bytes -- dns packet bytes (for handling message compression)
 	return -- example: "www.example.com."
 	"""
 	# ["www", "example", "com"]
 	name_decoded = []
+	parsed_pointers = set()
 	off = 1
+	buf = name
 
-	while off < len(name):
-		# b"xxx" -> "xxx"
-		name_decoded.append(name[off: off + name[off - 1]].decode())
-		off += name[off - 1] + 1
+	while off < len(buf):
+		size = buf[off-1]
+		if size == 0:
+			break
+		elif (size & 0b11000000) == 0:
+			# b"xxx" -> "xxx"
+			name_decoded.append(buf[off:off + size].decode())
+			off += size + 1
+		else:
+			# dns message compression
+			off = (((buf[off-1] & 0b00111111) << 8) | buf[off]) + 1
+			buf = dns_bytes
+
+			if off in parsed_pointers:
+				# dns message loop, abort...
+				break
+			parsed_pointers.add(off)
 	return ".".join(name_decoded) + "."
 
 
@@ -1230,7 +1246,7 @@ def dns_name_encode(name):
 def get_property_dnsname(var):
 	"""Create a get/set-property for a DNS name."""
 	return property(
-		lambda obj: dns_name_decode(obj.__getattribute__(var)),
+		lambda obj: dns_name_decode(obj.__getattribute__(var), obj.dns_bytes),
 		lambda obj, val: obj.__setattr__(var, dns_name_encode(val))
 	)
 

@@ -103,7 +103,23 @@ class DNS(pypacker.Packet):
 		("addrecords", None, triggerlist.TriggerList)
 	)
 
-	class Query(pypacker.Packet):
+	class MessageCompression(pypacker.Packet):
+		"""DNS subfield which supports DNS message compression."""
+		__hdr__ = tuple()
+
+		def __init__(self, *args, **kwargs):
+			super().__init__(*args, **kwargs)
+			self._dns_bytes = b''
+
+		@property
+		def dns_bytes(self):
+			return self._dns_bytes
+
+		@dns_bytes.setter
+		def dns_bytes(self, value):
+			self._dns_bytes = value
+
+	class Query(MessageCompression):
 		"""DNS question."""
 		__hdr__ = (
 			("name", None, b"\x03www\x04test\x03com\x00"),
@@ -119,10 +135,10 @@ class DNS(pypacker.Packet):
 			#logger.debug("val / format: %s %s" % (self._name, self._name_format))
 			return len(buf)  # name (including 0) + type + cls
 
-	class Answer(pypacker.Packet):
+	class Answer(MessageCompression):
 		"""DNS resource record."""
 		__hdr__ = (
-			("name", "H", 0xc00c),
+			("name", None, b"\xc0\x0c"),
 			("type", "H", DNS_A),
 			("cls", "H", DNS_IN),
 			("ttl", "I", 180),
@@ -130,14 +146,20 @@ class DNS(pypacker.Packet):
 			("address", None, b"1234")		# eg IPv4
 		)
 
-		def _dissect(self, buf):
-			# needed set format
-			addr_len = unpack_H(buf[10:12])[0]
-			self.address = buf[12:12 + addr_len]
-			# logger.debug("address: %s" % self.address)
-			return 12 + addr_len
+		name_s = pypacker.get_property_dnsname("name")
+		address_s = pypacker.get_property_dnsname("address")
 
-	class Auth(pypacker.Packet):
+		def _dissect(self, buf):
+			name_end = DNS.get_dns_length(buf)
+			self.name = buf[:name_end]
+			# needed set format
+			start = name_end + 8
+			addr_len = unpack_H(buf[start:start+2])[0]
+			self.address = buf[start+2:start+2+addr_len]
+			# logger.debug("address: %s" % self.address)
+			return start + 2 + addr_len
+
+	class Auth(MessageCompression):
 		"""Auth, generic type."""
 		__hdr__ = (
 			("name", "H", 0),
@@ -162,7 +184,7 @@ class DNS(pypacker.Packet):
 
 			return idx + 1
 
-	class AuthSOA(pypacker.Packet):
+	class AuthSOA(MessageCompression):
 		"""
 		Auth type SOA.
 		Not used atm
@@ -264,6 +286,7 @@ class DNS(pypacker.Packet):
 			#logger.debug("Query is: %s" % buf[off: q_end])
 			#logger.debug(len(buf[off: q_end]))
 			q = DNS.Query(buf[off: q_end])
+			q.dns_bytes = buf
 			# logger.debug("query is following..")
 			#logger.debug("Query: %s" % q)
 			# logger.debug("query name format: %s" % q._name_format)
@@ -286,6 +309,7 @@ class DNS(pypacker.Packet):
 			a_end += (2 + dlen)
 			#logger.debug("Answer is: %r" % buf[off: a_end])
 			a = DNS.Answer(buf[off: a_end])
+			a.dns_bytes = buf
 			# logger.debug("Answer: %s" % a)
 			self.answers.append(a)
 			off = a_end
@@ -300,6 +324,7 @@ class DNS(pypacker.Packet):
 			authlen = 12 + dlen
 			# logger.debug("Auth: %r" % buf[off: off + authlen])
 			a = DNS.Auth(buf[off: off + authlen])
+			a.dns_bytes = buf
 
 			# logger.debug("Auth server: %s" % a)
 			self.auths.append(a)
