@@ -3,7 +3,6 @@
 </p>
 
 [![Build Status](https://travis-ci.org/mike01/pypacker.svg?branch=master)](https://travis-ci.org/mike01/pypacker)
-[![Code Health](https://landscape.io/github/mike01/pypacker/master/landscape.svg?style=flat)](https://landscape.io/github/mike01/pypacker/master)
 [![version](http://img.shields.io/pypi/v/pypacker.svg)](https://pypi.python.org/pypi/pypacker)
 [![supported-versions](https://img.shields.io/pypi/pyversions/pypacker.svg)](https://pypi.python.org/pypi/pypacker)
 [![supported-implementations](https://img.shields.io/pypi/implementation/pypacker.svg)](https://pypi.python.org/pypi/pypacker)
@@ -15,39 +14,48 @@ It lets you create packets manually by defining every aspect of all header data,
 dissect packets by parsing raw packet bytes, sending/receiving packets on different layers and intercepting packets.
 
 ## What you can do with Pypacker
-Create Packets giving specific values or take the defaults:
+Create custom Packets (via keywords) or from raw bytes and change their data:
 
 ```python
 from pypacker.layer3.ip import IP
 from pypacker.layer3.icmp import ICMP
 
+# Packet via keywords
 ip0 = IP(src_s="127.0.0.1", dst_s="192.168.0.1", p=1) +\
 	ICMP(type=8) +\
 	ICMP.Echo(id=123, seq=1, body_bytes=b"foobar")
 
-# output packet
+# Packet from raw bytes. ip1_bts can also be retrieved via ip0.bin()
+ip1_bts = b"E\x00\x00*\x00\x00\x00\x00@\x01;)\x7f\x00\x00\x01\xc0\xa8\x00\x01\x08\x00\xc0?\x00{\x00\x01\x00\x00\x00\x00\x00\x00\x00\x00foobar"
+ip1 = IP(ip1_bts) 
+# Change source IPv4 address
+ip0.src_s = "1.2.3.4"
+# Change ICMP payload
+ip0[IP,ICMP,ICMP.Echo].body_bytes = b"foobar2"
+
+# Output packet (similar result for ip1)
 print("%s" % ip0)
 layer3.ip.IP
         v_hl        : 0x45 = 69 = 0b1000101
         tos         : 0x0 = 0 = 0b0
-        len         : 0x2A = 42 = 0b101010
+        len         : 0x2B = 43 = 0b101011
         id          : 0x0 = 0 = 0b0
         off         : 0x0 = 0 = 0b0
         ttl         : 0x40 = 64 = 0b1000000
         p           : 0x1 = 1 = 0b1
-        sum         : 0x3B29 = 15145 = 0b11101100101001
-        src         : b'\x7f\x00\x00\x01' = 127.0.0.1
+        sum         : 0xB623 = 46627 = 0b1011011000100011
+        src         : b'\x01\x02\x03\x04' = 1.2.3.4
         dst         : b'\xc0\xa8\x00\x01' = 192.168.0.1
         opts        : []
 layer3.icmp.ICMP
         type        : 0x8 = 8 = 0b1000
         code        : 0x0 = 0 = 0b0
-        sum         : 0xC03F = 49215 = 0b1100000000111111
+        sum         : 0x8E3F = 36415 = 0b1000111000111111
 layer3.icmp.Echo
         id          : 0x7B = 123 = 0b1111011
         seq         : 0x1 = 1 = 0b1
         ts          : 0x0 = 0 = 0b0
-        body_bytes: b'foobar'
+        bodybytes: b'foobar2'
 ```
 
 Read/write packets from/to file (pcap/tcpdump format):
@@ -70,6 +78,37 @@ for ts, buf in preader:
 		pwriter.write(eth.bin())
 
 pwriter.close()
+```
+
+Send/receive layer 2 packets:
+
+```python
+from pypacker import psocket
+from pypacker.layer12 import ethernet
+
+psock = psocket.SocketHndl(timeout=10)
+
+def filter_pkt(pkt):
+	return pkt.ip.tcp.sport == 80
+
+# Receive raw bytes
+for raw_bytes in psock:
+	eth = ethernet.Ethernet(raw_bytes)
+	print("Got packet: %r" % eth)
+	eth.reverse_address()
+	eth.upper_layer.reverse_address()
+	# Send bytes
+	psock.send(eth.bin())
+	# Receive raw bytes
+	bts = psock.recv()
+	# Send/receive based on source/destination data in packet
+	pkts = psock.sr(packet_ip)
+	# Use filter to get specific packets
+	pkts = psock.recvp(filter_match_recv=filter_pkt)
+	# stop on first packet
+	break
+
+psock.close()
 ```
 
 Intercept (and modificate) Packets eg for MITM:
@@ -106,47 +145,6 @@ print("now sind a ICMP echo request to localhost: ping 127.0.0.1")
 time.sleep(999)
 ictor.stop()
 ```
-
-Send/receive layer 2 packets:
-
-```python
-# send/receive raw bytes
-from pypacker import psocket
-from pypacker.layer12 import ethernet
-from pypacker.layer3 import ip
-
-psock = psocket.SocketHndl(timeout=10)
-
-def filter_pkt(pkt):
-	return pkt.ip.tcp.sport == 80
-
-for raw_bytes in psock:
-	eth = ethernet.Ethernet(raw_bytes)
-	print("Got packet: %r" % eth)
-	eth.reverse_address()
-	eth.upper_layer.reverse_address()
-	psock.send(eth.bin())
-	# Send/receive based on source/destination data
-	pkts = psock.sr(packet_ip)
-	# Use filter to get specific packets
-	pkts = psock.recvp(filter_match_recv=filter_pkt)
-	# stop on first packet
-	break
-
-psock.close()
-```
-
-## Key features
-
-- Create network packets on different OSI layers using keywords like MyPacket(value=123) or raw bytes MyPacket(b"value")
-- Concatination of layers via "+" like packet = layer1 + layer2
-- Fast access to layers via packet[tcp.TCP]
-- Readable packet structure using print(packet) or similar statements
-- Read/store packets via Pcap/tcpdump file reader/writer
-- Live packet reading/writing using a wrapped socket API
-- Auto Checksum calculation capabilities
-- Intercept Packets using NFQUEUE targets
-- Easily create new protocols (see FAQ below)
 
 
 ## Prerequisites
@@ -268,7 +266,7 @@ by their respective RFCs/official standards.
 
 **Q**: How can I contribute to this project?
 
-**A**: Please use the Github bug-tracker for bugs/feature request. Please read the bugtracker for
+**A**: Please use the Gitlab bug-tracker for bugs/feature request. Please read the bugtracker for
      already known bugs before filing a new one. Patches can be send via pull request.
 
 **Q**:	Under which license Pypacker is issued?
@@ -316,6 +314,8 @@ packet_found = pkt[Telnet]
 # Alternative: Use multi-value index-notation. This will stop parsing at any non-matching layer:
 packet_found = pkt[Ethernet,IP,TCP,Telnet]
 ```
+
+- Use pypy instead of cpython (~3x faster related to full packet parsing)
 
 - For even more performance disable auto fields (affects calling bin(...)):
 ```

@@ -80,7 +80,7 @@ def is_interface_up(iface):
 
 def set_interface_mode(iface, monitor_active=None, mtu=None, state_active=None):
 	"""
-	Configure an interface
+	Configure an interface, primarily for wifi monitor mode
 	Requirements: ifconfig, iwconfig
 
 	monitor_active -- activate/deactivate monitor mode (only for wlan interfaces)
@@ -110,6 +110,21 @@ def set_interface_mode(iface, monitor_active=None, mtu=None, state_active=None):
 	if state_active or initial_state_up:
 		cmd_call = ["ifconfig", iface, "up"]
 		subprocess.check_call(cmd_call)
+
+
+def is_interface_present(iface_name):
+	try:
+		netifaces.ifaddresses(iface_name)
+		return True
+	except ValueError:
+		# raised if interface is not present
+		return False
+
+
+def set_interface_state(iface_name, state_active=True):
+	state_str = "up" if state_active else "down"
+	output = subprocess.getoutput("ip link set dev %s %s" % (iface_name, state_str))
+	logger.debug(output)
 
 
 PROG_CHANNEL = re.compile(br"Channel ([\d]+) :")

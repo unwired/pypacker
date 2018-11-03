@@ -160,7 +160,7 @@ class LLDPChassisId(pypacker.Packet):
 
 	def __get_value(self):
 		if self.subtype not in GET_CHASSIS_TLV_SUBTYPES.keys():
-			return self.value
+			return self.value.decode()
 		return GET_CHASSIS_TLV_SUBTYPES.get(self.subtype)(self.value)
 
 	def __set_value(self, value):
@@ -190,7 +190,7 @@ class LLDPPortId(pypacker.Packet):
 
 	def __get_value(self):
 		if self.subtype not in GET_PORT_TLV_SUBTYPES.keys():
-			return self.value
+			return self.value.decode()
 		return GET_PORT_TLV_SUBTYPES.get(self.subtype)(self.value)
 
 	def __set_value(self, value):
@@ -301,7 +301,7 @@ class LLDPManagementAddress(pypacker.Packet):
 
 	def __get_addrval(self):
 		if self.addrsubtype not in GET_ADDRESS_SUBTYPE.keys():
-			return self.addrval
+			return ""
 		return GET_ADDRESS_SUBTYPE.get(self.addrsubtype)(self.addrval)
 
 	def __set_addrval(self, value):

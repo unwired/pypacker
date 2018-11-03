@@ -18,12 +18,11 @@ class TriggerList(list):
 
 	def __init__(self, packet, dissect_callback=None, buffer=b"", headerfield_name=""):
 		"""
-		packet -- packet where this TriggerList gets ingegrated
+		packet -- packet where this TriggerList gets integrated
 		dissect_callback -- callback which dessects byte string b"buffer", returns [a, b, c, ...]
 		buffer -- byte string to be dissected
 		headerfield_name -- name of this triggerlist when placed in a packet
 		"""
-		# TODO: needed?
 		super().__init__()
 		# set by external Packet
 		# logger.debug(">>> init of TriggerList (contained in %s): %s" %
@@ -47,21 +46,11 @@ class TriggerList(list):
 
 		initial_list_content = self._dissect_callback(self._cached_result)
 		self._dissect_callback = None
-		super().extend(initial_list_content)
-
-		# TODO: this is a bit redundant compared to _notify_change()
-		# TriggerList observes changes on packets:
-		# base packet <- TriggerList (observes changes, set changed status
-		# in basepacket) <- contained packet (changes)
-		for v in self:
-			try:
-				v._add_change_listener(self._notify_change)
-			# logger.debug("amount changelistener: %d" % len(self._packet._changelistener))
-			# logger.debug("amount changelistener: %d" % len(v._changelistener))
-			except AttributeError:
-				# this will fail if val is not a packet
-				# logger.debug(e)
-				pass
+		# This is re-calling _lazy_dissect() but directly returning after second if
+		# extend() is clearing cache -> remember cache
+		cache_tmp = self._cached_result
+		self.extend(initial_list_content)
+		self._cached_result = cache_tmp
 
 	# Python predefined overwritten methods
 
@@ -96,7 +85,7 @@ class TriggerList(list):
 			itemlist = self[k]
 		super().__delitem__(k)
 		# logger.debug("removed, handle mod")
-		self.__refresh_listener(itemlist, add_listener=False)
+		self.__refresh_listener(itemlist, connect_packet=False)
 
 	# logger.debug("finished removing")
 
@@ -130,24 +119,39 @@ class TriggerList(list):
 		self._lazy_dissect()
 		items = [item for item in self]
 		super().clear()
-		self.__refresh_listener(items, add_listener=False)
+		self.__refresh_listener(items, connect_packet=False)
 
 	# TODO: pop(...) needed?
 
-	def __refresh_listener(self, val, add_listener=True):
+	def __refresh_listener(self, val, connect_packet=True):
 		"""
 		Handle modifications of this TriggerList (adding, removing, ...).
+		WARNING: packets can only be put in one tl once at a time
 
 		val -- list of bytes, tuples or packets
-		add_listener -- re-add listener if True
+		connect_packet -- connect packet to this tl and parent packet
 		"""
 		for v in val:
 			try:
-				# react on changes of packets in this triggerlist -> call _notify_change on change
-				v._remove_change_listener(None, remove_all=True)
-
-				if add_listener:
-					v._add_change_listener(self._notify_change)
+				if connect_packet:
+					if v._triggelistpacket_parent is not None and v._triggelistpacket_parent != self._packet:
+						logger.warning("Packet %s currently in tl of %s is re-added to another tl in %s" %
+							(v.__class__, v._triggelistpacket_parent.__class__, self._packet.__class__))
+						v._remove_change_listener(None, remove_all=True)
+					# Add this TL as change listener to the header-packet
+					# Needed to react on changes of packets in this triggerlist -> call _notify_change on change
+					# TriggerList observes changes on packets:
+					# base packet <- TriggerList (observes changes, set changed status
+					# in basepacket) <- contained packet (changes)
+					lwrapper = lambda: self._notify_change()
+					v._add_change_listener(lwrapper)
+					# allow packet in tl to access packet containing this tl
+					v._triggelistpacket_parent = self._packet
+				else:
+					# remove any old listener
+					v._remove_change_listener(None, remove_all=True)
+					# remove old parent
+					v._triggelistpacket_parent = None
 			except AttributeError:
 				# this will fail if val is not a packet
 				# logger.debug(e)

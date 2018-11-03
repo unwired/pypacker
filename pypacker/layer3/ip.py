@@ -103,6 +103,7 @@ class IP(pypacker.Packet):
 
 	def __set_v(self, value):
 		self.v_hl = (value << 4) | (self.v_hl & 0xf)
+	# version
 	v = property(__get_v, __set_v)
 
 	def __get_hl(self):
@@ -110,6 +111,7 @@ class IP(pypacker.Packet):
 
 	def __set_hl(self, value):
 		self.v_hl = (self.v_hl & 0xf0) | value
+	# header length
 	hl = property(__get_hl, __set_hl)
 
 	def __get_flags(self):

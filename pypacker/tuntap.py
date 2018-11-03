@@ -26,6 +26,8 @@ import subprocess
 import netifaces
 import logging
 
+from pypacker import utils
+
 logger = logging.getLogger("pypacker")
 
 # Some constants used to ioctl the device file
@@ -51,17 +53,18 @@ class TunInterface(object):
 		ifacetype=TYPE_TUN,
 		ip_src="12.34.56.1",
 		ip_dst="12.34.56.2",
-		create_ondemand=False):
+		create_ondemand=False,
+		is_local_tunnel=False):
 		self._closed = False
 		self._tun_iface_name = tun_iface_name
 		self._is_newly_created = False
 		self._ifacetype = ifacetype
 
-		if not TunInterface.is_interface_present(tun_iface_name):
+		if not utils.is_interface_present(tun_iface_name):
 			if not create_ondemand:
 				raise Exception("Did not find %s and won't create ondemand" % tun_iface_name)
 			else:
-				TunInterface.create_interface_os(
+				TunInterface.create_tun_interface(
 					tun_iface_name,
 					iface_type_str=TYPE_STR_DCT[ifacetype]
 				)
@@ -69,8 +72,10 @@ class TunInterface(object):
 		else:
 			logger.debug("Found interface %s", tun_iface_name)
 
-		TunInterface.configure_interface_os(tun_iface_name, ip_src, ip_dst)
-		TunInterface.activate_interface_os(tun_iface_name)
+		TunInterface.configure_tun_interface(tun_iface_name,
+			ip_src, ip_dst,
+			is_local_tunnel=is_local_tunnel)
+		utils.set_interface_state(tun_iface_name, state_active=True)
 
 		# Open TUN device file
 		# TODO: multiqueue?
@@ -88,47 +93,37 @@ class TunInterface(object):
 	is_newly_created = property(lambda self: self._is_newly_created)
 
 	@staticmethod
-	def is_interface_present(iface_name):
-		try:
-			netifaces.ifaddresses(iface_name)
-			return True
-		except ValueError:
-			# raised if interface is not present
-			return False
-
-	@staticmethod
-	def activate_interface_os(iface_name):
-		output = subprocess.getoutput("ip link set dev %s up" % iface_name)
-		logger.debug(output)
-
-	@staticmethod
-	def create_interface_os(iface_name, iface_type_str="tun"):
+	def create_tun_interface(iface_name, iface_type_str="tun"):
 		output = subprocess.getoutput("ip tuntap add dev %s mode %s" % (iface_name, iface_type_str))
 		logger.debug(output)
 
 	@staticmethod
-	def configure_interface_os(iface_name, ip_src, ip_dst):
+	def configure_tun_interface(iface_name, ip_src, ip_dst, is_local_tunnel=False):
 		output = subprocess.getoutput("ifconfig %s %s pointopoint %s" % (iface_name, ip_src, ip_dst))
 		logger.debug(output)
-		# Packet with target ip_dst goes through "lo" if ip_dst is on the same host.
-		# Avoid this by removing local rules
-		output = subprocess.getoutput("ip route del %s table local" % ip_src)
-		logger.debug(output)
-		# pointopoint creates implicit rule in "main"
-		# Problem if src/dst tun are on the same host: packets pop out of tun1 (target), but the kernel
-		# does not recognize them as being addressed to the local host. (we removed the rule above)
-		# Solution: distinct routing decisions and configure routing in such a way that the local
-		# type routes are only "seen" by the input routing decision
-		output = subprocess.getoutput("ip route add local %s dev %s table 13" % (ip_src, iface_name))
-		logger.debug(output)
-		# make sure previous rules have been removed
-		output = subprocess.getoutput("ip rule del iif %s lookup 13" % iface_name)
-		logger.debug(output)
-		output = subprocess.getoutput("ip rule add iif %s lookup 13" % iface_name)
-		logger.debug(output)
+
+		if is_local_tunnel:
+			# Packet with target ip_dst goes through "lo" if ip_dst is on the same host.
+			# Avoid this by removing local rules
+			# TODO: bind() doesn't work with this
+			# TODO: avoid this if tun1 is not local (only tun0 or vose versa)
+			output = subprocess.getoutput("ip route del %s table local" % ip_src)
+			logger.debug(output)
+			# pointopoint creates implicit rule in "main"
+			# Problem if src/dst tun are on the same host: packets pop out of tun1 (target), but the kernel
+			# does not recognize them as being addressed to the local host. (we removed the rule above)
+			# Solution: distinct routing decisions and configure routing in such a way that the local
+			# type routes are only "seen" by the input routing decision
+			output = subprocess.getoutput("ip route add local %s dev %s table 13" % (ip_src, iface_name))
+			logger.debug(output)
+			# make sure previous rules have been removed
+			output = subprocess.getoutput("ip rule del iif %s lookup 13" % iface_name)
+			logger.debug(output)
+			output = subprocess.getoutput("ip rule add iif %s lookup 13" % iface_name)
+			logger.debug(output)
 
 	@staticmethod
-	def destroy_interface_os(iface_name, iface_type_str="tun", obj=None):
+	def destroy_tun_interface(iface_name, iface_type_str="tun", obj=None):
 		logger.debug("Trying to destroy interface %s", iface_name)
 		#output = subprocess.getoutput("ip link set dev %s down" % iface_name)
 		#logger.debug(output)
@@ -151,7 +146,7 @@ class TunInterface(object):
 			# write after closing
 			pass
 
-	def close(self):
+	def close(self, destroy_iface=False):
 		if self._closed:
 			return
 		self._closed = True
@@ -166,10 +161,10 @@ class TunInterface(object):
 			logger.warning("Could not close %s", self._tun_iface_name)
 			print(ex)
 		#time.sleep(2)
-		if self._is_newly_created:
+		if self._is_newly_created or destroy_iface:
 			# destroy interface only if it was auto-created
 			logger.debug("Destroying %s", self._tun_iface_name)
-			TunInterface.destroy_interface_os(
+			TunInterface.destroy_tun_interface(
 				self._tun_iface_name,
 				iface_type_str=TYPE_STR_DCT[self._ifacetype],
 				obj=self)
@@ -180,11 +175,17 @@ class LocalTunnel(object):
 	Local Back-to-back tunnel based on tun interfaces: local <-> tun1 <-> tun2 <-> local
 	"""
 	def __init__(self, ip_src="12.34.56.1", ip_dst="12.34.56.2"):
+		# TODO: enable for use with external tooling (eg netcat)
+		islocaltunnel = False
 		self._state_active = False
-		self._tundev0 = TunInterface(tun_iface_name="tun0", create_ondemand=True,
-			ip_src=ip_src, ip_dst=ip_dst)
-		self._tundev1 = TunInterface(tun_iface_name="tun1", create_ondemand=True,
-			ip_src=ip_dst, ip_dst=ip_src)
+		self._tundev0 = TunInterface(tun_iface_name="tun0",
+			create_ondemand=True,
+			ip_src=ip_src, ip_dst=ip_dst,
+			is_local_tunnel=islocaltunnel)
+		self._tundev1 = TunInterface(tun_iface_name="tun1",
+			create_ondemand=True,
+			ip_src=ip_dst, ip_dst=ip_src,
+			is_local_tunnel=islocaltunnel)
 		self._rs_thread_tun0 = None
 		self._rs_thread_tun1 = None
 

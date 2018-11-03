@@ -13,8 +13,8 @@ from pypacker.pypacker_meta import MetaPacket, FIELD_FLAG_AUTOUPDATE, FIELD_FLAG
 from pypacker.structcbs import pack_mac, unpack_mac, pack_ipv4, unpack_ipv4
 
 logger = logging.getLogger("pypacker")
-# logger.setLevel(logging.DEBUG)
-#logger.setLevel(logging.WARNING)
+#logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.WARNING)
 
 logger_streamhandler = logging.StreamHandler()
 logger_formatter = logging.Formatter("%(levelname)s (%(funcName)s): %(message)s")
@@ -101,10 +101,11 @@ class Packet(object, metaclass=MetaPacket):
 	- Convenient access for standard types (MAC, IP address) using string-representations
 		This is done by appending "_s" to the attributename:
 		ip.src_s = "127.0.0.1"
-		ip_src_bytes = ip.src
+		ip_src_str = ip.src_s
 
 		Implementation info:
 		Convenient access should be set via varname_s = pypacker.Packet.get_property_XXX("varname")
+		Get/set via is always done using strings (not byte strings).
 	- Concatination via "layer1 + layer2 + layerX"
 	- Header-values with length < 1 Byte should be set by using properties
 	- Activate/deactivate non-TriggerList header fields by setting values (None=deactive, value=active)
@@ -579,12 +580,13 @@ class Packet(object, metaclass=MetaPacket):
 				name_s = " = " + getattr(self, name_real + "_s")
 			except AttributeError:
 				pass
-			# values: int, None, bytes, Triggerlist (Packets, tuples, bytes)
+			# Values: int
 			if type(val) is int:
 				layer_sums_l.append("%-12s: 0x%X = %d = %s" % (name_real, val, val, bin(val)) + name_s)
+			# Inactive
 			elif val is None:
 				layer_sums_l.append("%-12s: (inactive)" % name_real)
-			# bytes, triggerlist
+			# Values: bytes, Triggerlist (Packets, tuples, bytes)
 			else:
 				layer_sums_l.append("%-12s: %s" % (name_real, val) + name_s)
 
@@ -1011,10 +1013,10 @@ class Packet(object, metaclass=MetaPacket):
 		listener_cb -- the change listener to be added as callback-function
 		"""
 		try:
-			self._changelistener.append(listener_cb)
+			self._changelistener.add(listener_cb)
 		except AttributeError:
 			# change listener not yet initiated
-			self._changelistener = [listener_cb]
+			self._changelistener = set([listener_cb])
 
 	def _remove_change_listener(self, listener_cb, remove_all=False):
 		"""
@@ -1027,10 +1029,10 @@ class Packet(object, metaclass=MetaPacket):
 			if not remove_all:
 				self._changelistener.remove(listener_cb)
 			else:
-				del self._changelistener[:]
-		except (TypeError, AttributeError):
-			# not listener list initiated so far -> nothing to remove
-			self._changelistener = []
+				self._changelistener.clear()
+		except AttributeError:
+			# change listener not yet initiated
+			self._changelistener = set()
 
 	def _notify_changelistener(self):
 		"""
@@ -1049,7 +1051,7 @@ class Packet(object, metaclass=MetaPacket):
 					logger.exception("error when informing listener: %s", e)
 		except TypeError:
 			# no listener added so far -> nothing to notify
-			self._changelistener = []
+			self._changelistener = set()
 
 	@classmethod
 	def load_handler(cls, clz_add, handler):
@@ -1192,11 +1194,13 @@ def get_property_ip6(var):
 
 
 # DNS names
-def dns_name_decode(name):
+def dns_name_decode(name, cb_mc_bytes=lambda: b""):
 	"""
 	DNS domain name decoder (bytes to string)
 
 	name -- example: b"\x03www\x07example\x03com\x00"
+	cb_bytes -- callback to get bytes used to find name in case of Message Compression
+		cb_bytes_pointer(): bytes
 	return -- example: "www.example.com."
 	"""
 	# ["www", "example", "com"]
@@ -1227,10 +1231,16 @@ def dns_name_encode(name):
 	return b"".join(name_encoded) + b"\x00"
 
 
-def get_property_dnsname(var):
-	"""Create a get/set-property for a DNS name."""
+def get_property_dnsname(var, cb_mc_bytes=lambda obj: b""):
+	"""
+	Create a get/set-property for a DNS name.
+
+	cb_bytes -- callback to get bytes used to find name in case of Message Compression
+		cb_bytes_pointer(containing_obj): bytes
+	"""
 	return property(
-		lambda obj: dns_name_decode(obj.__getattribute__(var)),
+		lambda obj: dns_name_decode(obj.__getattribute__(var),
+			cb_mc_bytes=lambda: cb_mc_bytes(obj)),
 		lambda obj, val: obj.__setattr__(var, dns_name_encode(val))
 	)
 

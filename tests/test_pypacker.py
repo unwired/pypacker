@@ -2477,32 +2477,39 @@ class LLDPTestCase(unittest.TestCase):
 		self.assertEqual(pkt.upper_layer.tlvlist[0].tlv_len, tlv_value_len)
 		self.assertEqual(pkt.upper_layer.tlvlist[0].subtype, 4)
 		self.assertEqual(pkt.upper_layer.tlvlist[0].value_s, "00:01:30:F9:AD:A0")
+
 		self.assertEqual(type(pkt.upper_layer.tlvlist[1]).__name__, "LLDPPortId")
 		self.assertEqual(pkt.upper_layer.tlvlist[1].tlv_type, 2)
 		tlv_value_len = len(pkt.upper_layer.tlvlist[1].value) + 1
 		self.assertEqual(pkt.upper_layer.tlvlist[1].tlv_len, tlv_value_len)
 		self.assertEqual(pkt.upper_layer.tlvlist[1].subtype, 5)
-		self.assertEqual(pkt.upper_layer.tlvlist[1].value_s, b"1/1")
+		self.assertEqual(pkt.upper_layer.tlvlist[1].value_s, "1/1")
+
 		self.assertEqual(type(pkt.upper_layer.tlvlist[2]).__name__, "LLDPTTL")
 		self.assertEqual(pkt.upper_layer.tlvlist[2].tlv_type, 3)
 		self.assertEqual(pkt.upper_layer.tlvlist[2].seconds, 120)
 		self.assertEqual(type(pkt.upper_layer.tlvlist[3]).__name__, "LLDPPortDescription")
 		self.assertEqual(pkt.upper_layer.tlvlist[3].tlv_type, 4)
+
 		tlv_value_len = len(pkt.upper_layer.tlvlist[3].value)
 		self.assertEqual(pkt.upper_layer.tlvlist[3].tlv_len, tlv_value_len)
+
 		self.assertEqual(type(pkt.upper_layer.tlvlist[4]).__name__, "LLDPSystemName")
 		self.assertEqual(pkt.upper_layer.tlvlist[4].tlv_type, 5)
 		tlv_value_len = len(pkt.upper_layer.tlvlist[4].value)
 		self.assertEqual(pkt.upper_layer.tlvlist[4].tlv_len, tlv_value_len)
+
 		self.assertEqual(type(pkt.upper_layer.tlvlist[5]).__name__, "LLDPSystemDescription")
 		self.assertEqual(pkt.upper_layer.tlvlist[5].tlv_type, 6)
 		tlv_value_len = len(pkt.upper_layer.tlvlist[5].value)
 		self.assertEqual(pkt.upper_layer.tlvlist[5].tlv_len, tlv_value_len)
+
 		self.assertEqual(type(pkt.upper_layer.tlvlist[6]).__name__, "LLDPSystemCapabilities")
 		self.assertEqual(pkt.upper_layer.tlvlist[6].tlv_type, 7)
 		self.assertEqual(pkt.upper_layer.tlvlist[6].tlv_len, 4)
 		self.assertEqual(pkt.upper_layer.tlvlist[6].capabilities, 20)
 		self.assertEqual(pkt.upper_layer.tlvlist[6].enabled, 20)
+
 		self.assertEqual(type(pkt.upper_layer.tlvlist[7]).__name__, "LLDPManagementAddress")
 		self.assertEqual(pkt.upper_layer.tlvlist[7].tlv_type, 8)
 		tlv_len = len(pkt.upper_layer.tlvlist[7].bin())
@@ -2514,6 +2521,7 @@ class LLDPTestCase(unittest.TestCase):
 		self.assertEqual(pkt.upper_layer.tlvlist[7].ifnumber, 1001)
 		self.assertEqual(pkt.upper_layer.tlvlist[7].oidlen, 0)
 		self.assertEqual(pkt.upper_layer.tlvlist[7].oid, b"")
+
 		self.assertEqual(type(pkt.upper_layer.tlvlist[-1]).__name__, "LLDPDUEnd")
 		self.assertEqual(pkt.upper_layer.tlvlist[-1].tlv_type, 0)
 		self.assertEqual(pkt.upper_layer.tlvlist[-1].tlv_len, 0)

@@ -355,6 +355,9 @@ class MetaPacket(type):
 		# objects which get notified on changes on header or body (shared)
 		# needs to be None do identify none-initialized variable
 		t._changelistener = None
+		# parent of the packet which is contained in a triggerlist
+		# parent_packet.triggerlist[sub] -> sub._triggelistpacket_parent == parent_packet
+		t._triggelistpacket_parent = None
 		# lazy handler data: [name, class, bytes]
 		t._lazy_handler_data = None
 		# Indicates the most top layer until which should be unpacked

@@ -89,6 +89,14 @@ DNS_HESIOD		= 4
 DNS_ANY			= 255
 
 
+def get_bts_for_msg_compression(tl_packet):
+	"""return -- header bytes of DNS or b"" """
+	# DNS.Triggestlist[sub] -> sub._triggelistpacket_parent == DNS
+	if tl_packet._triggelistpacket_parent is not None:
+		return tl_packet._triggelistpacket_parent.header_bytes
+	return b""
+
+
 class DNS(pypacker.Packet):
 	__hdr__ = (
 		("id", "H", 0x1234),
@@ -111,7 +119,7 @@ class DNS(pypacker.Packet):
 			("cls", "H", DNS_IN)
 		)
 
-		name_s = pypacker.get_property_dnsname("name")
+		name_s = pypacker.get_property_dnsname("name", cb_mc_bytes=get_bts_for_msg_compression)
 
 		def _dissect(self, buf):
 			q_end = DNS.get_dns_length(buf)
@@ -184,7 +192,7 @@ class DNS(pypacker.Packet):
 			("minttl", "H", 0)
 		)
 
-		name_s = pypacker.get_property_dnsname("name")
+		name_s = pypacker.get_property_dnsname("name2")
 		mailbox_s = pypacker.get_property_dnsname("mailbox")
 
 		def _dissect(self, buf):
