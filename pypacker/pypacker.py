@@ -1192,7 +1192,7 @@ def get_property_ip6(var):
 
 
 # DNS names
-def dns_name_decode(name, dns_bytes=b''):
+def dns_name_decode(name, cb_mc_bytes=lambda: b""):
 	"""
 	DNS domain name decoder (bytes to string)
 
@@ -1217,7 +1217,7 @@ def dns_name_decode(name, dns_bytes=b''):
 		else:
 			# dns message compression
 			off = (((buf[off-1] & 0b00111111) << 8) | buf[off]) + 1
-			buf = dns_bytes
+			buf = cb_mc_bytes()
 
 			if off in parsed_pointers:
 				# dns message loop, abort...
@@ -1243,10 +1243,16 @@ def dns_name_encode(name):
 	return b"".join(name_encoded) + b"\x00"
 
 
-def get_property_dnsname(var):
-	"""Create a get/set-property for a DNS name."""
+def get_property_dnsname(var, cb_mc_bytes=lambda obj: b""):
+	"""
+	Create a get/set-property for a DNS name.
+
+	cb_bytes -- callback to get bytes used to find name in case of Message Compression
+	cb_bytes_pointer(containing_obj) -- bytes
+	"""
 	return property(
-		lambda obj: dns_name_decode(obj.__getattribute__(var), obj.dns_bytes),
+		lambda obj: dns_name_decode(obj.__getattribute__(var),
+			cb_mc_bytes=lambda: cb_mc_bytes(obj)),
 		lambda obj, val: obj.__setattr__(var, dns_name_encode(val))
 	)
 
