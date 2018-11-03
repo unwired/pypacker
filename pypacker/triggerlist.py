@@ -137,7 +137,7 @@ class TriggerList(list):
 					if v._triggelistpacket_parent is not None and v._triggelistpacket_parent != self._packet:
 						logger.warning("Packet %s currently in tl of %s is re-added to another tl in %s" %
 							(v.__class__, v._triggelistpacket_parent.__class__, self._packet.__class__))
-						v._remove_change_listener(None, remove_all=True)
+						v._remove_change_listener()
 					# Add this TL as change listener to the header-packet
 					# Needed to react on changes of packets in this triggerlist -> call _notify_change on change
 					# TriggerList observes changes on packets:
@@ -149,7 +149,7 @@ class TriggerList(list):
 					v._triggelistpacket_parent = self._packet
 				else:
 					# remove any old listener
-					v._remove_change_listener(None, remove_all=True)
+					v._remove_change_listener()
 					# remove old parent
 					v._triggelistpacket_parent = None
 			except AttributeError:

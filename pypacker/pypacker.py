@@ -1018,18 +1018,12 @@ class Packet(object, metaclass=MetaPacket):
 			# change listener not yet initiated
 			self._changelistener = set([listener_cb])
 
-	def _remove_change_listener(self, listener_cb, remove_all=False):
+	def _remove_change_listener(self):
 		"""
-		Remove callback from the list of listeners.
-
-		listener_cb -- the change listener to be removed
-		remove_all -- remove all listener at once
+		Remove all change listener.
 		"""
 		try:
-			if not remove_all:
-				self._changelistener.remove(listener_cb)
-			else:
-				self._changelistener.clear()
+			self._changelistener.clear()
 		except AttributeError:
 			# change listener not yet initiated
 			self._changelistener = set()
