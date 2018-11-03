@@ -88,12 +88,14 @@ DNS_CHAOS		= 3
 DNS_HESIOD		= 4
 DNS_ANY			= 255
 
+
 def get_bts_for_msg_compression(tl_packet):
 	"""return -- header bytes of DNS or b"" """
 	# DNS.Triggestlist[sub] -> sub._triggelistpacket_parent == DNS
 	if tl_packet._triggelistpacket_parent is not None:
 		return tl_packet._triggelistpacket_parent.header_bytes
 	return b""
+
 
 def get_bts_for_msg_compression(tl_packet):
 	"""return -- header bytes of DNS or b"" """
@@ -116,7 +118,6 @@ class DNS(pypacker.Packet):
 		("auths", None, triggerlist.TriggerList),
 		("addrecords", None, triggerlist.TriggerList)
 	)
-
 
 	class Query(pypacker.Packet):
 		"""DNS question."""
@@ -153,8 +154,8 @@ class DNS(pypacker.Packet):
 			self.name = buf[:name_end]
 			# needed set format
 			start = name_end + 8
-			addr_len = unpack_H(buf[start:start+2])[0]
-			self.address = buf[start+2:start+2+addr_len]
+			addr_len = unpack_H(buf[start:start + 2])[0]
+			self.address = buf[start + 2:start + 2 + addr_len]
 			# logger.debug("address: %s" % self.address)
 			return start + 2 + addr_len
 

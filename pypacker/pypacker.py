@@ -1204,7 +1204,7 @@ def dns_name_decode(name, cb_mc_bytes=lambda: b""):
 	buf = name
 
 	while off < len(buf):
-		size = buf[off-1]
+		size = buf[off - 1]
 		if size == 0:
 			break
 		elif (size & 0b11000000) == 0:
@@ -1213,7 +1213,7 @@ def dns_name_decode(name, cb_mc_bytes=lambda: b""):
 			off += size + 1
 		else:
 			# dns message compression
-			off = (((buf[off-1] & 0b00111111) << 8) | buf[off]) + 1
+			off = (((buf[off - 1] & 0b00111111) << 8) | buf[off]) + 1
 			buf = cb_mc_bytes()
 
 			if off in parsed_pointers:
