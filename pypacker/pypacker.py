@@ -1199,12 +1199,27 @@ def dns_name_decode(name, cb_mc_bytes=lambda: b""):
 	"""
 	# ["www", "example", "com"]
 	name_decoded = []
+	parsed_pointers = set()
 	off = 1
+	buf = name
 
-	while off < len(name):
-		# b"xxx" -> "xxx"
-		name_decoded.append(name[off: off + name[off - 1]].decode())
-		off += name[off - 1] + 1
+	while off < len(buf):
+		size = buf[off-1]
+		if size == 0:
+			break
+		elif (size & 0b11000000) == 0:
+			# b"xxx" -> "xxx"
+			name_decoded.append(buf[off:off + size].decode())
+			off += size + 1
+		else:
+			# dns message compression
+			off = (((buf[off-1] & 0b00111111) << 8) | buf[off]) + 1
+			buf = cb_mc_bytes()
+
+			if off in parsed_pointers:
+				# dns message loop, abort...
+				break
+			parsed_pointers.add(off)
 	return ".".join(name_decoded) + "."
 
 
@@ -1230,7 +1245,7 @@ def get_property_dnsname(var, cb_mc_bytes=lambda obj: b""):
 	Create a get/set-property for a DNS name.
 
 	cb_bytes -- callback to get bytes used to find name in case of Message Compression
-		cb_bytes_pointer(containing_obj): bytes
+		cb_bytes_pointer(containing_obj) -- bytes
 	"""
 	return property(
 		lambda obj: dns_name_decode(obj.__getattribute__(var),
