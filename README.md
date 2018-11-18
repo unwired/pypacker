@@ -13,7 +13,7 @@ This is Pypacker: The fastest and simplest packet manipulation lib for Python.
 It lets you create packets manually by defining every aspect of all header data,
 dissect packets by parsing raw packet bytes, sending/receiving packets on different layers and intercepting packets.
 
-If you like his project you can   [![Donate with PayPal](https://www.paypalobjects.com/en_US/i/btn/btn_donate_SM.gif)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=M6GGAXJQCUHVC&source=url) via PayPal.
+If you like this project you can [![Donate with PayPal](https://www.paypalobjects.com/en_US/i/btn/btn_donate_SM.gif)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=M6GGAXJQCUHVC&source=url) via PayPal.
 
 ## What you can do with Pypacker
 Create custom Packets (via keywords) or from raw bytes and change their data:
