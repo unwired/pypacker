@@ -162,8 +162,12 @@ ictor.stop()
 
 ## Installation
 Some examples:
-- Download/clone pypacker -> python setup.py install (newest version)
-- pip install pypacker (synched to master on major version changes)
+- Clone newest version
+  - git clone https://gitlab.com/mike01/pypacker.git
+  - cd pypacker
+  - python setup.py install
+- Use pip (synched to master on major version changes)
+  - pip install pypacker
 
 ## Usage examples
 See examples/ and tests/test_pypacker.py.
