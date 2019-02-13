@@ -85,7 +85,7 @@ class SocketHndl(object):
 			while True:
 				yield self.recv()
 		except socket.timeout:
-			raise StopIteration
+			return
 
 	def recvp(self, filter_match_recv=None, lowest_layer=ethernet.Ethernet, max_amount=1):
 		"""

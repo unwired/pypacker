@@ -278,10 +278,13 @@ class PcapHandler(FileHandler):
 		return -- (metadata, bytes)
 		"""
 		if self._closed:
-			raise StopIteration
+			return
 
 		while True:
-			yield self.__next__()
+			try:
+				yield self.__next__()
+			except StopIteration:
+				break
 
 
 class Writer(PcapHandler):
