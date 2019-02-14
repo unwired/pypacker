@@ -79,13 +79,19 @@ class SocketHndl(object):
 
 	def __iter__(self):
 		"""
-		Call recv() until socket.timeout
+		Call __next__() until StopIteration
 		"""
 		try:
 			while True:
-				yield self.recv()
-		except socket.timeout:
+				yield self.__next__()
+		except StopIteration:
 			return
+
+	def __next__(self):
+		try:
+			return self.recv()
+		except socket.timeout:
+			raise StopIteration
 
 	def recvp(self, filter_match_recv=None, lowest_layer=ethernet.Ethernet, max_amount=1):
 		"""
@@ -129,7 +135,7 @@ class SocketHndl(object):
 			try:
 				bts = self.recv()
 			except socket.timeout:
-				yield None
+				return
 
 			packet_recv = lowest_layer(bts)
 			# logger.debug("got packet: %s" % packet_recv)
@@ -140,7 +146,7 @@ class SocketHndl(object):
 				# no filter set
 				yield packet_recv
 			except StopIteration:
-				return None
+				return
 			except:
 				continue
 
