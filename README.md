@@ -57,7 +57,7 @@ layer3.icmp.Echo
         id          : 0x7B = 123 = 0b1111011
         seq         : 0x1 = 1 = 0b1
         ts          : 0x0 = 0 = 0b0
-        bodybytes: b'foobar2'
+        bodybytes   : b'foobar2'
 ```
 
 Read/write packets from/to file (pcap/tcpdump format):

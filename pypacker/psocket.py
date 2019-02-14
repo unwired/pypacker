@@ -129,7 +129,7 @@ class SocketHndl(object):
 
 	def recvp_iter(self, filter_match_recv=None, lowest_layer=ethernet.Ethernet):
 		"""
-		Same as recvp but using iterator.
+		Same as recvp but using iterator returning one packet per cycle.
 		"""
 		while True:
 			try:
