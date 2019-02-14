@@ -13,6 +13,8 @@ This is Pypacker: The fastest and simplest packet manipulation lib for Python.
 It lets you create packets manually by defining every aspect of all header data,
 dissect packets by parsing raw packet bytes, sending/receiving packets on different layers and intercepting packets.
 
+If you like this project you can [![Donate with PayPal](https://www.paypalobjects.com/en_US/i/btn/btn_donate_SM.gif)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=M6GGAXJQCUHVC&source=url) via PayPal.
+
 ## What you can do with Pypacker
 Create custom Packets (via keywords) or from raw bytes and change their data:
 
@@ -160,8 +162,12 @@ ictor.stop()
 
 ## Installation
 Some examples:
-- Download/clone pypacker -> python setup.py install (newest version)
-- pip install pypacker (synched to master on major version changes)
+- Clone newest version
+  - git clone https://gitlab.com/mike01/pypacker.git
+  - cd pypacker
+  - python setup.py install
+- Use pip (synched to master on major version changes)
+  - pip install pypacker
 
 ## Usage examples
 See examples/ and tests/test_pypacker.py.
@@ -275,17 +281,13 @@ by their respective RFCs/official standards.
 
 **Q**:	Are there any plans to support [protocol xyz]?
 
-**A**:	Support for particular protocols is added to Pypacker as a result of people contributing
+**A**:	Support for particular protocols is added to Pypacker as a result of me needing this feature or people contributing
 	that support - no formal plans for adding support for particular protocols in particular
 	future releases exist. 
 
 **Q**:	There is problem xyz with Pypacker using Windows 3.11/XP/7/8/mobile etc. Can you fix that?
 
-**A**:	The basic features should work with any OS. Optional ones may make trouble (eg interceptor)
-        and there will be no support for that. Why? Because quality matters and I won't give support for
-	inferior systems. Think twice before chosing an operating system and deal with the consequences;
-	don't blame others for your decision. Alternatively: give me monetary compensation and I'll see
-	what I can do (;
+**A**:	The basic features should work with any OS. Optional ones may make trouble (eg interceptor).
 
 
 # Usage hints

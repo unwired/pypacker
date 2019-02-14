@@ -163,7 +163,7 @@ def pcap_cb_btstopkt(self, meta, bts):
 	return self._lowest_layer_new(bts)
 
 
-# PCAPNG related
+# PCAPNG related_btstopkt
 # Generic/filetype invariant related
 
 FILETYPE_PCAP	= 0
@@ -232,7 +232,6 @@ class PcapHandler(FileHandler):
 					logger.debug("found handler for file: %x", pcaptype)
 					# read callback
 					self.__next__ = types.MethodType(callbacks[3], self)
-					self.read = types.MethodType(callbacks[3], self)
 					# bytes-to-packet callback
 					self._btstopkt = types.MethodType(callbacks[4], self)
 					break
@@ -268,7 +267,7 @@ class PcapHandler(FileHandler):
 		return -- iterator yielding (metadata, packet)
 		"""
 		if self._closed:
-			raise StopIteration
+			return ""
 
 		while True:
 			yield self.read_packet(pktfilter=pktfilter)
@@ -278,10 +277,13 @@ class PcapHandler(FileHandler):
 		return -- (metadata, bytes)
 		"""
 		if self._closed:
-			raise StopIteration
+			return
 
 		while True:
-			yield self.__next__()
+			try:
+				yield self.__next__()
+			except StopIteration:
+				break
 
 
 class Writer(PcapHandler):
