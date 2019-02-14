@@ -72,9 +72,10 @@ class TunInterface(object):
 		else:
 			logger.debug("Found interface %s", tun_iface_name)
 
-		TunInterface.configure_tun_interface(tun_iface_name,
-			ip_src, ip_dst,
-			is_local_tunnel=is_local_tunnel)
+		if ip_src is not None and ip_dst is not None:
+			TunInterface.configure_tun_interface(tun_iface_name,
+				ip_src, ip_dst,
+				is_local_tunnel=is_local_tunnel)
 		utils.set_interface_state(tun_iface_name, state_active=True)
 
 		# Open TUN device file
@@ -204,11 +205,14 @@ class LocalTunnel(object):
 		while obj._state_active:
 			try:
 				bts = tun_1.read()
-				tun2.write(bts)
 				logger.debug("Sending %s" % name)
-			except ValueError:
+				logger.debug(bts)
+				tun2.write(bts)
+			except ValueError as ex:
+				logger.warning(ex)
 				break
-			except OSError:
+			except OSError as ex:
+				logger.warning(ex)
 				break
 			except Exception as ex:
 				logger.debug(ex)

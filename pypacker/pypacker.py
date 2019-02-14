@@ -582,17 +582,18 @@ class Packet(object, metaclass=MetaPacket):
 				pass
 			# Values: int
 			if type(val) is int:
-				layer_sums_l.append("%-12s: 0x%X = %d = %s" % (name_real, val, val, bin(val)) + name_s)
+				format = getattr(self, name + "_format")
+				layer_sums_l.append("%-12s (%s): 0x%X = %d = %s" % (name_real, format, val, val, bin(val)) + name_s)
 			# Inactive
 			elif val is None:
-				layer_sums_l.append("%-12s: (inactive)" % name_real)
+				layer_sums_l.append("%-16s: (inactive)" % name_real)
 			# Values: bytes, Triggerlist (Packets, tuples, bytes)
 			else:
-				layer_sums_l.append("%-12s: %s" % (name_real, val) + name_s)
+				layer_sums_l.append("%-16s: %s" % (name_real, val) + name_s)
 
-		if self._upper_layer is None:
+		if self.upper_layer is None:
 			# no upper layer present
-			layer_sums_l.append("bodybytes: %s" % self.body_bytes)
+			layer_sums_l.append("%-16s:" % "bodybytes" + " %s" % self.body_bytes)
 
 		layer_sums = "%s\n\t%s" % (
 			self.__module__[9:] + "." + self.__class__.__name__,

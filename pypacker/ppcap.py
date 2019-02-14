@@ -241,7 +241,7 @@ class PcapHandler(FileHandler):
 		else:
 			raise Exception("wrong mode: %d" % mode)
 
-	def read_packet(self, pktfilter=None):
+	def read_packet(self, pktfilter=lambda pkt: True):
 		"""
 		return -- (metadata, packet) if packet can be created from bytes
 			else (metadata, bytes). For pcap/tcpdump metadata is a nanoseconds timestamp
@@ -260,8 +260,8 @@ class PcapHandler(FileHandler):
 				if pktfilter(pkt):
 					return meta, pkt
 			except AttributeError:
-				# no packet filter? return raw bytes
-				return meta, bts
+				# no packet filter? nothing to return
+				pass
 
 	def read_packet_iter(self, pktfilter=lambda pkt: True):
 		"""

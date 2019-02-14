@@ -94,8 +94,8 @@ class NewProtocol(pypacker.Packet):
 		_dissect(...) must be overwritten if the header format can change
 		from its original format. This is generally the case when
 		- using TriggerLists (see ip.IP)
-		- simple fields can get deactivated (see ethernet.Ethernet)
-		- using dynamic fields (see dns.DNS)
+		- a simple field could get deactivated (see ethernet.Ethernet -> vlan)
+		- using dynamic fields (see dns.DNS -> Query -> name)
 
 		In NewProtocol idk can get deactivated, options is a TriggerList
 		and yolo is a dynamic field so _dissect(...) needs to be defined.
@@ -169,7 +169,7 @@ class NewProtocol(pypacker.Packet):
 
 	def reverse_address(self):
 		"""
-		reverse_a# ddress(...) should be overwritten to be able to reverse
+		reverse_address(...) should be overwritten to be able to reverse
 		source/destination addresses (see ethernet.Ethernet)
 		"""
 		self.src, self.dst = self.dst, self.src
