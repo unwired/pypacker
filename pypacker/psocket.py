@@ -93,7 +93,7 @@ class SocketHndl(object):
 		except socket.timeout:
 			raise StopIteration
 
-	def recvp(self, filter_match_recv=None, lowest_layer=ethernet.Ethernet, max_amount=1):
+	def recvp(self, filter_match_recv=lambda _: True, lowest_layer=ethernet.Ethernet, max_amount=1):
 		"""
 		Receive packets from network. This does the same as calling recv() but using a receive
 		filter and received bytes will be converted to packets using class given by lowest_layer.
@@ -116,9 +116,6 @@ class SocketHndl(object):
 			try:
 				if filter_match_recv(packet_recv):
 					received.append(packet_recv)
-			except TypeError:
-				# no filter set
-				received.append(packet_recv)
 			except StopIteration:
 				break
 			except:
@@ -127,7 +124,7 @@ class SocketHndl(object):
 
 		return received
 
-	def recvp_iter(self, filter_match_recv=None, lowest_layer=ethernet.Ethernet):
+	def recvp_iter(self, filter_match_recv=lambda _: True, lowest_layer=ethernet.Ethernet):
 		"""
 		Same as recvp but using iterator returning one packet per cycle.
 		"""
@@ -142,15 +139,12 @@ class SocketHndl(object):
 			try:
 				if filter_match_recv(packet_recv):
 					yield packet_recv
-			except TypeError:
-				# no filter set
-				yield packet_recv
 			except StopIteration:
 				return
 			except:
 				continue
 
-	def sr(self, packet_send, max_packets_recv=1, pfilter=None, lowest_layer=ethernet.Ethernet):
+	def sr(self, packet_send, max_packets_recv=1, pfilter=lambda _: True, lowest_layer=ethernet.Ethernet):
 		"""
 		Send a packet and receive answer packets. This will use information retrieved
 		from direction() to retrieve answer packets. This is not 100% reliable as
@@ -161,7 +155,6 @@ class SocketHndl(object):
 		max_packets_recv -- max packets to be received
 		pfilter -- filter as lambda function to match packets to be retrieved,
 			return True to accept a specific packet.
-			Set to None to accept everything.
 		lowest_layer -- packet class to be used to create new packets
 
 		return -- packets receives
@@ -176,13 +169,9 @@ class SocketHndl(object):
 			bts = self.recv()
 			packet_recv = lowest_layer(bts)
 			# logger.debug("got packet: %s" % packet_recv)
-			try:
-				if not pfilter(packet_recv):
-					# filter didn't match
-					continue
-			except TypeError:
-				# no filter set
-				pass
+			if not pfilter(packet_recv):
+				# filter didn't match
+				continue
 
 			# start to compare on corresponding receive-layer
 			if packet_send.is_direction(packet_recv[packet_send_clz], pypacker.Packet.DIR_REV):

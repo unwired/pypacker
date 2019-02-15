@@ -242,6 +242,8 @@ class PcapHandler(FileHandler):
 
 	def read_packet(self, pktfilter=lambda pkt: True):
 		"""
+		pktfilter -- filter as lambda function to match packets to be retrieved,
+			return True to accept a specific packet.
 		return -- (metadata, packet) if packet can be created from bytes
 			else (metadata, bytes). For pcap/tcpdump metadata is a nanoseconds timestamp
 		"""
@@ -255,22 +257,24 @@ class PcapHandler(FileHandler):
 				logger.warning("could not create packets from bytes: %r", ex)
 				return meta, bts
 
-			try:
-				if pktfilter(pkt):
-					return meta, pkt
-			except AttributeError:
-				# no packet filter? nothing to return
-				pass
+			if pktfilter(pkt):
+				return meta, pkt
+
 
 	def read_packet_iter(self, pktfilter=lambda pkt: True):
 		"""
+		pktfilter -- filter as lambda function to match packets to be retrieved,
+			return True to accept a specific packet.
 		return -- iterator yielding (metadata, packet)
 		"""
 		if self._closed:
-			return ""
+			return
 
 		while True:
-			yield self.read_packet(pktfilter=pktfilter)
+			try:
+				yield self.read_packet(pktfilter=pktfilter)
+			except:
+				return
 
 	def __iter__(self):
 		"""
