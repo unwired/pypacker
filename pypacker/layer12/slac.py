@@ -5,6 +5,7 @@ HomePlug Green PHY Specification
 import logging
 import sys
 
+from pypacker import pypacker
 from pypacker.pypacker import Packet
 from pypacker.structcbs import pack_H_le, unpack_H, unpack_H_le
 from pypacker.triggerlist import TriggerList
@@ -170,6 +171,8 @@ class CMAttenCharInd(Packet):
 		("numsounds", "B", 0)
 	)
 
+	sourceaddr_s = pypacker.get_property_mac("sourceaddr")
+
 
 class CMAttenCharRsp(Packet):
 	__hdr__ = (
@@ -181,6 +184,8 @@ class CMAttenCharRsp(Packet):
 		("respid", "17s", b"\x00" * 17),
 		("result", "B", 0)
 	)
+
+	sourceaddr_s = pypacker.get_property_mac("sourceaddr")
 
 
 class CMSlacParmReq(Packet):
@@ -208,27 +213,8 @@ class CMSlacParmCnf(Packet):
 		("ciphersuite", "H", None)
 	)
 
-
-class CMSlacMatchReq(Packet):
-	__hdr__ = (
-		("apptype", "B", 0),
-		("sectype", "B", 0),
-		("mvflen", "H", 0),
-		("pevid", "17s", b"\x00" * 17),
-		("pevmac", "6s", b"\x00" * 6),
-		("evseid", "17s", b"\x00" * 17),
-		("evsemac", "6s", b"\x00" * 6),
-		("runid", "Q", 0),
-		("rsvd", "Q", 0)
-	)
-
-	def _get_mvflen_be(self):
-		return unpack_H(pack_H_le(self.mvflen))[0]
-
-	def _set_mvflen_be(self, val):
-		self.mvflen = unpack_H(pack_H_le(val))[0]
-
-	mvflen_be = property(_get_mvflen_be, _set_mvflen_be)
+	msoundtarget_s = pypacker.get_property_mac("msoundtarget")
+	forwardingsta_s = pypacker.get_property_mac("forwardingsta")
 
 
 class CMStartAttenCharInd(Packet):
@@ -242,6 +228,8 @@ class CMStartAttenCharInd(Packet):
 		("runid", "Q", 0),
 	)
 
+	forwardingsta_s = pypacker.get_property_mac("forwardingsta")
+
 
 class CMMnbcSoundInd(Packet):
 	__hdr__ = (
@@ -253,6 +241,31 @@ class CMMnbcSoundInd(Packet):
 		("rsvd", "8s", b"\x00" * 8),
 		("rnd", "16s", b"\x00" * 16)
 	)
+
+
+class CMSlacMatchReq(Packet):
+	__hdr__ = (
+		("apptype", "B", 0),
+		("sectype", "B", 0),
+		("mvflen", "H", 0),
+		("pevid", "17s", b"\x00" * 17),
+		("pevmac", "6s", b"\x00" * 6),
+		("evseid", "17s", b"\x00" * 17),
+		("evsemac", "6s", b"\x00" * 6),
+		("runid", "Q", 0),
+		("rsvd", "8s", b"\x00" * 8)
+	)
+
+	def _get_mvflen_be(self):
+		return unpack_H(pack_H_le(self.mvflen))[0]
+
+	def _set_mvflen_be(self, val):
+		self.mvflen = unpack_H(pack_H_le(val))[0]
+
+	mvflen_be = property(_get_mvflen_be, _set_mvflen_be)
+
+	pevmac_s = pypacker.get_property_mac("pevmac")
+	evsemac_s = pypacker.get_property_mac("evsemac")
 
 
 class CMSlacMatchCnf(Packet):
@@ -271,6 +284,9 @@ class CMSlacMatchCnf(Packet):
 		("nmk", "16s", b"\x00" * 16),
 	)
 
+	pevmac_s = pypacker.get_property_mac("pevmac")
+	evsemac_s = pypacker.get_property_mac("evsemac")
+
 
 class CMLinkStatsReq(Packet):
 	__hdr__ = (
@@ -282,6 +298,8 @@ class CMLinkStatsReq(Packet):
 		("mgmtflag", "B", 0),
 		("dasa", "6s", b"\x00" * 6)
 	)
+
+	dasa_s = pypacker.get_property_mac("dasa")
 
 
 # TODO: LinkStats payload as handler for CMLinkStatsCnf, how to differentiate?
@@ -326,6 +344,8 @@ class CMPKCSCertReq(Packet):
 		("cipersuite", None, TriggerList)
 	)
 
+	targetmac_s = pypacker.get_property_mac("targetmac")
+
 
 class CMPKCSCertCnf(Packet):
 	__hdr__ = (
@@ -335,6 +355,8 @@ class CMPKCSCertCnf(Packet):
 		("certlen", "H", 0),
 		("certpackage", None, TriggerList)
 	)
+
+	targetmac_s = pypacker.get_property_mac("targetmac")
 
 
 class CMPKCSCertInd(Packet):
@@ -354,6 +376,8 @@ class CMPKCSCertInd(Packet):
 		("certpackage", None, TriggerList)
 	)
 
+	targetmac_s = pypacker.get_property_mac("targetmac")
+
 
 class CMPKCSCertRsp(Packet):
 	__hdr__ = (
@@ -362,6 +386,8 @@ class CMPKCSCertRsp(Packet):
 		("ciphersuitesize", "B", 0),  # optional
 		("cipersuite", None, TriggerList)
 	)
+
+	targetmac_s = pypacker.get_property_mac("targetmac")
 
 
 MASK_FRAGINDEX = 0xF0

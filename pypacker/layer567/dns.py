@@ -97,14 +97,6 @@ def get_bts_for_msg_compression(tl_packet):
 	return b""
 
 
-def get_bts_for_msg_compression(tl_packet):
-	"""return -- header bytes of DNS or b"" """
-	# DNS.Triggestlist[sub] -> sub._triggelistpacket_parent == DNS
-	if tl_packet._triggelistpacket_parent is not None:
-		return tl_packet._triggelistpacket_parent.header_bytes
-	return b""
-
-
 class DNS(pypacker.Packet):
 	__hdr__ = (
 		("id", "H", 0x1234),

@@ -260,7 +260,6 @@ class PcapHandler(FileHandler):
 			if pktfilter(pkt):
 				return meta, pkt
 
-
 	def read_packet_iter(self, pktfilter=lambda pkt: True):
 		"""
 		pktfilter -- filter as lambda function to match packets to be retrieved,
