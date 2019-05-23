@@ -22,7 +22,7 @@ from pypacker.structcbs import unpack_H, pack_ipv4_header, pack_ipv6_header
 
 # handler
 from pypacker.layer4 import ssl
-from pypacker.layer567 import bgp, http, rtp, sip, telnet, tpkt, pmap
+from pypacker.layer567 import bgp, http, mqtt, rtp, sip, telnet, tpkt, pmap
 
 # avoid references for performance reasons
 in_cksum = checksum.in_cksum
@@ -96,6 +96,7 @@ TCP_PROTO_TPKT		= 102
 TCP_PROTO_PMAP		= 111
 TCP_PROTO_BGP		= 179
 TCP_PROTO_SSL		= 443
+TCP_PROTO_MQTT		= (1883, 8883)
 TCP_PROTO_HTTP		= (80, 8008, 8080)
 TCP_PROTO_RTP 		= (5004, 5005)
 TCP_PROTO_SIP		= (5060, 5061)
@@ -139,6 +140,7 @@ class TCP(pypacker.Packet):
 		TCP_PROTO_TELNET: telnet.Telnet,
 		TCP_PROTO_TPKT: tpkt.TPKT,
 		TCP_PROTO_PMAP: pmap.Pmap,
+		TCP_PROTO_MQTT: mqtt.MQTTBase,
 		TCP_PROTO_HTTP: http.HTTP,
 		TCP_PROTO_SSL: ssl.SSL,
 		TCP_PROTO_RTP: rtp.RTP,

@@ -15,7 +15,7 @@ from pypacker.layer12 import aoe, arp, btle, can, dtp, ethernet, ieee80211, linu
 	flow_control, lldp, slac
 from pypacker.layer3 import ip, ip6, ipx, icmp, igmp, ospf, pim
 from pypacker.layer4 import tcp, udp, ssl, sctp
-from pypacker.layer567 import diameter, dhcp, dns, der, hsrp, http, ntp, pmap, radius, rip, rtp, telnet, tpkt
+from pypacker.layer567 import diameter, dhcp, dns, der, hsrp, http, mqtt, ntp, pmap, radius, rip, rtp, telnet, tpkt
 
 
 # General testcases:
@@ -58,6 +58,7 @@ from pypacker.layer567 import diameter, dhcp, dns, der, hsrp, http, ntp, pmap, r
 # - SCTP
 #
 # - HTTP
+# - MQTT
 # - NTP
 # - RTP
 # - DHCP
@@ -2531,6 +2532,30 @@ class LLDPTestCase(unittest.TestCase):
 		self.assertEqual(pkt.upper_layer.tlvlist[-1].tlv_len, 0)
 
 
+class MQTTTestCase(unittest.TestCase):
+	def test_mqttbase(self):
+		print_header("MQTT")
+		raw_pkt = get_pcap("tests/packets_mqtt.pcap")
+		pkts = [ethernet.Ethernet(bts) for bts in raw_pkt]
+
+		for pkt in pkts:
+			self.assertTrue(pkt[tcp.TCP].sport == 1883 or pkt[tcp.TCP].dport == 1883)
+			print(pkt[tcp.TCP].higher_layer)
+			#self.assertEqual(pkt[tcp.TCP].higher_layer.__class__.__name__, mqtt.MQTTBase.__name__)
+
+		self.assertEqual(pkts[0][mqtt.MQTTBase].msgtype, mqtt.MSGTYPE_CONNECT)
+		self.assertEqual(pkts[1][mqtt.MQTTBase].msgtype, mqtt.MSGTYPE_CONNACK)
+		self.assertEqual(pkts[2][mqtt.MQTTBase].msgtype, mqtt.MSGTYPE_SUBSCRIBEREQ)
+
+	def test_mqttvarlen(self):
+		val = 129
+		val_encoded = mqtt.MQTTBase._encode_length(val)
+		self.assertEqual(val_encoded, b"\x81\x01")  # 127 + 1
+		hflen, val_decoded = mqtt.MQTTBase._decode_length(val_encoded)
+		self.assertEqual(hflen, 2)
+		self.assertEqual(val_decoded, val)
+
+
 class SlacTestCase(unittest.TestCase):
 	def test_smb(self):
 		print_header("SLAC")
@@ -2800,6 +2825,7 @@ suite.addTests(loader.loadTestsFromTestCase(StaticsTestCase))
 suite.addTests(loader.loadTestsFromTestCase(DNS2TestCase))
 suite.addTests(loader.loadTestsFromTestCase(FlowControlTestCase))
 suite.addTests(loader.loadTestsFromTestCase(LLDPTestCase))
+suite.addTests(loader.loadTestsFromTestCase(MQTTTestCase))
 suite.addTests(loader.loadTestsFromTestCase(SlacTestCase))
 suite.addTests(loader.loadTestsFromTestCase(LACPTestCase))
 suite.addTests(loader.loadTestsFromTestCase(StateMachineTestCase))

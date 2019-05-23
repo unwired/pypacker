@@ -146,7 +146,7 @@ def configure_packet_header(t, hdrs, header_fmt):
 	for hdr in hdrs:
 		# Sanity checks
 		if len(hdr) > 4:
-			logger.warning("Field definition length > 4: %s has length %d", hdr[0], len(hdr))
+			logger.warning("Amount of field definitions > 4: %r", hdr)
 
 		if hdr[1] is not None:
 			try:
