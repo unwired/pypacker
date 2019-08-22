@@ -7,6 +7,7 @@ import os
 import logging
 import math
 from socket import inet_ntoa
+import ipaddress
 
 from pypacker import pypacker as pypacker
 from pypacker.structcbs import pack_L_le
@@ -323,6 +324,29 @@ def get_ipv4_for_iface(iface_name, idx=0):
 		return None
 
 
+def get_ipv4_addressinfo(iface_name, idx=0):
+	"""
+	iface_name -- Name of the interface to get the information from
+	idx -- Index to the n'th element in the address-info list (useful if multiple IP addresses are assigned)
+	return -- Adressinfo (IP address, mask, broadcast address) for the given interface name
+		like ("1.2.3.4", "255.255.255.0", "192.168.0.255") or None on error
+	"""
+	try:
+		addressinfo = netifaces.ifaddresses(iface_name)[netifaces.AF_INET][idx]
+		return addressinfo["addr"], addressinfo["netmask"], addressinfo["broadcast"]
+	except Exception as ex:
+		return None
+
+
+def nwmask_to_cidr(nmask):
+	"""
+	TODO: Detect if IPv4 or IPv6
+	nmask -- An IPv4 network mask like "255.255.255.0"
+	return -- The amount of network bits in CIDR format like 24
+	"""
+	return ipaddress.IPv4Network("1.2.3.4/%s" % nmask, strict=False).prefixlen
+
+
 def get_ipv6_for_iface(iface_name, idx=0):
 	"""
 	return -- IPv6 address found for interface iface_name at index idx
@@ -360,7 +384,8 @@ def get_arp_cache_entry(ipaddr):
 
 	with open("/proc/net/arp", "r") as fd:
 		for line in fd:
-			if ipaddr in line:
+			# TODO: might need updating
+			if line.startswith(ipaddr + " "):
 				mac = pattern_mac.search(line).group(0)
 				break
 	return mac

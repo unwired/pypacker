@@ -271,10 +271,11 @@ class TCP(pypacker.Packet):
 
 	def ra_collect(self, pkt_list):
 		"""
-		Collect a TCP segment into ra_segments. Retrieve concatenated
-		segments via ra_bin().
-		return -- bytes_cnt, [True|False]: amount of bytes added (sum of body bytes)
-			and final packet found (RST or FIN)
+		Collect TCP segments which have the same direction as this packet.
+		Concatenated segments can be retrieved via ra_bin(). Does not check for missing
+		segments.
+		return -- bytes_cnt, [True|False]: amount of bytes added (sum of body bytes),
+			final packet found (RST or FIN). True indicates that ra_bin() can be called.
 		"""
 		if type(pkt_list) is not list:
 			pkt_list = [pkt_list]
@@ -302,10 +303,11 @@ class TCP(pypacker.Packet):
 
 	def ra_bin(self):
 		"""
-		Retrieve sorted and concatenated TCP segments (body bytes of
-		TCP segments) a flush internal buffer.
+		Assemble retrieved TCP segments in sorted order (body bytes of TCP segments).
+		Does NOT flush the internal buffer; this is done via self.ra_segments.clear()
 		"""
 		self.ra_segments[self.seq] = self.body_bytes
 		sorted_list = sorted(self.ra_segments.items(), key=lambda t: t[0])
 		bts_lst = [value for key, value in sorted_list]
+		self.ra_segments.clear()
 		return b"".join(bts_lst)

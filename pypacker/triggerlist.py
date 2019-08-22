@@ -33,7 +33,7 @@ class TriggerList(list):
 		self._headerfield_name = headerfield_name
 
 	def _lazy_dissect(self):
-		if not self._packet._unpacked and self._packet._unpacked is not None:
+		if self._packet._unpacked is not None and not self._packet._unpacked:
 			# Before changing TriggerList we need to unpack or
 			# cached header won't fit on _unpack(...)
 			# This is called before any changes to TriggerList so place it here.
@@ -261,16 +261,30 @@ class TriggerList(list):
 	def __str__(self):
 		self._lazy_dissect()
 		tl_descr_l = []
+		contains_pkt = False
 
 		for val_tl in self:
 			if type(val_tl) in TRIGGERLIST_CONTENT_SIMPLE:
 				tl_descr_l.append("%s" % str(val_tl))
 			else:
 				# assume packet
-				pkt_fqn = val_tl.__module__[9:] + "." + val_tl.__class__.__name__
-				tl_descr_l.append(pkt_fqn)
+				#pkt_fqn = val_tl.__module__[9:] + "." + val_tl.__class__.__name__
+				#tl_descr_l.append(pkt_fqn)
+				tl_descr_l.append("%s" % val_tl)
+				contains_pkt = True
 
-		return "[" + ", ".join(tl_descr_l) + "]"
+		if not contains_pkt or len(tl_descr_l) == 0:
+			# Oneline output
+			return "[" + ", ".join(tl_descr_l) + "]"
+		else:
+			# Multiline output
+			final_descr = ["(see below)\n" + "-" * 10 + "\n"]
+
+			for idx, val in enumerate(tl_descr_l):
+				idx_descr = "%s[%d]" % (self._headerfield_name[1:], idx)
+				final_descr.append("-> %s:\n%s\n" % (idx_descr, val))
+			final_descr.append("-" * 10)
+			return "".join(final_descr)
 
 	def get_by_key(self, key_needle, idx_startat=0):
 		"""

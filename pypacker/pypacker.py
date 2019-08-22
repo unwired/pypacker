@@ -14,7 +14,7 @@ from pypacker.structcbs import pack_mac, unpack_mac, pack_ipv4, unpack_ipv4
 
 logger = logging.getLogger("pypacker")
 # logger.setLevel(logging.DEBUG)
-#logger.setLevel(logging.WARNING)
+logger.setLevel(logging.WARNING)
 
 logger_streamhandler = logging.StreamHandler()
 logger_formatter = logging.Formatter("%(levelname)s (%(funcName)s): %(message)s")
@@ -168,7 +168,7 @@ class Packet(object, metaclass=MetaPacket):
 		if args:
 			if len(args) > 1:
 				# assume packet, target class given until which we unpack
-				self._target_unpack_clz = args[1]._target_unpack_clz
+				self._final_unpack_clz = args[1]._final_unpack_clz
 			# Any Exception will be forwarded (SomePkt(bytes) or lazy dissect)
 			# If this is the lowest layer the Exception has to be caught
 			# logger.debug("dissecting: %s", self.__class__.__name__)
@@ -278,7 +278,7 @@ class Packet(object, metaclass=MetaPacket):
 		"""
 		if self._upper_layer is not None:
 			# reset all handler data
-			self._set_upperlayer(None)
+			self._set_higherlayer(None)
 		# logger.debug("setting new raw data: %s", value)
 		self._body_bytes = value
 		self._body_changed = True
@@ -290,7 +290,7 @@ class Packet(object, metaclass=MetaPacket):
 	# Setting body_bytes will clear any handler (upper_layer will return None afterwards).
 	body_bytes = property(_get_bodybytes, _set_bodybytes)
 
-	def _get_upperlayer(self):
+	def _get_higherlayer(self):
 		"""
 		Retrieve next upper layer. This is the only direct way to do this.
 		return -- handler object or None if not present.
@@ -314,12 +314,10 @@ class Packet(object, metaclass=MetaPacket):
 			pass
 		return None
 
-	def _set_upperlayer(self, hndl):
+	def _set_higherlayer(self, hndl):
 		"""
-		Set body handler for this packet and make it accessible via layername.addedtype
-		like ethernet.ip. This will take the lowercase classname of the given handler eg "ip"
-		and make the handler accessible by this name. If handler is None any handler will
-		be reset and data will be set to an empty byte string.
+		Set body handler for this packet and make it accessible via layername[addedtypeclass]
+		like ethernet[ip.IP]. If handler is None any handler will be reset and data will be set to an empty byte string.
 
 		hndl -- the handler to be set: None or a Packet instance. Setting to None
 			will clear any handler and set body_bytes to b"".
@@ -346,9 +344,9 @@ class Packet(object, metaclass=MetaPacket):
 		self._notify_changelistener()
 
 	# deprecated, wording "higher_layer/highest_layer layer is more consistent
-	upper_layer = property(_get_upperlayer, _set_upperlayer)
+	upper_layer = property(_get_higherlayer, _set_higherlayer)
 	# Get/set body handler. Note: this will force lazy dissecting when reading
-	higher_layer = property(_get_upperlayer, _set_upperlayer)
+	higher_layer = property(_get_higherlayer, _set_higherlayer)
 
 	def _set_lower_layer(self, val):
 		try:
@@ -376,7 +374,7 @@ class Packet(object, metaclass=MetaPacket):
 		current = self
 
 		# unpack all layer, assuming string class will be never found
-		self._target_unpack_clz = str.__class__
+		self._final_unpack_clz = str.__class__
 
 		while current.upper_layer is not None:
 			current = current.upper_layer
@@ -400,6 +398,17 @@ class Packet(object, metaclass=MetaPacket):
 	# get top layer
 	highest_layer = property(_get_highest_layer)
 
+	def disconnect_layer(self):
+		"""
+		Disconnect and return this layer. Connects lower and upper layer
+		with each other. This is the same as 'pkt.lower_layer = pkt.upper_layer'
+		without returning the middle layer (pkt).
+		return -- This layer
+		"""
+		if self.lower_layer is not None and self.higher_layer is not None:
+			self.lower_layer.higher_layer = self.higher_layer
+		return self
+
 	def _initialize_handler(self):
 		"""
 		Lazy initialize the handler previously set by _init_handler.
@@ -408,12 +417,12 @@ class Packet(object, metaclass=MetaPacket):
 		handler_data = self._lazy_handler_data
 
 		try:
-			# instantiate handler class using lazy data buffer
+			# Instantiate handler class using lazy data buffer
 			# See _init_handler() for 2nd place where handler instantation takes place
 			# logger.debug("lazy parsing using: %s", handler_data)
 			type_instance = handler_data[0](handler_data[1], self)
 
-			self._set_upperlayer(type_instance)
+			self._set_higherlayer(type_instance)
 			# this was a lazy init: same as direct dissecting -> no body change
 			self._body_changed = False
 		except:
@@ -461,10 +470,10 @@ class Packet(object, metaclass=MetaPacket):
 		# single-value index search
 		else:
 			# set most top layer to be unpacked, __getattr__() could be called unpacking lazy data
-			self._target_unpack_clz = packet_type
+			self._final_unpack_clz = packet_type
 
 			while not type(p_instance) is packet_type:
-				# this will auto-parse lazy handler data via _get_upperlayer()
+				# this will auto-parse lazy handler data via _get_higherlayer()
 				p_instance = p_instance.upper_layer
 
 				if p_instance is None:
@@ -480,11 +489,11 @@ class Packet(object, metaclass=MetaPacket):
 		"""
 		p_instance = self
 		# Unpack until highest layer; assume string class never gets found as layer
-		self._target_unpack_clz = str.__class__
+		self._final_unpack_clz = str.__class__
 
 		while p_instance is not None:
 			yield p_instance
-			# this will auto-parse lazy handler data via _get_upperlayer()
+			# this will auto-parse lazy handler data via _get_higherlayer()
 			p_instance = p_instance.upper_layer
 
 			if p_instance is None:
@@ -573,27 +582,32 @@ class Packet(object, metaclass=MetaPacket):
 		for name in self._header_field_names:
 			name_real = name[1:]
 			val = getattr(self, name_real)
-			name_s = ""
+			value_alt = ""
 
 			try:
 				# try to get convenient name
-				name_s = " = " + getattr(self, name_real + "_s")
+				value_alt = " = " + getattr(self, name_real + "_s")
 			except AttributeError:
 				pass
 			# Values: int
 			if type(val) is int:
 				format = getattr(self, name + "_format")
-				layer_sums_l.append("%-12s (%s): 0x%X = %d = %s" % (name_real, format, val, val, bin(val)) + name_s)
+				layer_sums_l.append("%-12s (%s): 0x%X = %d = %s" % (name_real, format, val, val, bin(val)) + value_alt)
 			# Inactive
 			elif val is None:
 				layer_sums_l.append("%-16s: (inactive)" % name_real)
 			# Values: bytes, Triggerlist (Packets, tuples, bytes)
 			else:
-				layer_sums_l.append("%-16s: %s" % (name_real, val) + name_s)
+				if type(val) is bytes:
+					bts_cnt = "(%d)" % len(val)
+					layer_sums_l.append("%-9s %6s: %s" % (name_real, bts_cnt, val) + value_alt)
+				else:
+					layer_sums_l.append("%-16s: %s" % (name_real, val) + value_alt)
 
 		if self.upper_layer is None:
-			# no upper layer present
-			layer_sums_l.append("%-16s:" % "bodybytes" + " %s" % self.body_bytes)
+			# Bo upper layer present: describe body bytes
+			bts_cnt = "(%d)" % len(self.body_bytes)
+			layer_sums_l.append("%-9s %6s: " % ("bodybytes", bts_cnt) + "%s" % self.body_bytes)
 
 		layer_sums = "%s\n\t%s" % (
 			self.__module__[9:] + "." + self.__class__.__name__,
@@ -692,7 +706,7 @@ class Packet(object, metaclass=MetaPacket):
 	def _init_handler(self, hndl_type, buffer):
 		"""
 		Called by overwritten "_dissect()":
-		Initiate the handler-parser using the given buffer and set it using _set_upperlayer()
+		Initiate the handler-parser using the given buffer and set it using _set_higherlayer()
 		later on (lazy init). This will use the calling class and given handler type to retrieve
 		the resulting handler. On any error this will set raw bytes given for body data.
 
@@ -707,7 +721,7 @@ class Packet(object, metaclass=MetaPacket):
 			return
 
 		try:
-			if self._target_unpack_clz is None or self._target_unpack_clz is self.__class__:
+			if self._final_unpack_clz is None or self._final_unpack_clz is self.__class__:
 				# set lazy handler data, __getattr__() will be called on access
 				# to handler (field not yet initiated)
 				clz = Packet._id_handlerclass_dct[self.__class__][hndl_type]
@@ -720,9 +734,9 @@ class Packet(object, metaclass=MetaPacket):
 			else:
 				# Continue parsing next upper layer, happens on "__iter__()": avoid unneeded lazy-data
 				# handling/creating uneeded meta data for later body handling
-				# logger.debug("--------> direct unpacking in: %s", self.__class__.__name__)
+				#logger.debug("--------> direct unpacking in: %s", self.__class__.__name__)
 				type_instance = Packet._id_handlerclass_dct[self.__class__][hndl_type](buffer, self)
-				self._set_upperlayer(type_instance)
+				self._set_higherlayer(type_instance)
 		except KeyError:
 			self.body_bytes = buffer
 			self._errors |= ERROR_UNKNOWN_PROTO
@@ -730,8 +744,8 @@ class Packet(object, metaclass=MetaPacket):
 			#	self.__class__, hndl_type)
 			#logger.warning(errormsg)
 		except Exception:
-			#logger.debug("can't set handler data, type/lazy handler init: %s/%s:",
-			#	str(hndl_type), self._target_unpack_clz is None or self._target_unpack_clz is self.__class__)
+			#logger.warning("can't set handler data, type/lazy handler init: %s/%s:",
+			#	str(hndl_type), self._final_unpack_clz is None or self._final_unpack_clz is self.__class__)
 			# set raw bytes as data (eg handler class not found)
 			self.body_bytes = buffer
 			self._errors |= ERROR_DISSECT
@@ -1027,7 +1041,7 @@ class Packet(object, metaclass=MetaPacket):
 			self._changelistener.clear()
 		except AttributeError:
 			# change listener not yet initiated
-			self._changelistener = set()
+			pass
 
 	def _notify_changelistener(self):
 		"""
@@ -1046,7 +1060,7 @@ class Packet(object, metaclass=MetaPacket):
 					logger.exception("error when informing listener: %s", e)
 		except TypeError:
 			# no listener added so far -> nothing to notify
-			self._changelistener = set()
+			pass
 
 	@classmethod
 	def load_handler(cls, clz_add, handler):
@@ -1300,6 +1314,8 @@ def get_property_bytes_num(var, format_target):
 def get_ondemand_property(varname, initval_cb):
 	"""
 	Creates a property whose value gets initialized ondemand.
+	This is meant as an alternative to an initialization in __init__
+	to decrease initial loading time
 	"""
 	varname_shadowed = "_%s" % varname
 

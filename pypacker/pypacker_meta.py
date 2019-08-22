@@ -363,7 +363,7 @@ class MetaPacket(type):
 		# Indicates the most top layer until which should be unpacked
 		# (vs. lazy dissecting = just next upper layer)
 		# Setting this to an unknown class will keep the next-layer-parsing going on
-		t._target_unpack_clz = None
+		t._final_unpack_clz = None
 		# indicates if static header values got already unpacked
 		# [True|False] = Status after dissect, None = pre-dissect (not unpacked)
 		t._unpacked = None

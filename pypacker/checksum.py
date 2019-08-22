@@ -13,22 +13,22 @@ logger = logging.getLogger("pypacker")
 # avoid references for performance reasons
 array_call = array.array
 ntohs = socket.ntohs
-ENDIANNES = sys.byteorder
+ENDIANNES_IS_BIG = True if sys.byteorder == "big" else False
 
 # TCP (RFC 793) and UDP (RFC 768) checksum
 
 
 def in_cksum_add(s, buf):
-	"""Add checksum value to the given value s. Adds 0x0 padding if not multiple of 2."""
-	n = len(buf)
+	"""return -- s + checksum value of buf. Adds 0x0 padding to buf if not multiple of 2."""
+	buflen = len(buf)
 	# logger.debug("buflen for checksum: %d" % n)
-	# len=123 -> len=122
-	a = array_call("H", buf[:n & (~0x1)])
+	#a = [unpack_H_le(buf[off: off+2])[0] for off in range(0, buflen & ~0x1, 2)] # seems to be slower
+	a = array_call("H", buf[:buflen & ~0x1])
 
-	if ENDIANNES != "little":
+	if ENDIANNES_IS_BIG:
 		a.byteswap()
 
-	if n & 0x1 == 0x1:
+	if buflen & 0x1 == 0x1:
 		# not multiple of 2: add padding
 		a.append(unpack_H_le(buf[-1:] + b"\x00")[0])
 

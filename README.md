@@ -289,6 +289,17 @@ by their respective RFCs/official standards.
 
 **A**:	The basic features should work with any OS. Optional ones may make trouble (eg interceptor).
 
+**Q**:	Calling copy.deepcopy(some_packet) raises an exception "TypeError: can't pickle Struct objects".
+
+**A**:	Try the following workaround to be able to pickle Struct objects:
+```python
+import copy, copyreg
+def pickle_struct(s):
+	return struct.Struct, (s.format,)
+
+copyreg.pickle(struct.Struct, pickle_struct)
+```
+
 
 # Usage hints
 ## Performance related

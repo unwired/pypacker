@@ -1,5 +1,7 @@
+
 """
 Scalable service-Oriented MiddlewarE over IP (SOME/IP)
+https://www.autosar.org/fileadmin/user_upload/standards/foundation/1-2/AUTOSAR_PRS_SOMEIPServiceDiscoveryProtocol.pdf
 """
 import logging
 
@@ -9,14 +11,25 @@ from pypacker.pypacker import FIELD_FLAG_AUTOUPDATE
 logger = logging.getLogger("pypacker")
 
 
-# TODO needs testing
+RET_CODE_E_OK				= 0x00
+RET_CODE_E_NOT_OK			= 0x01
+RET_CODE_E_UNKNOWN_SERVICE		= 0x02
+RET_CODE_E_UNKNOWN_METHOD		= 0x03
+RET_CODE_E_NOT_READY			= 0x04
+RET_CODE_E_NOT_REACHABLE		= 0x05
+RET_CODE_E_TIMEOUT			= 0x06
+RET_CODE_E_WRONG_PROTOCOL_VERSION	= 0x07
+RET_CODE_E_WRONG_INTERFACE_VERSION	= 0x08
+RET_CODE_E_MALFORMED_MESSAGE		= 0x09
+RET_CODE_E_WRONG_MESSAGE_TYPE		= 0x0A
+# Other codes: RESERVED
+
+
 class SomeIP(Packet):
 	__hdr__ = (
-		("serviceid", "H", 1),
-		("methodid", "H", 0),
+		("messageid", "I", 1),
 		("length", "I", 8, FIELD_FLAG_AUTOUPDATE),  # in bytes, inclusive 8 bytes of header
-		("clientid", "I", 0),
-		("sessionid", "I", 0),
+		("reqid", "I", 0),
 		("protoversion", "B", 0),
 		("ifaceversion", "B", 0),
 		("msgtype", "B", 0),

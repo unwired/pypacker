@@ -15,7 +15,8 @@ from pypacker.layer12 import aoe, arp, btle, can, dtp, ethernet, ieee80211, linu
 	flow_control, lldp, slac
 from pypacker.layer3 import ip, ip6, ipx, icmp, igmp, ospf, pim
 from pypacker.layer4 import tcp, udp, ssl, sctp
-from pypacker.layer567 import diameter, dhcp, dns, der, hsrp, http, mqtt, ntp, pmap, radius, rip, rtp, telnet, tpkt
+from pypacker.layer567 import diameter, dhcp, dns, der, hsrp, http, mqtt, ntp, pmap, radius, rip, rtp, someip,\
+	telnet, tpkt
 
 
 # General testcases:
@@ -476,6 +477,17 @@ class GeneralTestCase(unittest.TestCase):
 
 		eth_tcp = layers_split[0] + layers_split[2]
 		self.assertEqual(eth_tcp.higher_layer, tcp.TCP)
+
+	def test_disconnect(self):
+		eth0 = ethernet.Ethernet()
+		ip0 = ip.IP()
+		tcp0 = tcp.TCP()
+
+		pkt = eth0 + ip0 + tcp0
+		self.assertEqual(pkt.higher_layer, ip0)
+		ip0_dc = pkt.higher_layer.disconnect_layer()
+		self.assertEqual(pkt.higher_layer, tcp0)
+		self.assertEqual(ip0, ip0_dc)
 
 
 class PacketDumpTestCase(unittest.TestCase):
@@ -1406,6 +1418,28 @@ class StunTestCase(unittest.TestCase):
 		self.assertEqual(len(stun1.attrs), 5)
 
 
+class SomeIPTestCase(unittest.TestCase):
+	def test_someip(self):
+		print_header("SOME/IP")
+		packet_bytes = get_pcap("tests/packets_someip.pcap")
+
+		# SOME/IP does not have fixed port numbers -> needs to be parsed explicitly
+		for bts in packet_bytes:
+			bts_someip = ethernet.Ethernet(bts).highest_layer.body_bytes
+			someip1 = someip.SomeIP(bts_someip)
+			someip1.msgid = 0x01234567
+			someip1.bin()
+			print("%s" % someip1)
+
+		# Test update fields
+		someip1_bts = ethernet.Ethernet(packet_bytes[0]).highest_layer.body_bytes
+		someip1 = someip.SomeIP(someip1_bts)
+		self.assertEqual(someip1.length, 8 + len(someip1.body_bytes))
+		someip1.body_bytes += b"\xFF"
+		someip1.bin()
+		self.assertEqual(someip1.length, 8 + len(someip1.body_bytes))
+
+
 class TFTPTestCase(unittest.TestCase):
 	def test_tftp(self):
 		print_header("TFTP")
@@ -1908,6 +1942,22 @@ class PerfTestCase(unittest.TestCase):
 		print("rounds per test: %d" % cnt)
 		print("=====================================")
 
+		def tracefunc(frame, event, arg, indent=[0]):
+			if event == "call":
+				indent[0] += 2
+				print("-" * indent[0] + "> call function", frame.f_code.co_name)
+			elif event == "return":
+				print("<" + "-" * indent[0], "exit function", frame.f_code.co_name)
+				indent[0] -= 2
+			return tracefunc
+		"""
+		# Trace parsing
+		import sys
+		sys.settrace(tracefunc)
+		time.sleep(1)
+		ip1 = ip.IP(s)
+		time.sleep(999)
+		"""
 		print(">>> parsing (IP + ICMP)")
 		start = time.time()
 		for i in range(cnt):
@@ -2798,6 +2848,7 @@ suite.addTests(loader.loadTestsFromTestCase(PIMTestCase))
 suite.addTests(loader.loadTestsFromTestCase(HSRPTestCase))
 suite.addTests(loader.loadTestsFromTestCase(DHCPTestCase))
 suite.addTests(loader.loadTestsFromTestCase(StunTestCase))
+suite.addTests(loader.loadTestsFromTestCase(SomeIPTestCase))
 suite.addTests(loader.loadTestsFromTestCase(TFTPTestCase))
 suite.addTests(loader.loadTestsFromTestCase(DNSTestCase))
 suite.addTests(loader.loadTestsFromTestCase(NTPTestCase))
