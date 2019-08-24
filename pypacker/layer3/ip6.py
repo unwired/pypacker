@@ -66,6 +66,7 @@ class IP6(pypacker.Packet):
 	# Convenient access for: src[_s], dst[_s]
 	src_s = pypacker.get_property_ip6("src")
 	dst_s = pypacker.get_property_ip6("dst")
+	nxt_t = pypacker.get_property_translator("nxt", "IP_PROTO_")
 
 	__handler__ = {
 		IP_PROTO_ICMP6: icmp6.ICMP6,

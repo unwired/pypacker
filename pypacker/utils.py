@@ -389,3 +389,13 @@ def get_arp_cache_entry(ipaddr):
 				mac = pattern_mac.search(line).group(0)
 				break
 	return mac
+
+
+def add_arp_entry(ip_address, mac_address, interface_name):
+	cmd_call = ["arp", "-s", ip_address, "-i", interface_name, mac_address]
+	subprocess.check_call(cmd_call)
+
+
+def flush_arp_cache():
+	cmd_call = ["ip", "-s", "neigh", "flush", "all"]
+	subprocess.check_call(cmd_call)

@@ -65,6 +65,7 @@ from pypacker.layer567 import diameter, dhcp, dns, der, hsrp, http, mqtt, ntp, p
 # - DHCP
 # - RIP
 # - SIP
+# - SOME/IP
 # - Telnet
 # - HSRP
 # - Diameter
@@ -490,8 +491,21 @@ class GeneralTestCase(unittest.TestCase):
 		self.assertEqual(ip0, ip0_dc)
 
 
+class SummarizeTestCase(unittest.TestCase):
+	def test_summarize(self):
+		pkt0 = ethernet.Ethernet() + ip.IP() + tcp.TCP(flags=tcp.TH_SYN | tcp.TH_ACK | tcp.TH_PUSH)
+		summary = "%s" % pkt0
+		print(summary)
+		self.assertTrue("ETH_TYPE_IP" in summary)
+		self.assertTrue("IP_PROTO_TCP" in summary)
+
+		pkt1 = icmp.ICMP()
+		summary = "%s" % pkt1
+		print(summary)
+
+
 class PacketDumpTestCase(unittest.TestCase):
-	def test_exdump(self):
+	def test_hexdump(self):
 		bts = get_pcap("tests/packets_ether.pcap")[7]
 		eth = ethernet.Ethernet(bts)
 		eth.hexdump()
@@ -2822,6 +2836,7 @@ loader = unittest.defaultTestLoader
 
 suite.addTests(loader.loadTestsFromTestCase(GeneralTestCase))
 suite.addTests(loader.loadTestsFromTestCase(PacketDumpTestCase))
+suite.addTests(loader.loadTestsFromTestCase(SummarizeTestCase))
 suite.addTests(loader.loadTestsFromTestCase(EthTestCase))
 suite.addTests(loader.loadTestsFromTestCase(AOETestCase))
 suite.addTests(loader.loadTestsFromTestCase(LinuxCookedCapture))

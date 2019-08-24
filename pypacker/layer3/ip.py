@@ -78,7 +78,7 @@ class IP(pypacker.Packet):
 		# TODO: rename to frag_off
 		("off", "H", 0),
 		("ttl", "B", 64),
-		("p", "B", IP_PROTO_TCP, FIELD_FLAG_AUTOUPDATE | FIELD_FLAG_IS_TYPEFIELD),
+		("p", "B", IP_PROTO_TCP, FIELD_FLAG_IS_TYPEFIELD),
 		("sum", "H", 0, FIELD_FLAG_AUTOUPDATE),
 		("src", "4s", b"\x00" * 4),
 		("dst", "4s", b"\x00" * 4),
@@ -169,10 +169,11 @@ class IP(pypacker.Packet):
 	# Convenient access for: src[_s], dst[_s]
 	src_s = pypacker.get_property_ip4("src")
 	dst_s = pypacker.get_property_ip4("dst")
+	p_t = pypacker.get_property_translator("p", "IP_PROTO_")
 
 	def _dissect(self, buf):
 		total_header_length = ((buf[0] & 0xf) << 2)
-		options_length = total_header_length - 20		# total IHL - standard IP-len = options length
+		options_length = total_header_length - 20  # total IHL - standard IP-len = options length
 
 		if options_length > 0:
 			# logger.debug("got some IP options: %s" % tl_opts)

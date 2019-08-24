@@ -208,27 +208,36 @@ class LocalTunnel(object):
 	"""
 	Local Back-to-back tunnel based on tun interfaces: local <-> ip:tun1:dev <-> dev:tun2:ip <-> local
 	"""
-	def __init__(self, ip_src="12.34.56.1", ip_dst="12.34.56.2", ifacetype=TYPE_TUN):
-		self._ifacetype = ifacetype
+	def __init__(self, ip_iface_A="192.168.2.1", ip_iface_B="192.168.3.1"):
+		self._ifacetype = TYPE_TAP
 		islocaltunnel = True
-		ifacetype_str = TYPE_STR_DCT[ifacetype]
+		ifacetype_str = TYPE_STR_DCT[self._ifacetype]
 		logger.debug("Base interface name: %s" % ifacetype_str)
 		self._state_active = False
 
-		self._dev_B = TuntapInterface(
-			iface_name=ifacetype_str + "B0",
-			devnode="/dev/net/" + ifacetype_str + "B",
-			ifacetype=ifacetype,
-			ip_src=ip_dst, ip_dst=ip_src,
-			is_local_tunnel=islocaltunnel
-		)
+		iface_name_A = ifacetype_str + "A0"
 		self._dev_A = TuntapInterface(
-			iface_name=ifacetype_str + "A0",
+			iface_name=iface_name_A,
 			devnode="/dev/net/" + ifacetype_str + "A",
-			ifacetype=ifacetype,
-			ip_src=ip_src, ip_dst=ip_dst,
+			ifacetype=self._ifacetype,
+			ip_src=ip_iface_A,
 			is_local_tunnel=islocaltunnel
 		)
+		iface_name_B = ifacetype_str + "B0"
+		self._dev_B = TuntapInterface(
+			iface_name=iface_name_B,
+			devnode="/dev/net/" + ifacetype_str + "B",
+			ifacetype=self._ifacetype,
+			ip_src=ip_iface_B,
+			is_local_tunnel=islocaltunnel
+		)
+		logger.debug("Configuring ARP cache")
+		utils.flush_arp_cache()
+		mac_A = utils.get_mac_for_iface(iface_name_A)
+		mac_B = utils.get_mac_for_iface(iface_name_B)
+		#utils.add_arp_entry(ip_iface_A, mac_A, iface_name_B)
+		#utils.add_arp_entry(ip_iface_B, mac_B, iface_name_A)
+
 		self._rs_thread_A = None
 		self._rs_thread_B = None
 
@@ -249,11 +258,11 @@ class LocalTunnel(object):
 				bts = iface_in.read()
 				try:
 					pkt = ip.IP(bts) if obj._ifacetype == TYPE_TUN else ethernet.Ethernet(bts)
+					logger.debug("Sending in cycler %s (%s -> %s):\n%s\n%s" %
+						     (name, iface_in._iface_name, iface_out._iface_name, bts, pkt))
+					iface_out.write(bts)
 				except:
-					pkt = None
-				logger.debug("Sending in cycler %s (%s -> %s):\n%s\n%s" %
-					(name, iface_in._iface_name, iface_out._iface_name, bts, pkt))
-				iface_out.write(bts)
+					pass
 			except ValueError as ex:
 				logger.warning(ex)
 				break

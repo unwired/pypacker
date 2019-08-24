@@ -77,6 +77,8 @@ class TCPOptSingle(pypacker.Packet):
 		("type", "B", 0),
 	)
 
+	type_t = pypacker.get_property_translator("type", "TCP_OPT_")
+
 
 class TCPOptMulti(pypacker.Packet):
 	"""
@@ -86,6 +88,8 @@ class TCPOptMulti(pypacker.Packet):
 		("type", "B", 0),
 		("len", "B", 2, FIELD_FLAG_AUTOUPDATE)
 	)
+
+	type_t = pypacker.get_property_translator("type", "TCP_OPT_")
 
 	def _update_fields(self):
 		if self.len_au_active:
@@ -102,10 +106,15 @@ TCP_PROTO_RTP 		= (5004, 5005)
 TCP_PROTO_SIP		= (5060, 5061)
 
 
+def cb_get_flag_description(value, value_name):
+	descr = [name_d for value_d, name_d in value_name.items() if value_d & value != 0]
+	return " | ".join(descr)
+
+
 class TCP(pypacker.Packet):
 	__hdr__ = (
 		("sport", "H", 0xdead),
-		("dport", "H", 0, FIELD_FLAG_AUTOUPDATE | FIELD_FLAG_IS_TYPEFIELD),
+		("dport", "H", 0, FIELD_FLAG_IS_TYPEFIELD),
 		("seq", "I", 0xdeadbeef),
 		("ack", "I", 0),
 		("off_x2", "B", ((5 << 4) | 0), FIELD_FLAG_AUTOUPDATE),  # 10*4 Byte
@@ -133,7 +142,9 @@ class TCP(pypacker.Packet):
 	# set real header length based on header info (should be n*4)
 	def __set_hlen(self, value):
 		self.off = int(value / 4)
+
 	hlen = property(__get_hlen, __set_hlen)
+	flags_t = pypacker.get_property_translator("flags", "TH_", cb_get_description=cb_get_flag_description)
 
 	__handler__ = {
 		TCP_PROTO_BGP: bgp.BGP,

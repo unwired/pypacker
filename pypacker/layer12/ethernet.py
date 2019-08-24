@@ -7,7 +7,7 @@ import logging
 
 from pypacker.layer12 import lldp, slac
 from pypacker import pypacker, triggerlist
-from pypacker.pypacker import FIELD_FLAG_AUTOUPDATE, FIELD_FLAG_IS_TYPEFIELD
+from pypacker.pypacker import FIELD_FLAG_IS_TYPEFIELD
 from pypacker.structcbs import unpack_H
 
 # handler
@@ -98,6 +98,7 @@ class Dot1Q(pypacker.Packet):
 		self.tci = self.tci & 0xF000 | value
 	vid = property(__get_vid, __set_vid)
 
+	type_t = pypacker.get_property_translator("type", "ETH_TYPE_")
 
 # standard or double vlan tag
 # ETH_TYPE_TUNNELING as outer tag is NON-standard!
@@ -106,15 +107,16 @@ VLAN_TAG_START = {ETH_TYPE_8021Q, ETH_TYPE_PBRIDGE, ETH_TYPE_TUNNELING}
 
 
 class Ethernet(pypacker.Packet):
-	__hdr__ = (
+	__hdr__ = [
 		("dst", "6s", b"\xff" * 6),
 		("src", "6s", b"\xff" * 6),
 		("vlan", None, triggerlist.TriggerList),
-		("type", "H", ETH_TYPE_IP, FIELD_FLAG_AUTOUPDATE | FIELD_FLAG_IS_TYPEFIELD)
-	)
+		("type", "H", ETH_TYPE_IP, FIELD_FLAG_IS_TYPEFIELD)
+	]
 
 	dst_s = pypacker.get_property_mac("dst")
 	src_s = pypacker.get_property_mac("src")
+	type_t = pypacker.get_property_translator("type", "ETH_TYPE_")
 
 	__handler__ = {
 		ETH_TYPE_IP: ip.IP,

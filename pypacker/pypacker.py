@@ -6,11 +6,13 @@ import random
 import re
 import struct
 from struct import Struct
+import inspect
 from ipaddress import IPv6Address, v6_int_to_packed
 
 # imported to make usable via import "pypacker.[FIELD_FLAG_AUTOUPDATE | FIELD_FLAG_IS_TYPEFIELD]"
 from pypacker.pypacker_meta import MetaPacket, FIELD_FLAG_AUTOUPDATE, FIELD_FLAG_IS_TYPEFIELD
 from pypacker.structcbs import pack_mac, unpack_mac, pack_ipv4, unpack_ipv4
+from pypacker.lazydict import LazyDict
 
 logger = logging.getLogger("pypacker")
 # logger.setLevel(logging.DEBUG)
@@ -34,6 +36,8 @@ ERROR_NONE		= 0
 ERROR_DISSECT		= 1
 ERROR_UNKNOWN_PROTO	= 2
 ERROR_NOT_UNPACKED	= 4
+
+VARFILTER_TYPES = {bytes, int}
 
 
 class InvalidValuetypeException(Exception):
@@ -583,29 +587,47 @@ class Packet(object, metaclass=MetaPacket):
 			name_real = name[1:]
 			val = getattr(self, name_real)
 			value_alt = ""
+			value_translated = ""
 
 			try:
-				# try to get convenient name
+				# Try to get convenient name
 				value_alt = " = " + getattr(self, name_real + "_s")
 			except AttributeError:
+				# Not set
 				pass
+
+			try:
+				# Try to get translated name
+				#logger.debug("Looking for translation: %s -> %s" % (self.__class__, name_real + "_t"))
+				value_translated = getattr(self, name_real + "_t")
+
+				if value_translated != "":
+					# Nothing found
+					value_translated = " = " + value_translated
+			except AttributeError:
+				# Not set
+				pass
+
 			# Values: int
 			if type(val) is int:
 				format = getattr(self, name + "_format")
-				layer_sums_l.append("%-12s (%s): 0x%X = %d = %s" % (name_real, format, val, val, bin(val)) + value_alt)
+				layer_sums_l.append("%-12s (%s): 0x%X = %d = %s" % (name_real, format, val, val,
+					bin(val)) + value_alt + value_translated)
 			# Inactive
 			elif val is None:
 				layer_sums_l.append("%-16s: (inactive)" % name_real)
-			# Values: bytes, Triggerlist (Packets, tuples, bytes)
 			else:
+				# Values: bytes
 				if type(val) is bytes:
 					bts_cnt = "(%d)" % len(val)
-					layer_sums_l.append("%-9s %6s: %s" % (name_real, bts_cnt, val) + value_alt)
+					layer_sums_l.append("%-9s %6s: %s" % (name_real, bts_cnt, val) +
+						value_alt + value_translated)
+				# Values Triggerlist (can contain Packets, tuples, bytes)
 				else:
 					layer_sums_l.append("%-16s: %s" % (name_real, val) + value_alt)
 
 		if self.upper_layer is None:
-			# Bo upper layer present: describe body bytes
+			# No upper layer present: describe body bytes
 			bts_cnt = "(%d)" % len(self.body_bytes)
 			layer_sums_l.append("%-9s %6s: " % ("bodybytes", bts_cnt) + "%s" % self.body_bytes)
 
@@ -1308,6 +1330,43 @@ def get_property_bytes_num(var, format_target):
 		get_val_bts_to_int,
 		# int -> bytes
 		set_val_int_to_bts
+	)
+
+
+def get_property_translator(
+	varname,
+	varname_regex,
+	cb_get_description=lambda value,
+	value_name_dct: value_name_dct[value]):
+	"""
+	Get a descriptor allowing to make a value->name translation for variable values
+
+	varname_regex -- The regex to find variables.
+	cb_get_description -- lambda value, value_name_dct: Description
+	return -- property allowing get-access to get an descriptive name
+	"""
+	# Get globals of calling module containing the variables in question
+	# TODO: avoid globals? Too high delay for collecting? (just one time start)
+	globals_caller = inspect.stack()[1][0].f_globals
+
+	def collect_cb():
+		varname_pattern = re.compile(varname_regex)
+		# TODO: avoid globals? Too high delay for collecting? (just one time start)
+		return {value: name for name, value in globals_caller.items() if
+			type(value) in VARFILTER_TYPES and varname_pattern.match(name)}
+
+	ldict = LazyDict(collect_cb)
+
+	def descricptor_cb(value):
+		try:
+			#logger.debug("Trying to get description!")
+			return cb_get_description(value, ldict)
+		except:
+			return ""
+
+	# Only get access
+	return property(
+		lambda obj: descricptor_cb(obj.__getattribute__(varname))
 	)
 
 

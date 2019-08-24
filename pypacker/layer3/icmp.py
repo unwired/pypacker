@@ -89,6 +89,7 @@ class ICMP(pypacker.Packet):
 		("code", "B", 0),
 		("sum", "H", 0, FIELD_FLAG_AUTOUPDATE)
 	)
+	type_t = pypacker.get_property_translator("type", "ICMP_")
 
 	def _update_fields(self):
 		# logger.debug("sum is: %d" % self.sum)

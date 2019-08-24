@@ -3,7 +3,13 @@ import logging
 
 logger = logging.getLogger("pypacker")
 
+# Allows to activate/decative the auto-update of a header field.
+# Note: _update_fields() has to be implemented
 FIELD_FLAG_AUTOUPDATE	= 1
+# Identifies the header field defining the next upper layer type
+# Allows to auto-set the value on concatenation: "pkt = eth0 + ip0" sets type field in eth0
+# Auto-sets FIELD_FLAG_AUTOUPDATE
+# Note: _update_fields() has to be implemented and _update_upperlayer_id() has to be called in it.
 FIELD_FLAG_IS_TYPEFIELD	= 2
 
 
@@ -140,11 +146,12 @@ def configure_packet_header(t, hdrs, header_fmt):
 	# This way we get informed about get-access (needed to check for unpack)
 	# more efficiently than using __getattribute__ (slow access for header
 	# fields vs. slow access for ALL class members).
-	# every header field will get two additional values set:
+	# Every header field will get two additional values set:
 	# var_active = indicates if header is active
 	# var_format = indicates the header format
 	for hdr in hdrs:
 		# Sanity checks
+		# Max packet fields: [name, format, value, flags, {value:key})
 		if len(hdr) > 4:
 			logger.warning("Amount of field definitions > 4: %r", hdr)
 
@@ -204,7 +211,7 @@ def configure_packet_header(t, hdrs, header_fmt):
 			setattr(t, shadowed_name + "_active", True if hdr[2] is not None else False)
 
 			# check for auto-update
-			if len(hdr) == 4:
+			if len(hdr) >= 4:
 				field_flags = hdr[3]
 
 				if field_flags & FIELD_FLAG_IS_TYPEFIELD != 0:
@@ -218,9 +225,9 @@ def configure_packet_header(t, hdrs, header_fmt):
 					# remember which fields are auto-update ones, default is active
 					setattr(t, hdr[0] + "_au_active", True)
 
-			# set initial value via shadowed variable:
+			# Setting/getting value is done via properties.
+			# Set initial value via shadowed variable:
 			# _varname <- varname [optional in subclass: <- varname_s]
-			# setting/getting value is done via properties.
 			# logger.debug("init simple type: %s=%r" % (shadowed_name, hdr[2]))
 			setattr(t, shadowed_name, hdr[2])
 			setattr(t, hdr[0], property(
