@@ -14,44 +14,17 @@ logger = logging.getLogger("pypacker")
 # Types (icmp_type) and codes (icmp_code) -
 # http://www.iana.org/assignments/icmp-parameters
 
-ICMP_CODE_NONE			= 0		# for types without codes
+
 ICMP_ECHO_REPLY			= 0		# echo reply
-ICMP_UNREACH			= 3		# dest unreachable, codes:
-ICMP_UNREACH_NET		= 0		# bad net
-ICMP_UNREACH_HOST		= 1		# bad host
-ICMP_UNREACH_PROTO		= 2		# bad protocol
-ICMP_UNREACH_PORT		= 3		# bad port
-ICMP_UNREACH_NEEDFRAG		= 4		# IP_DF caused drop
-ICMP_UNREACH_SRCFAIL		= 5		# src route failed
-ICMP_UNREACH_NET_UNKNOWN	= 6		# unknown net
-ICMP_UNREACH_HOST_UNKNOWN	= 7		# unknown host
-ICMP_UNREACH_ISOLATED		= 8		# src host isolated
-ICMP_UNREACH_NET_PROHIB		= 9		# for crypto devs
-ICMP_UNREACH_HOST_PROHIB	= 10		# ditto
-ICMP_UNREACH_TOSNET		= 11		# bad tos for net
-ICMP_UNREACH_TOSHOST		= 12		# bad tos for host
-ICMP_UNREACH_FILTER_PROHIB	= 13		# prohibited access
-ICMP_UNREACH_HOST_PRECEDENCE	= 14		# precedence error
-ICMP_UNREACH_PRECEDENCE_CUTOFF	= 15		# precedence cutoff
+ICMP_UNREACH			= 3		# dest unreachable
 ICMP_SRCQUENCH			= 4		# packet lost, slow down
-ICMP_REDIRECT			= 5		# shorter route, codes:
-ICMP_REDIRECT_NET		= 0		# for network
-ICMP_REDIRECT_HOST		= 1		# for host
-ICMP_REDIRECT_TOSNET		= 2		# for tos and net
-ICMP_REDIRECT_TOSHOST		= 3		# for tos and host
+ICMP_REDIRECT			= 5		# shorter route
 ICMP_ALTHOSTADDR		= 6		# alternate host address
 ICMP_ECHO_REQUEST		= 8		# echo service
-ICMP_RTRADVERT			= 9		# router advertise, codes:
-ICMP_RTRADVERT_NORMAL		= 0		# normal
-ICMP_RTRADVERT_NOROUTE_COMMON	= 16		# selective routing
-ICMP_RTRSOLICIT			= 10		# router solicitation
+ICMP_RTRADVERT			= 9		# router advertise
+ICMP_RTRSEL			= 10		# router selection
 ICMP_TIMEXCEED			= 11		# time exceeded, code:
-ICMP_TIMEXCEED_INTRANS		= 0		# ttl==0 in transit
-ICMP_TIMEXCEED_REASS		= 1		# ttl==0 in reass
 ICMP_PARAMPROB			= 12		# ip header bad
-ICMP_PARAMPROB_ERRATPTR		= 0		# req. opt. absent
-ICMP_PARAMPROB_OPTABSENT	= 1		# req. opt. absent
-ICMP_PARAMPROB_LENGTH		= 2		# bad length
 ICMP_TSTAMP			= 13		# timestamp request
 ICMP_TSTAMPREPLY		= 14		# timestamp reply
 ICMP_INFO			= 15		# information request
@@ -69,13 +42,6 @@ ICMP_DNS			= 37		# domain name request
 ICMP_DNSREPLY			= 38		# domain name reply
 ICMP_SKIP			= 39		# SKIP
 ICMP_PHOTURIS			= 40		# Photuris
-ICMP_PHOTURIS_UNKNOWN_INDEX	= 0		# unknown sec index
-ICMP_PHOTURIS_AUTH_FAILED	= 1		# auth failed
-ICMP_PHOTURIS_DECOMPRESS_FAILED	= 2		# decompress failed
-ICMP_PHOTURIS_DECRYPT_FAILED	= 3		# decrypt failed
-ICMP_PHOTURIS_NEED_AUTHN	= 4		# no authentication
-ICMP_PHOTURIS_NEED_AUTHZ	= 5		# no authorization
-ICMP_TYPE_MAX			= 40
 
 
 class ICMP(pypacker.Packet):
@@ -119,9 +85,25 @@ class ICMP(pypacker.Packet):
 
 	class Unreach(pypacker.Packet):
 		__hdr__ = (
-			("pad", "H", 0),
-			("mtu", "H", 0)
+			("pad", "I", 0),
 		)
+
+		CODE_UNREACH_NET = 0  # bad net
+		CODE_UNREACH_HOST = 1  # bad host
+		CODE_UNREACH_PROTO = 2  # bad protocol
+		CODE_UNREACH_PORT = 3  # bad port
+		CODE_UNREACH_NEEDFRAG = 4  # IP_DF caused drop
+		CODE_UNREACH_SRCFAIL = 5  # src route failed
+		CODE_UNREACH_NET_UNKNOWN = 6  # unknown net
+		CODE_UNREACH_HOST_UNKNOWN = 7  # unknown host
+		CODE_UNREACH_ISOLATED = 8  # src host isolated
+		CODE_UNREACH_NET_PROHIB = 9  # for crypto devs
+		CODE_UNREACH_HOST_PROHIB = 10  # ditto
+		CODE_UNREACH_TOSNET = 11  # bad tos for net
+		CODE_UNREACH_TOSHOST = 12  # bad tos for host
+		CODE_UNREACH_FILTER_PROHIB = 13  # prohibited access
+		CODE_UNREACH_HOST_PRECEDENCE = 14  # precedence error
+		CODE_UNREACH_PRECEDENCE_CUTOFF = 15  # precedence cutoff
 
 	class Quench(pypacker.Packet):
 		__hdr__ = (
@@ -132,16 +114,69 @@ class ICMP(pypacker.Packet):
 		__hdr__ = (
 			("gw", "I", 0),
 		)
+		CODE_REDIRECT_NET = 0  # for network
+		CODE_REDIRECT_HOST = 1  # for host
+		CODE_REDIRECT_TOSNET = 2  # for tos and net
+		CODE_REDIRECT_TOSHOST = 3  # for tos and host
+
+	class RouterAdvertisement(pypacker.Packet):
+		__hdr__ = (
+			("numaddr", "B", 0),
+			("addrsize", "B", 0),
+			("lifetime", "H", 0)
+		)
+
+		CODE_RTRADVERT_NORMAL = 0  # normal
+		CODE_RTRADVERT_NOROUTE_COMMON = 16  # selective routing
+		CODE_RTRSOLICIT = 10  # router solicitation
+
+	class RouterSelection(pypacker.Packet):
+		__hdr__ = (
+			("numaddr", "B", 0),
+			("addrsize", "B", 0),
+			("lifetime", "H", 0)
+		)
 
 	class TimeExceed(pypacker.Packet):
 		__hdr__ = (
 			("pad", "I", 0),
 		)
 
+		CODE_TIMEXCEED_INTRANS = 0  # ttl==0 in transit
+		CODE_TIMEXCEED_REASS = 1  # ttl==0 in reass
+
+	class ParamProblem(pypacker.Packet):
+		__hdr__ = (
+			("pointer", "B", 0),
+			("unused", "3s", b"\x00" * 3)
+		)
+
+		CODE_PARAMPROB_ERRATPTR = 0  # req. opt. absent
+		CODE_PARAMPROB_OPTABSENT = 1  # req. opt. absent
+		CODE_PARAMPROB_LENGTH = 2  # bad length
+
+	class Photuris(pypacker.Packet):
+		class ParamProblem(pypacker.Packet):
+			__hdr__ = (
+				("reserved", "H", 0),
+				("pointer", "H", 0)
+			)
+
+		CODE_PHOTURIS_UNKNOWN_INDEX = 0  # unknown sec index
+		CODE_PHOTURIS_AUTH_FAILED = 1  # auth failed
+		CODE_PHOTURIS_DECOMPRESS_FAILED = 2  # decompress failed
+		CODE_PHOTURIS_DECRYPT_FAILED = 3  # decrypt failed
+		CODE_PHOTURIS_NEED_AUTHN = 4  # no authentication
+		CODE_PHOTURIS_NEED_AUTHZ = 5  # no authorization
+
 	__handler__ = {
 		(ICMP_ECHO_REQUEST, ICMP_ECHO_REPLY): Echo,
 		ICMP_UNREACH: Unreach,
 		ICMP_SRCQUENCH: Quench,
 		ICMP_REDIRECT: Redirect,
-		ICMP_TIMEXCEED: TimeExceed
+		ICMP_RTRADVERT: RouterAdvertisement,
+		ICMP_RTRSEL: RouterSelection,
+		ICMP_TIMEXCEED: TimeExceed,
+		ICMP_PARAMPROB: ParamProblem,
+		ICMP_PHOTURIS: Photuris
 	}
