@@ -20,7 +20,7 @@ ICMP_UNREACH			= 3		# dest unreachable
 ICMP_SRCQUENCH			= 4		# packet lost, slow down
 ICMP_REDIRECT			= 5		# shorter route
 ICMP_ALTHOSTADDR		= 6		# alternate host address
-ICMP_ECHO_REQUEST		= 8		# echo service
+ICMP_ECHO			= 8		# echo service
 ICMP_RTRADVERT			= 9		# router advertise
 ICMP_RTRSEL			= 10		# router selection
 ICMP_TIMEXCEED			= 11		# time exceeded, code:
@@ -46,7 +46,7 @@ ICMP_PHOTURIS			= 40		# Photuris
 
 class ICMP(pypacker.Packet):
 	__hdr__ = (
-		("type", "B", ICMP_ECHO_REQUEST, FIELD_FLAG_IS_TYPEFIELD),
+		("type", "B", ICMP_ECHO, FIELD_FLAG_IS_TYPEFIELD),
 		("code", "B", 0),
 		("sum", "H", 0, FIELD_FLAG_AUTOUPDATE)
 	)
@@ -170,7 +170,7 @@ class ICMP(pypacker.Packet):
 		CODE_PHOTURIS_NEED_AUTHZ = 5  # no authorization
 
 	__handler__ = {
-		(ICMP_ECHO_REQUEST, ICMP_ECHO_REPLY): Echo,
+		(ICMP_ECHO, ICMP_ECHO_REPLY): Echo,
 		ICMP_UNREACH: Unreach,
 		ICMP_SRCQUENCH: Quench,
 		ICMP_REDIRECT: Redirect,
