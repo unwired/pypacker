@@ -1,4 +1,8 @@
-"""Internet Control Message Protocol for IPv4."""
+"""
+Internet Control Message Protocol for IPv4.
+https://www.iana.org/assignments/icmp-parameters/icmp-parameters.xhtml
+https://tools.ietf.org/html/rfc792
+"""
 import logging
 
 from pypacker import pypacker, checksum
