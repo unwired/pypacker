@@ -11,6 +11,7 @@ from pypacker.psocket import SocketHndl
 import pypacker.ppcap as ppcap
 import pypacker.pcapng as pcapng
 from pypacker import statemachine
+from pypacker import lazydict
 from pypacker.layer12 import aoe, arp, btle, can, dtp, ethernet, ieee80211, linuxcc, ppp, radiotap, stp, vrrp,\
 	flow_control, lldp, slac
 from pypacker.layer3 import ip, ip6, ipx, icmp, igmp, ospf, pim
@@ -489,6 +490,16 @@ class GeneralTestCase(unittest.TestCase):
 		ip0_dc = pkt.higher_layer.disconnect_layer()
 		self.assertEqual(pkt.higher_layer, tcp0)
 		self.assertEqual(ip0, ip0_dc)
+
+
+class LazydictTestCase(unittest.TestCase):
+	def test_dict(self):
+		def creat_cb():
+			return {"key0": "value0", "key1": "value1", "key2": "value2"}
+		ld0 = lazydict.LazyDict(creat_cb)
+		self.assertIsNotNone(ld0._cb_createentries)
+		items = ld0.items()
+		self.assertIsNone(ld0._cb_createentries)
 
 
 class SummarizeTestCase(unittest.TestCase):
@@ -2835,6 +2846,7 @@ suite = unittest.TestSuite()
 loader = unittest.defaultTestLoader
 
 suite.addTests(loader.loadTestsFromTestCase(GeneralTestCase))
+suite.addTests(loader.loadTestsFromTestCase(LazydictTestCase))
 suite.addTests(loader.loadTestsFromTestCase(PacketDumpTestCase))
 suite.addTests(loader.loadTestsFromTestCase(SummarizeTestCase))
 suite.addTests(loader.loadTestsFromTestCase(EthTestCase))

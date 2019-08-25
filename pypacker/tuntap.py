@@ -39,7 +39,6 @@ import threading
 import subprocess
 import logging
 import pathlib
-import time
 
 from pypacker.layer12 import ethernet
 from pypacker.layer3 import ip
@@ -233,8 +232,8 @@ class LocalTunnel(object):
 		)
 		logger.debug("Configuring ARP cache")
 		utils.flush_arp_cache()
-		mac_A = utils.get_mac_for_iface(iface_name_A)
-		mac_B = utils.get_mac_for_iface(iface_name_B)
+		#mac_A = utils.get_mac_for_iface(iface_name_A)
+		#mac_B = utils.get_mac_for_iface(iface_name_B)
 		#utils.add_arp_entry(ip_iface_A, mac_A, iface_name_B)
 		#utils.add_arp_entry(ip_iface_B, mac_B, iface_name_A)
 
@@ -259,7 +258,7 @@ class LocalTunnel(object):
 				try:
 					pkt = ip.IP(bts) if obj._ifacetype == TYPE_TUN else ethernet.Ethernet(bts)
 					logger.debug("Sending in cycler %s (%s -> %s):\n%s\n%s" %
-						     (name, iface_in._iface_name, iface_out._iface_name, bts, pkt))
+						(name, iface_in._iface_name, iface_out._iface_name, bts, pkt))
 					iface_out.write(bts)
 				except:
 					pass

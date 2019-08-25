@@ -2,7 +2,7 @@
 import logging
 
 from pypacker import pypacker, checksum
-from pypacker.pypacker import FIELD_FLAG_AUTOUPDATE
+from pypacker.pypacker import FIELD_FLAG_AUTOUPDATE, FIELD_FLAG_IS_TYPEFIELD
 
 logger = logging.getLogger("pypacker")
 
@@ -11,7 +11,7 @@ logger = logging.getLogger("pypacker")
 # http://www.iana.org/assignments/icmp-parameters
 
 ICMP_CODE_NONE			= 0		# for types without codes
-ICMP_ECHOREPLY			= 0		# echo reply
+ICMP_ECHO_REPLY			= 0		# echo reply
 ICMP_UNREACH			= 3		# dest unreachable, codes:
 ICMP_UNREACH_NET		= 0		# bad net
 ICMP_UNREACH_HOST		= 1		# bad host
@@ -36,7 +36,7 @@ ICMP_REDIRECT_HOST		= 1		# for host
 ICMP_REDIRECT_TOSNET		= 2		# for tos and net
 ICMP_REDIRECT_TOSHOST		= 3		# for tos and host
 ICMP_ALTHOSTADDR		= 6		# alternate host address
-ICMP_ECHO			= 8		# echo service
+ICMP_ECHO_REQUEST		= 8		# echo service
 ICMP_RTRADVERT			= 9		# router advertise, codes:
 ICMP_RTRADVERT_NORMAL		= 0		# normal
 ICMP_RTRADVERT_NOROUTE_COMMON	= 16		# selective routing
@@ -74,18 +74,9 @@ ICMP_PHOTURIS_NEED_AUTHZ	= 5		# no authorization
 ICMP_TYPE_MAX			= 40
 
 
-ICMP_TYPE_ECHO_REQ	= 0
-ICMP_TYPE_UNREACH	= 3
-ICMP_TYPE_QUENCH	= 4
-ICMP_TYPE_ECHO_RESP	= 8
-ICMP_TYPE_ECHO		= (ICMP_TYPE_ECHO_REQ, ICMP_TYPE_ECHO_RESP)
-ICMP_TYPE_REDIRECT	= 5
-ICMP_TYPE_TIMEEXCEED	= 11
-
-
 class ICMP(pypacker.Packet):
 	__hdr__ = (
-		("type", "B", ICMP_ECHO),
+		("type", "B", ICMP_ECHO_REQUEST, FIELD_FLAG_IS_TYPEFIELD),
 		("code", "B", 0),
 		("sum", "H", 0, FIELD_FLAG_AUTOUPDATE)
 	)
@@ -144,9 +135,9 @@ class ICMP(pypacker.Packet):
 		)
 
 	__handler__ = {
-		ICMP_TYPE_ECHO: Echo,
-		ICMP_TYPE_UNREACH: Unreach,
-		ICMP_TYPE_QUENCH: Quench,
-		ICMP_TYPE_REDIRECT: Redirect,
-		ICMP_TYPE_TIMEEXCEED: TimeExceed
+		(ICMP_ECHO_REQUEST, ICMP_ECHO_REPLY): Echo,
+		ICMP_UNREACH: Unreach,
+		ICMP_SRCQUENCH: Quench,
+		ICMP_REDIRECT: Redirect,
+		ICMP_TIMEXCEED: TimeExceed
 	}
