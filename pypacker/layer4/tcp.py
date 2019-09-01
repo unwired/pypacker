@@ -20,7 +20,6 @@ from pypacker import pypacker, triggerlist, checksum
 from pypacker.pypacker import FIELD_FLAG_AUTOUPDATE, FIELD_FLAG_IS_TYPEFIELD
 from pypacker.structcbs import unpack_H, pack_ipv4_header, pack_ipv6_header
 
-# handler
 from pypacker.layer4 import ssl
 from pypacker.layer567 import bgp, http, mqtt, rtp, sip, telnet, tpkt, pmap
 
@@ -158,9 +157,22 @@ class TCP(pypacker.Packet):
 		TCP_PROTO_SIP: sip.SIP
 	}
 
+	def _needs_dependend_update(self):
+		"""
+		TCP is special as it takes IP src/dst as input -> checksum update depends on IP.
+		"""
+		needs_update = False
+
+		try:
+			if self._lower_layer.__class__ in UPDATE_DEPENDED_CLASSES:
+				needs_update = self._lower_layer._header_changed
+		except:
+			pass
+		return needs_update
+
 	def _update_fields(self):
 		# TCP-checksum needs to be updated on one of the following:
-		# - this layer itself or any upper layer changed
+		# - this layer itself or any higher layer changed
 		# - changes to the IP-pseudoheader
 		update = True
 		# update header length. NOTE: needs to be a multiple of 4 Bytes.
@@ -172,7 +184,7 @@ class TCP(pypacker.Packet):
 		if self._lower_layer is None:
 			return
 
-		#self._update_upperlayer_id()
+		#self._update_higherlayer_id()
 
 		try:
 			# changes to IP-layer, don't mind if this isn't IP

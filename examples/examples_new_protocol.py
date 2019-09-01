@@ -102,10 +102,11 @@ class NewProtocol(pypacker.Packet):
 		"""
 		# Header fields are not yet accessible in _dissect(...) so basic information
 		# (type info, header length, bytes of dynamic content etc) has to be parsed manually.
-		upper_layer_type = buf[0]  # extract type information of next layer, here it can only be 0x66 but we extract it anyway
-		# logger.debug("Found type: 0x%X" % upper_layer_type)
+		# Extract type information of next layer, here it can only be 0x66 but we extract it anyway.
+		higher_layer_type = buf[0]
+		# logger.debug("Found type: 0x%X" % higher_layer_type)
 		total_header_length = unpack_H(buf[9: 11])[0]
-		yolo_len = 4 if upper_layer_type == TYPE_VALUE_IP else 5  # length of yolo is derived from type
+		yolo_len = 4 if higher_layer_type == TYPE_VALUE_IP else 5  # length of yolo is derived from type
 		# logger.debug("Found length: %d, yolo=%d" % (total_header_length, yolo_len))
 		tl_bts = buf[12 + yolo_len: total_header_length]  # options are the the end of the header
 		# logger.debug("Bytes for TriggerList: %r" % tl_bts)
@@ -116,11 +117,11 @@ class NewProtocol(pypacker.Packet):
 
 		# self._init_handler(...) must be called to initiate the handler of the next
 		# upper layer and makes it accessible (eg "ip" in "ethernet" via "ethernet.ip" or ethernet[ip.IP]).
-		# Which handler to be initialized generally depends on the type information (here upper_layer_type)
+		# Which handler to be initialized generally depends on the type information (here higher_layer_type)
 		# found in the current layer (see layer12/ethernet.Ethernet -> type).
-		# Here upper_layer_type can become the value 0x66 (defined by __handler__ field) and
+		# Here higher_layer_type can become the value 0x66 (defined by __handler__ field) and
 		# as a result ip.IP will be created as upper layer using the bytes given by "buf[total_header_length:]".
-		self._init_handler(upper_layer_type, buf[total_header_length:])
+		self._init_handler(higher_layer_type, buf[total_header_length:])
 		return total_header_length
 
 	# Handler can be registered by defining the static dictionary

@@ -148,7 +148,7 @@ class Ethernet(pypacker.Packet):
 				vlan_tag = Dot1Q(buf[12: 16])
 				self.vlan.append(vlan_tag)
 				hlen += 4
-				# get real upper layer type
+				# get real higher layer type
 				eth_type = unpack_H(buf[16: 18])[0]
 			# 802.1ad: support up to 2 tags (double tagging aka QinQ)
 			else:
@@ -157,7 +157,7 @@ class Ethernet(pypacker.Packet):
 				vlan_tag2 = Dot1Q(buf[16: 20])
 				self.vlan.extend([vlan_tag1, vlan_tag2])
 				hlen += 8
-				# get real upper layer type
+				# get real higher layer type
 				eth_type = unpack_H(buf[20: 22])[0]
 
 		# logger.debug("eth type is: %d" % eth_type)
@@ -166,7 +166,7 @@ class Ethernet(pypacker.Packet):
 		# don't use headers for this because this is a rare situation
 		dlen = len(buf) - hlen  # data length [+ padding?]
 
-		# assume padding only present if len(upper_layer.bin()) <= 46
+		# assume padding only present if len(higher_layer.bin()) <= 46
 		if dlen <= 46:
 			try:
 				# this will only work on complete headers: Ethernet + IP + ...
@@ -203,12 +203,12 @@ class Ethernet(pypacker.Packet):
 					dlen = lacppdu_len
 			except Exception as ex:
 				logger.exception("could not extract padding info, assuming incomplete ethernet frame: %r", ex)
-		# logger.debug("len(buf)=%d, len(upper)=%d" % (len(buf), dlen))
+		# logger.debug("len(buf)=%d, len(higher)=%d" % (len(buf), dlen))
 		self._init_handler(eth_type, buf[hlen: hlen + dlen])
 		return hlen
 
 	def _update_fields(self):
-		self._update_upperlayer_id()
+		self._update_higherlayer_id()
 
 	def bin(self, update_auto_fields=True):
 		# padding needs to be placed at the very end

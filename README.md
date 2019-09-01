@@ -98,7 +98,7 @@ for raw_bytes in psock:
 	eth = ethernet.Ethernet(raw_bytes)
 	print("Got packet: %r" % eth)
 	eth.reverse_address()
-	eth.upper_layer.reverse_address()
+	eth.higher_layer.reverse_address()
 	# Send bytes
 	psock.send(eth.bin())
 	# Receive raw bytes

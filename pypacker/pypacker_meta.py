@@ -6,10 +6,10 @@ logger = logging.getLogger("pypacker")
 # Allows to activate/decative the auto-update of a header field.
 # Note: _update_fields() has to be implemented
 FIELD_FLAG_AUTOUPDATE	= 1
-# Identifies the header field defining the next upper layer type
+# Identifies the header field defining the next higher layer type
 # Allows to auto-set the value on concatenation: "pkt = eth0 + ip0" sets type field in eth0
 # Auto-sets FIELD_FLAG_AUTOUPDATE
-# Note: _update_fields() has to be implemented and _update_upperlayer_id() has to be called in it.
+# Note: _update_fields() has to be implemented and _update_higherlayer_id() has to be called in it.
 FIELD_FLAG_IS_TYPEFIELD	= 2
 
 
@@ -217,7 +217,7 @@ def configure_packet_header(t, hdrs, header_fmt):
 				if field_flags & FIELD_FLAG_IS_TYPEFIELD != 0:
 					#logger.debug("setting _id_fieldname: %r" % (hdr[0]))
 					setattr(t, "_id_fieldname", hdr[0])
-					# xxx__au_active must be set: read by _update_upperlayer_id
+					# xxx__au_active must be set: read by _update_higherlayer_id
 					field_flags |= FIELD_FLAG_AUTOUPDATE
 
 				if field_flags & FIELD_FLAG_AUTOUPDATE != 0:
@@ -338,6 +338,12 @@ class MetaPacket(type):
 			else:
 				t.load_handler(t, handler)
 
+		# Set of higher_layer classes which force dissecting (update dependends):
+		# IP->TCP => IP changed, TCP needs checksum update and
+		# needs to be dissected for this => TCP is ud in ip
+		update_deps = getattr(t, "UPDATE_DEPENDANTS", set())
+		t._update_dependants = set([ud.__class__ for ud in update_deps])
+
 		# logger.debug(">>> translated header names: %s/%r" % (clsname, t._header_name_translate))
 		# current format as string
 		t._header_format = struct.Struct("".join(header_fmt))
@@ -352,7 +358,7 @@ class MetaPacket(type):
 		t._body_bytes = b""
 		# next lower layer: a = b + c -> b will be lower layer for c
 		t._lower_layer = None
-		t._upper_layer = None
+		t._higher_layer = None
 		# track changes to header values: This is needed for layers like TCP for
 		# checksum-recalculation. Set to "True" on changes to header/body values, set to False on "bin()"
 		# track changes to header values
@@ -368,7 +374,7 @@ class MetaPacket(type):
 		# lazy handler data: [name, class, bytes]
 		t._lazy_handler_data = None
 		# Indicates the most top layer until which should be unpacked
-		# (vs. lazy dissecting = just next upper layer)
+		# (vs. lazy dissecting = just next higher layer)
 		# Setting this to an unknown class will keep the next-layer-parsing going on
 		t._final_unpack_clz = None
 		# indicates if static header values got already unpacked

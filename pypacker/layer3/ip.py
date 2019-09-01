@@ -98,6 +98,8 @@ class IP(pypacker.Packet):
 		IP_PROTO_OSPF: ospf.OSPF
 	}
 
+	UPDATE_DEPENDANTS = {tcp.TCP, udp.UDP}
+
 	def __get_v(self):
 		return self.v_hl >> 4
 
@@ -211,10 +213,7 @@ class IP(pypacker.Packet):
 		return optlist
 
 	def _update_fields(self):
-		if not self._changed():
-			return
-
-		self._update_upperlayer_id()
+		self._update_higherlayer_id()
 
 		if self.len_au_active:
 			self.len = len(self)
@@ -225,13 +224,13 @@ class IP(pypacker.Packet):
 			self.hl = int(self.header_len / 4) & 0xf
 		if self.sum_au_active:
 			# length changed so we have to recalculate checksum
-			# logger.debug(">>> IP: calculating sum")
+			logger.debug(">>> IP: calculating sum, current: %0X" % self.sum)
 			# reset checksum for recalculation,  mark as changed / clear cache
 			self.sum = 0
 			# logger.debug(">>> IP: bytes for sum: %s" % self.header_bytes)
 			self.sum = in_cksum(self._pack_header())
 			# logger.debug("IP: new hl: %d / %d" % (self._packet.hdr_len, hdr_len_off))
-			# logger.debug("new sum: %0X" % self.sum)
+			logger.debug("new sum: %0X" % self.sum)
 
 	def direction(self, other):
 		# logger.debug("checking direction: %s<->%s" % (self, next))

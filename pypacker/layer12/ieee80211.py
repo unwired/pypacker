@@ -133,9 +133,9 @@ class IEEE80211(pypacker.Packet):
 		# data: client -> AP or client <- AP
 		if self.type == DATA_TYPE:
 			if self.from_ds == 1 and self.to_ds == 0:
-				macs_clients.append(self.upper_layer.dst)
+				macs_clients.append(self.higher_layer.dst)
 			elif self.from_ds == 0 and self.to_ds == 1:
-				macs_clients.append(self.upper_layer.src)
+				macs_clients.append(self.higher_layer.src)
 
 		return [addr for addr in macs_clients if not utils.is_special_mac(addr)]
 

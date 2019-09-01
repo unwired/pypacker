@@ -68,7 +68,6 @@ TYPE_TAP	= 1
 
 TYPE_STR_DCT = {TYPE_TUN: "tun", TYPE_TAP: "tap"}
 
-
 def exec_syscmd(cmd):
 	output = subprocess.getoutput(cmd)
 	logger.debug(output)

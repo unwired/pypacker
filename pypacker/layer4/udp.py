@@ -64,20 +64,20 @@ class UDP(pypacker.Packet):
 		# - this layer itself or any upper layer changed
 		# - changes to the IP-pseudoheader
 		# There is no update on user-set checksums.
-		changed = self._changed()
+		#changed = self._changed()
 		update = True
 
-		if changed and self.ulen_au_active:
+		if self.ulen_au_active:
 			self.ulen = len(self)
 
-		#self._update_upperlayer_id()
+		#self._update_higherlayer_id()
 
 		try:
 			# changes to IP-layer, don't mind if this isn't IP
 			if not self._lower_layer._header_changed:
 				# lower layer doesn't need update, check for changes in present and upper layer
 				# logger.debug("lower layer did NOT change!")
-				update = changed
+				update = True
 		except AttributeError:
 			# assume not an IP packet: we can't calculate the checksum
 			update = False

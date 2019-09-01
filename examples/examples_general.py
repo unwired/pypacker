@@ -44,7 +44,7 @@ packet1[ip.IP].opts.extend(opts)
 # get specific layers
 layers = [packet1[ethernet.Ethernet], packet1[ip.IP], packet1[icmp.ICMP]]
 # the same as above but without index notation
-layers = [packet1, packet1.upper_layer, packet1.upper_layer.upper_layer]
+layers = [packet1, packet1.higher_layer, packet1.higher_layer.higher_layer]
 # the same as above but without index notation and navigating downwards
 pkt_icmp = layers[2]
 layers = [pkt_icmp.lowest_layer, pkt_icmp.lower_layer, pkt_icmp]

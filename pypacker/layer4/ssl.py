@@ -159,11 +159,11 @@ class SSL(pypacker.Packet):
 		for record in self.records:
 			try:
 				#logger.debug("%r", record)
-				if record.type == RECORD_TLS_HANDSHAKE and record.upper_layer.type == HNDS_CERTIFICATE:
+				if record.type == RECORD_TLS_HANDSHAKE and record.higher_layer.type == HNDS_CERTIFICATE:
 					#logger.debug("type: %X, sub: %X, len: %r",
 					#	record.type, record.handshake.type, record.handshake.len_i)
 					# Handshake Proto -> Cert -> Length
-					return record.upper_layer.len_i - 3
+					return record.higher_layer.len_i - 3
 			except Exception as ex:
 				logger.warning(ex)
 				pass

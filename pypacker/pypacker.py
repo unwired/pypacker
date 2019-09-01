@@ -223,10 +223,10 @@ class Packet(object, metaclass=MetaPacket):
 			# lazy data present: avoid unneeded parsing
 			# logger.debug("returning length from cached lazy handler in %s", self.__class__.__name__)
 			return self.header_len + len(self._lazy_handler_data[1])
-		elif self._upper_layer is not None:
+		elif self._higher_layer is not None:
 			# logger.debug("returning length from present handler in %s, handler is: %s"\
-			# % (self.__class__.__name__, self._upper_layer))
-			return self.header_len + len(self._upper_layer)
+			# % (self.__class__.__name__, self._higher_layer))
+			return self.header_len + len(self._higher_layer)
 		else:
 			# Assume bodybytes are set
 			# logger.debug("returning length from raw bytes in %s", self.__class__.__name__)
@@ -266,9 +266,9 @@ class Packet(object, metaclass=MetaPacket):
 		if self._lazy_handler_data is not None:
 			# no need to parse: raw bytes for all upper layers
 			return self._lazy_handler_data[1]
-		elif self._upper_layer is not None:
+		elif self._higher_layer is not None:
 			# some handler was set
-			hndl = self._upper_layer
+			hndl = self._higher_layer
 			return hndl._pack_header() + hndl._get_bodybytes()
 		else:
 			# return raw bytes (no handler)
@@ -280,7 +280,7 @@ class Packet(object, metaclass=MetaPacket):
 
 		value -- a byte string (do NOT set to None)
 		"""
-		if self._upper_layer is not None:
+		if self._higher_layer is not None:
 			# reset all handler data
 			self._set_higherlayer(None)
 		# logger.debug("setting new raw data: %s", value)
@@ -290,8 +290,8 @@ class Packet(object, metaclass=MetaPacket):
 		#logger.debug("notify after setting body bytes")
 		self._notify_changelistener()
 
-	# Get and set bytes for body. Note: this returns bytes even if upper_layer returns None.
-	# Setting body_bytes will clear any handler (upper_layer will return None afterwards).
+	# Get and set bytes for body. Note: this returns bytes even if higher_layer returns None.
+	# Setting body_bytes will clear any handler (higher_layer will return None afterwards).
 	body_bytes = property(_get_bodybytes, _set_bodybytes)
 
 	def _get_higherlayer(self):
@@ -301,7 +301,7 @@ class Packet(object, metaclass=MetaPacket):
 		"""
 		if self._lazy_handler_data is not None:
 			self._initialize_handler()
-		return self._upper_layer
+		return self._higher_layer
 
 	@staticmethod
 	def get_id_for_handlerclass(origin_class, handler_class):
@@ -326,11 +326,11 @@ class Packet(object, metaclass=MetaPacket):
 		hndl -- the handler to be set: None or a Packet instance. Setting to None
 			will clear any handler and set body_bytes to b"".
 		"""
-		if self._upper_layer is not None:
+		if self._higher_layer is not None:
 			# clear old linked data of upper layer if body handler is already parsed
-			# A.B -> A.upper_layer = x -> B.lower_layer = None
+			# A.B -> A.higher_layer = x -> B.lower_layer = None
 			# logger.debug("removing old data handler connections")
-			self._upper_layer._lower_layer = None
+			self._higher_layer._lower_layer = None
 
 		if hndl is None:
 			# avoid (body_bytes=None, handler=None)
@@ -341,7 +341,7 @@ class Packet(object, metaclass=MetaPacket):
 			self._body_bytes = None
 			hndl._lower_layer = self
 
-		self._upper_layer = hndl
+		self._higher_layer = hndl
 		self._body_changed = True
 		self._lazy_handler_data = None
 		#logger.debug("notify after setting handler")
@@ -356,7 +356,7 @@ class Packet(object, metaclass=MetaPacket):
 		try:
 			# remove upper layer (us) from current lower layer before
 			# setting a new lower layer
-			self._lower_layer.upper_layer = None
+			self._lower_layer.higher_layer = None
 		except:
 			# no lower layer, don't mind
 			pass
@@ -380,8 +380,8 @@ class Packet(object, metaclass=MetaPacket):
 		# unpack all layer, assuming string class will be never found
 		self._final_unpack_clz = str.__class__
 
-		while current.upper_layer is not None:
-			current = current.upper_layer
+		while current.higher_layer is not None:
+			current = current.higher_layer
 
 		return current
 
@@ -395,7 +395,7 @@ class Packet(object, metaclass=MetaPacket):
 		if layer_to_change is None:
 			return
 
-		layer_to_change.upper_layer = layer
+		layer_to_change.higher_layer = layer
 
 	# get lowest layer
 	lowest_layer = property(_lowest_layer)
@@ -405,12 +405,17 @@ class Packet(object, metaclass=MetaPacket):
 	def disconnect_layer(self):
 		"""
 		Disconnect and return this layer. Connects lower and upper layer
-		with each other. This is the same as 'pkt.lower_layer = pkt.upper_layer'
+		with each other. This is the same as 'pkt.lower_layer = pkt.higher_layer'
 		without returning the middle layer (pkt).
 		return -- This layer
 		"""
+		# Connect lower/upper layer of this layer
 		if self.lower_layer is not None and self.higher_layer is not None:
 			self.lower_layer.higher_layer = self.higher_layer
+
+		self.lower_layer = None
+		self.higher_layer = None
+
 		return self
 
 	def _initialize_handler(self):
@@ -463,11 +468,11 @@ class Packet(object, metaclass=MetaPacket):
 
 				type_cnt += 1
 				# highest layer reached
-				if p_instance.upper_layer is None:
+				if p_instance.higher_layer is None:
 					break
 				elif type_cnt != packet_type_len:
 					# end of match sequence in packet_type not reached, go higher
-					p_instance = p_instance.upper_layer
+					p_instance = p_instance.higher_layer
 
 			# return last matching layer
 			return p_instance if type_cnt == packet_type_len else None
@@ -478,7 +483,7 @@ class Packet(object, metaclass=MetaPacket):
 
 			while not type(p_instance) is packet_type:
 				# this will auto-parse lazy handler data via _get_higherlayer()
-				p_instance = p_instance.upper_layer
+				p_instance = p_instance.higher_layer
 
 				if p_instance is None:
 					break
@@ -498,7 +503,7 @@ class Packet(object, metaclass=MetaPacket):
 		while p_instance is not None:
 			yield p_instance
 			# this will auto-parse lazy handler data via _get_higherlayer()
-			p_instance = p_instance.upper_layer
+			p_instance = p_instance.higher_layer
 
 			if p_instance is None:
 				break
@@ -523,7 +528,7 @@ class Packet(object, metaclass=MetaPacket):
 			self.__getattribute__(name)
 
 		try:
-			self.upper_layer.dissect_full()
+			self.higher_layer.dissect_full()
 		except AttributeError:
 			# no handler present
 			pass
@@ -532,12 +537,12 @@ class Packet(object, metaclass=MetaPacket):
 		"""
 		Handle concatination of layers like "Ethernet + IP + TCP" and make them accessible
 		via "ethernet[IP] or ethernet[TCP]".
-		This is the same as "pkt.highest_layer.upper_layer = pkt_to_set"
+		This is the same as "pkt.highest_layer.higher_layer = pkt_to_set"
 
 		packet_or_bytes_to_add -- The packet or bytes to be added as highest layer
 		"""
 		if type(packet_or_bytes_to_add) is not bytes:
-			self.highest_layer.upper_layer = packet_or_bytes_to_add
+			self.highest_layer.higher_layer = packet_or_bytes_to_add
 		else:
 			self.highest_layer.body_bytes = packet_or_bytes_to_add
 		return self
@@ -546,12 +551,12 @@ class Packet(object, metaclass=MetaPacket):
 		"""
 		Handle concatination of layers like "Ethernet + IP + TCP" and make them accessible
 		via "ethernet[IP] or ethernet[TCP]".
-		This is the same as "pkt.highest_layer.upper_layer = pkt_to_set"
+		This is the same as "pkt.highest_layer.higher_layer = pkt_to_set"
 
 		packet_or_bytes_to_add -- The packet or bytes to be added as highest layer
 		"""
 		if type(packet_or_bytes_to_add) is not bytes:
-			self.highest_layer.upper_layer = packet_or_bytes_to_add
+			self.highest_layer.higher_layer = packet_or_bytes_to_add
 		else:
 			self.highest_layer.body_bytes = packet_or_bytes_to_add
 		return self
@@ -626,7 +631,7 @@ class Packet(object, metaclass=MetaPacket):
 				else:
 					layer_sums_l.append("%-16s: %s" % (name_real, val) + value_alt)
 
-		if self.upper_layer is None:
+		if self.higher_layer is None:
 			# No upper layer present: describe body bytes
 			bts_cnt = "(%d)" % len(self.body_bytes)
 			layer_sums_l.append("%-9s %6s: " % ("bodybytes", bts_cnt) + "%s" % self.body_bytes)
@@ -643,7 +648,7 @@ class Packet(object, metaclass=MetaPacket):
 			# logger.debug("header/body changed: need to reparse (%s)", self.__class__)
 			self.bin()
 		# this does lazy init of handler
-		upperlayer_str = "\n%s" % self.upper_layer if self.upper_layer is not None else ""
+		upperlayer_str = "\n%s" % self.higher_layer if self.higher_layer is not None else ""
 		return self._summarize() + upperlayer_str
 
 	def _unpack(self):
@@ -723,7 +728,7 @@ class Packet(object, metaclass=MetaPacket):
 
 		while current_hndl is not None:
 			current_hndl.reverse_address()
-			current_hndl = current_hndl.upper_layer
+			current_hndl = current_hndl.higher_layer
 
 	def _init_handler(self, hndl_type, buffer):
 		"""
@@ -801,11 +806,11 @@ class Packet(object, metaclass=MetaPacket):
 		try:
 			# check upper layers and combine current result
 			# logger.debug("direction? checking next layer")
-			dir_upper = self.upper_layer.direction_all(other_packet.upper_layer)
+			dir_upper = self.higher_layer.direction_all(other_packet.higher_layer)
 
 			return dir_ext & dir_upper
 		except AttributeError:
-			# one of both _upper_layer was None
+			# one of both _higher_layer was None
 			# Example: TCP ACK (last step of handshake, no payload) <-> TCP ACK + Telnet
 			# logger.debug("AttributeError, direction: %d", dir_ext)
 			# logger.debug(e)
@@ -832,7 +837,7 @@ class Packet(object, metaclass=MetaPacket):
 		# logger.debug("direction_all & direction = %d & %d", self.direction_all(packet2), direction)
 		return self.direction_all(packet2) & direction == direction
 
-	def _update_upperlayer_id(self):
+	def _update_higherlayer_id(self):
 		"""
 		Updates the upperlayer id named by _id_fieldname (FIELD_FLAG_IS_TYPEFIELD was
 		set) based on the upperlayer class and simply assigning the associated id to that field.
@@ -849,7 +854,7 @@ class Packet(object, metaclass=MetaPacket):
 		# logger.debug("%s -> _id_fieldname: %s", self.__class__, self._id_fieldname)
 		if self._id_fieldname is None\
 			or not self._body_changed\
-			or self._upper_layer is None\
+			or self._higher_layer is None\
 			or not self.__getattribute__("%s_au_active" % self._id_fieldname)\
 			or self._lazy_handler_data is not None:
 			# logger.debug("Will NOT update!")
@@ -861,7 +866,7 @@ class Packet(object, metaclass=MetaPacket):
 		#	self._lazy_handler_data,
 		#	self._body_changed)
 		try:
-			handler_clz = self._upper_layer.__class__
+			handler_clz = self._higher_layer.__class__
 			#logger.debug("handler class is: %s", handler_clz)
 
 			self.__setattr__(self._id_fieldname,
@@ -869,12 +874,12 @@ class Packet(object, metaclass=MetaPacket):
 		except KeyError:
 			# no type id found, something like eth + Telnet
 			# logger.debug("no type id found for %s, class: %s -> %s" %
-			#	(self._upper_layer.__class__, self.__class__, handler_clz))
+			#	(self._higher_layer.__class__, self.__class__, handler_clz))
 			pass
 
 	def _update_fields(self):
 		"""
-		Overwrite this to update header fields.
+		Overwrite this to update header fields. Only gets called if this or any other upper layer has changed.
 		Callflow on a packet "pkt = layer1 + layer2 + layer3 -> pkt.bin()":
 		layer3._update_fields() -> layer2._update_fields() -> layer1._update_fields() ...
 		"""
@@ -888,7 +893,8 @@ class Packet(object, metaclass=MetaPacket):
 		update_auto_fields -- if True auto-update fields like checksums, else leave them be
 		"""
 		# Update all above layers until a non-handler layer is found
-		if update_auto_fields:
+		if update_auto_fields and self._changed():
+			# Collect layers to be updated:
 			# Iterate update for A.B.C like C->B->A: A needs uptodate B and C,
 			# B needs uptodate C
 			layers = []
@@ -896,8 +902,19 @@ class Packet(object, metaclass=MetaPacket):
 
 			while layer_it is not None:
 				layers.append(layer_it)
-				# if layer is not yet parsed -> no need for update
-				layer_it = layer_it.upper_layer if layer_it._lazy_handler_data is None else None
+				# Upper layer is not yet dissected but could need update:
+				# ip:changed + tcp:notchanged/parsed -> tcp needs update
+				if layer_it._lazy_handler_data is not None:
+					# Next upper layer forces update in layet_it
+					if layer_it._header_changed and\
+						layer_it._lazy_handler_data[0].__class__ in layer_it._update_dependants:
+						# Force dissecting
+						layer_it = layer_it.higher_layer
+					else:
+						layer_it = None
+				else:
+					layer_it = layer_it.higher_layer
+			# Start from the top
 			layers.reverse()
 
 			for layer in layers:
@@ -907,10 +924,10 @@ class Packet(object, metaclass=MetaPacket):
 			# logger.debug("Got lazy data layer: %s -> %s", self.__class__, self._lazy_handler_data[0])
 			# no need to parse, just take lazy handler data bytes
 			bodybytes_tmp = self._lazy_handler_data[1]
-		elif self._upper_layer is not None:
-			# logger.debug("Got upper layer: %s -> %s", self.__class__, self._upper_layer.__class__)
+		elif self._higher_layer is not None:
+			# logger.debug("Got upper layer: %s -> %s", self.__class__, self._higher_layer.__class__)
 			# Don't update fields, this was already done above
-			bodybytes_tmp = self.upper_layer.bin(update_auto_fields=False)
+			bodybytes_tmp = self.higher_layer.bin(update_auto_fields=False)
 		else:
 			# logger.debug("Got raw bytes in %s", self.__class__)
 			# raw bytes
@@ -1032,7 +1049,7 @@ class Packet(object, metaclass=MetaPacket):
 				break
 			elif p_instance._lazy_handler_data is None:
 				# one layer up, stop if next layer is not yet initiated which means: no change
-				p_instance = p_instance.upper_layer
+				p_instance = p_instance.higher_layer
 			else:
 				# nothing changed upwards: lazy handler data still present/nothing got parsed
 				break

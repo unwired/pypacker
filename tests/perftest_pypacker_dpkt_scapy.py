@@ -35,7 +35,7 @@ try:
 		pkt1 = Ethernet(pkt_eth_ip_tcp_bts)
 		# dpkt does not parse TCP content but pypacker does
 		# -> access layer ip to get comparable result
-		pkt2 = pkt1.upper_layer
+		pkt2 = pkt1.higher_layer
 		bts = pkt2.body_bytes
 	t_end = time.time()
 
