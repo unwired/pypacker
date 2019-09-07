@@ -224,13 +224,13 @@ class IP(pypacker.Packet):
 			self.hl = int(self.header_len / 4) & 0xf
 		if self.sum_au_active:
 			# length changed so we have to recalculate checksum
-			logger.debug(">>> IP: calculating sum, current: %0X" % self.sum)
+			# logger.debug(">>> IP: calculating sum, current: %0X" % self.sum)
 			# reset checksum for recalculation,  mark as changed / clear cache
 			self.sum = 0
 			# logger.debug(">>> IP: bytes for sum: %s" % self.header_bytes)
 			self.sum = in_cksum(self._pack_header())
 			# logger.debug("IP: new hl: %d / %d" % (self._packet.hdr_len, hdr_len_off))
-			logger.debug("new sum: %0X" % self.sum)
+			# logger.debug("new sum: %0X" % self.sum)
 
 	def direction(self, other):
 		# logger.debug("checking direction: %s<->%s" % (self, next))

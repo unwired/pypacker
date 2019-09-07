@@ -139,7 +139,19 @@ class DNS(pypacker.Packet):
 		)
 
 		name_s = pypacker.get_property_dnsname("name", get_bts_for_msg_compression)
-		address_s = pypacker.get_property_dnsname("address", get_bts_for_msg_compression)
+
+		def _get_address_readable(self):
+			if self.type == DNS_A:
+				return pypacker.ip4_bytes_to_str(self.address)
+			elif self.type == DNS_AAAA:
+				return pypacker.ip6_bytes_to_str(self.address)
+			elif self.type == DNS_CNAME:
+				return pypacker.dns_name_decode(self.address)
+			else:
+				# Unknown type
+				return ""
+
+		address_s = property(_get_address_readable)
 
 		def _dissect(self, buf):
 			name_end = DNS.get_dns_length(buf)
@@ -264,6 +276,9 @@ class DNS(pypacker.Packet):
 	def _dissect(self, buf):
 		# unpack basic data to get things done
 		quests_amount, ans_amount, authserver_amount, addreq_amount = unpack_HHHH(buf[4:12])
+		# Sanity check: assume max amount of 50 addresses
+		if quests_amount > 50 or ans_amount > 50 or authserver_amount > 50 or addreq_amount > 50:
+			raise Exception("Adress count too high, invalid packet")
 		off = 12
 
 		# TODO: use lazy dissect, dns seems to be too shitty for this
@@ -349,8 +364,8 @@ class DNS(pypacker.Packet):
 	def _update_fields(self):
 		if self._header_changed:
 			# logger.debug("updating lenghts")
-			# avoid lazy dissect by checking for [b"bytes", dissect_callback]
-			# first assigning to length will trigger _unpack(...)
+			# Avoid lazy dissect by checking for [b"bytes", dissect_callback]
+			# First assigning to length will trigger _unpack(...)
 			if self.questions_amount_au_active and self._queries.__class__ is not list:
 				self.questions_amount = len(self.queries)
 			if self.answers_amount_au_active and self._answers.__class__ is not list:
@@ -360,3 +375,23 @@ class DNS(pypacker.Packet):
 			if self.addrr_amount_au_active and self._addrecords.__class__ is not list:
 				self.addrr_amount = len(self.addrecords)
 			# logger.debug("finished updating lengths")
+
+	def get_resolved_addresses(self):
+		ret = {}
+
+		if self.answers_amount == 0 or self.questions_amount == 0:
+			return ret
+		"""
+		if self.questions_amount > 1:
+			# Only one question for now
+			logger.warning("More than 1 question")
+			logger.warning(self.queries)
+		"""
+		question_dns = self.queries[0].name_s
+
+		for answer in self.answers:
+			# Assume answer for first query
+			if answer.name == b"\xC0\x0C" and answer.type in [DNS_A, DNS_AAAA]:
+				ret[answer.address_s] = question_dns[:-1]
+
+		return ret

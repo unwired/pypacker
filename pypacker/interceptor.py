@@ -308,9 +308,9 @@ class Interceptor(object):
 
 		nfq_handle = ll_open_queue()  # 2
 
-		# TODO: what about IPv6?
-		unbind_pf(nfq_handle, socket.AF_INET)
-		bind_pf(nfq_handle, socket.AF_INET)
+		# TODO: This call is obsolete, Linux kernels from 3.8 onwards ignore it.
+		#unbind_pf(nfq_handle, socket.AF_INET)
+		#bind_pf(nfq_handle, socket.AF_INET)
 
 		c_handler = HANDLER(verdict_callback_ind)
 		queue = create_queue(nfq_handle, queue_id, c_handler, None)  # 1

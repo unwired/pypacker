@@ -178,7 +178,7 @@ Tests are executed as follows:
 1) Add Pypacker directory to the PYTHONPATH.
 
 - cd pypacker
-- export PYTHONPATH=$PYTHONPATH:$(pwd)
+- export PYTHONPATH=$(pwd):$PYTHONPATH
 
 2) execute tests
 

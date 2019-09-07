@@ -157,19 +157,6 @@ class TCP(pypacker.Packet):
 		TCP_PROTO_SIP: sip.SIP
 	}
 
-	def _needs_dependend_update(self):
-		"""
-		TCP is special as it takes IP src/dst as input -> checksum update depends on IP.
-		"""
-		needs_update = False
-
-		try:
-			if self._lower_layer.__class__ in UPDATE_DEPENDED_CLASSES:
-				needs_update = self._lower_layer._header_changed
-		except:
-			pass
-		return needs_update
-
 	def _update_fields(self):
 		# TCP-checksum needs to be updated on one of the following:
 		# - this layer itself or any higher layer changed

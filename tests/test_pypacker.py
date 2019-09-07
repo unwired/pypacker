@@ -1562,6 +1562,23 @@ class DNSTestCase(unittest.TestCase):
 		for bts in packet_bytes:
 			dns2 = ethernet.Ethernet(bts)[dns.DNS]
 
+		print()
+		print(">>> DNS 5")
+		packet_bytes = get_pcap("tests/packets_dns2.pcap")
+
+		dns2 = ethernet.Ethernet(packet_bytes[5])[dns.DNS]
+		ip_to_dns = dns2.get_resolved_addresses()
+		self.assertEqual(len(ip_to_dns), 1)
+		self.assertEqual(ip_to_dns["207.46.130.100"], "time.windows.com")
+
+		dns2 = ethernet.Ethernet(packet_bytes[7])[dns.DNS]
+		ip_to_dns = dns2.get_resolved_addresses()
+		self.assertEqual(len(ip_to_dns), 4)
+		self.assertEqual(ip_to_dns["64.4.25.86"], "teredo.ipv6.microsoft.com")
+		self.assertEqual(ip_to_dns["64.4.25.80"], "teredo.ipv6.microsoft.com")
+		self.assertEqual(ip_to_dns["64.4.25.82"], "teredo.ipv6.microsoft.com")
+		self.assertEqual(ip_to_dns["64.4.25.84"], "teredo.ipv6.microsoft.com")
+
 
 class NTPTestCase(unittest.TestCase):
 	def test_ntp(self):
