@@ -170,7 +170,8 @@ class BGP(pypacker.Packet):
 		)
 
 		def _dissect(self, buf):
-			# withdrawn Routes
+			# Withdrawn Routes
+			#logger.debug("Dissecting BGP update")
 			off = 4
 			off_end = off + unpack_H(buf[:2])[0]
 
@@ -180,9 +181,9 @@ class BGP(pypacker.Packet):
 				self.wroutes.append(route)
 				off += rlen
 
-			# path attributes
+			# Path attributes
 			off_end = off + unpack_H(buf[2:4])[0]
-			#logger.debug("unpacking attributes")
+			#logger.debug("Unpacking attributes")
 
 			while off < off_end:
 				alen = 3 + buf[off + 2]
@@ -191,16 +192,17 @@ class BGP(pypacker.Packet):
 				self.pathattrs.append(attr)
 				off += alen
 
-			# announced routes
+			# Announced routes
 			off_end = len(buf)
-			#logger.debug("unpacking routes")
+			#logger.debug("Unpacking routes")
 
-			while off < off_end:
+			while off + 3 <= off_end:
 				rlen = 3 + 0
 				#logger.debug("bytes for route: %r" % buf[off:off + rlen])
 				route = Route(buf[off: off + rlen])
 				self.anncroutes.append(route)
 				off += rlen
+			#logger.debug("Finished, off=%d off_end=%d" % (off, off_end))
 			return off
 
 		class Attribute(pypacker.Packet):

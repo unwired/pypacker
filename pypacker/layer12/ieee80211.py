@@ -111,10 +111,12 @@ class IEEE80211(pypacker.Packet):
 	__hdr_sub__ = _subheader_properties
 
 	def _dissect(self, buf):
+		# self.type/self.subtype use self.framectl, no unpack will happen in dissect so this has
+		# to be done manually
 		self.framectl = unpack_H(buf[0:2])[0]
-		# logger.debug("ieee80211 bytes=%X, type/subtype is=%X/%X, handler=%r" %
-		# 			(self.framectl, self.type, self.subtype,
-		# 			 pypacker.Packet._id_handlerclass_dct[self.__class__][TYPE_FACTORS[self.type] + self.subtype]))
+		#logger.debug("ieee80211 bytes=%X, type/subtype is=%X/%X, handler=%r" %
+		#	(self.framectl, self.type, self.subtype,
+		#	pypacker.Packet._id_handlerclass_dct[self.__class__][TYPE_FACTORS[self.type] + self.subtype]))
 		self._init_handler(TYPE_FACTORS[self.type] + self.subtype, buf[4:])
 		return 4
 
@@ -701,8 +703,13 @@ class IEEE80211(pypacker.Packet):
 
 			dlen = buf[off + 1]
 			# logger.debug("IE parser is: %d = %s = %s" % (ie_id, parser, buf[off: off+2+dlen]))
-			ie = parser(buf[off: off + 2 + dlen])
-			ies.append(ie)
+			# TODO: make sure there are enough bytes for the IE class
+			try:
+				ie = parser(buf[off: off + 2 + dlen])
+				ies.append(ie)
+			except:
+				# Not enough bytes for handler, add raw bytes
+				ies.append(buf[off: off + 2 + dlen])
 			off += 2 + dlen
 
 		return ies

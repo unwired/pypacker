@@ -25,7 +25,7 @@ class DTP(pypacker.Packet):
 			off += hlen
 
 		self.tvs.extend(tvs)
-		return 1 + dlen
+		return off
 
 
 class TV(pypacker.Packet):

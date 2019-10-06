@@ -178,15 +178,17 @@ class DNS(pypacker.Packet):
 		server_s = pypacker.get_property_dnsname("server", get_bts_for_msg_compression)
 
 		def _dissect(self, buf):
-			# needed set format
-			# find server name by 0-termination
-			idx = buf.find(b"\x00", 12)
-			if idx == -1:
-				idx = len(buf)
-			self.server = buf[12: idx + 1]
+			# Needed set format
+			# Find server name by 0-termination
+			off_end = buf.find(b"\x00", 12)
+			if off_end == -1:
+				off_end = len(buf)
+			else:
+				off_end += 1
+			self.server = buf[12: off_end]
 			# logger.debug("server: %s" % self.server)
 
-			return idx + 1
+			return off_end
 
 	class AuthSOA(pypacker.Packet):
 		"""
@@ -286,7 +288,7 @@ class DNS(pypacker.Packet):
 		# parse queries
 		#
 		#logger.debug(">>> parsing questions: %d" % quests_amount)
-		while quests_amount > 0:
+		while quests_amount > 0 and off < len(buf):
 			# find name by 0-termination
 			q_end = off + DNS.get_dns_length(buf[off:]) + 4
 			#logger.debug("name is: %s" % buf[off: q_end-4])
@@ -305,7 +307,7 @@ class DNS(pypacker.Packet):
 		# parse answers
 		#
 		#logger.debug(">>> parsing answers: %d" % ans_amount)
-		while ans_amount > 0:
+		while ans_amount > 0 and off < len(buf):
 			# find name by label/0-termination
 			# DNS name:x + type:2 + class:2 + ttl:4
 			a_end = off + DNS.get_dns_length(buf[off:]) + 2 + 2 + 4
@@ -326,7 +328,7 @@ class DNS(pypacker.Packet):
 		# parse authorative servers
 		#
 		#logger.debug(">>> parsing authorative servers: %d" % authserver_amount)
-		while authserver_amount > 0:
+		while authserver_amount > 0 and off < len(buf):
 			dlen = unpack_H(buf[off + 10: off + 12])[0]
 			authlen = 12 + dlen
 			# logger.debug("Auth: %r" % buf[off: off + authlen])
@@ -342,7 +344,7 @@ class DNS(pypacker.Packet):
 		# parse additional requests
 		#
 		#logger.debug(">>> parsing additional records: %d" % addreq_amount)
-		while addreq_amount > 0:
+		while addreq_amount > 0 and off < len(buf):
 			if buf[off: off + 3] == b"\x00\x00\x29":
 				a = DNS.AddRecordRoot(buf[off: off + 11])
 				off += 11

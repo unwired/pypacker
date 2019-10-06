@@ -15,8 +15,8 @@ from pypacker.structcbs import pack_mac, unpack_mac, pack_ipv4, unpack_ipv4
 from pypacker.lazydict import LazyDict
 
 logger = logging.getLogger("pypacker")
-# logger.setLevel(logging.DEBUG)
-logger.setLevel(logging.WARNING)
+logger.setLevel(logging.DEBUG)
+# logger.setLevel(logging.WARNING)
 
 logger_streamhandler = logging.StreamHandler()
 logger_formatter = logging.Formatter("%(levelname)s (%(funcName)s): %(message)s")
@@ -132,6 +132,7 @@ class Packet(object, metaclass=MetaPacket):
 				-> (optional): call _init_handler() initiating a handler representing an upper-layer
 				-> (optional): call _init_triggerlist(name, b"bytes", dissect_callback)
 				to initiate a TriggerList field
+				Note: headers won't be updated to buffer values until dissect finishes
 			-> (optional) on access to simple headers: _unpack() sets all header values
 			-> (optional) on access to TriggerList headers: lazy parsing gets triggered
 			-> (optional) on access to body handler next upper layer gets initiated
@@ -178,9 +179,10 @@ class Packet(object, metaclass=MetaPacket):
 			# logger.debug("dissecting: %s", self.__class__.__name__)
 			header_len = self._dissect(args[0])
 			# logger.debug("init header (+ body bytes): %s", self.__class__.__name__)
-
 			# problem: len(args[0]) < _header_len -> can't be unpacked
-			# don't mind this problem until we call _unpack() -> raises exception
+			if len(args[0]) < header_len:
+				raise Exception("Not enough bytes for packet class %s: given=%d < expected=%d" % (self.__class__, len(args[0]), header_len))
+
 			self._header_len = header_len
 			self._header_cached = args[0][:header_len]
 
@@ -434,14 +436,12 @@ class Packet(object, metaclass=MetaPacket):
 			self._set_higherlayer(type_instance)
 			# this was a lazy init: same as direct dissecting -> no body change
 			self._body_changed = False
-		except:
+		except Exception as ex:
 			# error on lazy dissecting: set raw bytes
-			# logger.debug("Exception on dissecting lazy handler")
 			self._errors |= ERROR_DISSECT
 			self._body_bytes = handler_data[1]
-			#logger.warning("could not lazy-parse handler: %s, there could be 2 reasons for this: " +
-			#	"1) packet was malformed 2) dissecting-code is buggy" % handler_data)
-			# pkt.uppername is None on first retrieval but raises AttributeError on second try
+			logger.warning("Can't set handler data (malformed packet?): base=%s handler_type/handlerclass=%r, reason: %s",
+				self.__class__, handler_data[0], ex)
 		self._lazy_handler_data = None
 
 	def __getitem__(self, packet_type):
@@ -761,18 +761,18 @@ class Packet(object, metaclass=MetaPacket):
 			else:
 				# Continue parsing next upper layer, happens on "__iter__()": avoid unneeded lazy-data
 				# handling/creating uneeded meta data for later body handling
-				#logger.debug("--------> direct unpacking in: %s", self.__class__.__name__)
+				#logger.debug("--------> direct init in: %s", self.__class__.__name__)
 				type_instance = Packet._id_handlerclass_dct[self.__class__][hndl_type](buffer, self)
 				self._set_higherlayer(type_instance)
 		except KeyError:
 			self.body_bytes = buffer
 			self._errors |= ERROR_UNKNOWN_PROTO
-			#errormsg = "unknown upper layer type for %s: %d, feel free to implement" % (
-			#	self.__class__, hndl_type)
-			#logger.warning(errormsg)
-		except Exception:
-			#logger.warning("can't set handler data, type/lazy handler init: %s/%s:",
-			#	str(hndl_type), self._final_unpack_clz is None or self._final_unpack_clz is self.__class__)
+			errormsg = "Unknown upper layer type for %s: %d, feel free to implement" % (
+				self.__class__, hndl_type)
+			logger.warning(errormsg)
+		except Exception as ex:
+			logger.warning("Can't set handler data (malformed?): base=%s handler_type/id=%r, reason: %s",
+				self.__class__, Packet._id_handlerclass_dct[self.__class__][hndl_type], ex)
 			# set raw bytes as data (eg handler class not found)
 			self.body_bytes = buffer
 			self._errors |= ERROR_DISSECT

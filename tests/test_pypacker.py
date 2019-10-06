@@ -70,6 +70,7 @@ from pypacker.layer567 import diameter, dhcp, dns, der, hsrp, http, mqtt, ntp, p
 # - Telnet
 # - HSRP
 # - Diameter
+# - SOME/IP
 # - SSL
 # - STUN
 # - TFTP
@@ -789,9 +790,10 @@ class IPTestCase(unittest.TestCase):
 		self.assertEqual(ip2.sum, 0x8e60)
 
 		print("IP options..")
-		# IP + options
-		ip3_bytes = b"\x49" + packet_bytes[0][15:34]
-		ip3_opt_bytes = b"\x03\04\x00\x07" + b"\x09\03\x07" + b"\x01"
+		# IP + options: Skip Ethernet/up to before UDP
+		# Change 1st byte: 0x?7 = 7*4 = 28 Bytes
+		ip3_bytes = b"\x47" + packet_bytes[0][15:34]
+		ip3_opt_bytes = b"\x03\x04\x00\x07" + b"\x09\03\x07" + b"\x01"
 		ip3_bytes_opts = ip3_bytes + ip3_opt_bytes
 		# print(ip3_bytes)
 		# print(ip3_opt_bytes)
@@ -838,7 +840,7 @@ class IPTestCase(unittest.TestCase):
 
 		print("ip len: 20+%d, in header: %d" % (totallen, (20 + totallen) / 4))
 		print("header offset: %d" % ip3.hl)
-		self.assertEqual(ip3.hl, 9)
+		self.assertEqual(ip3.hl, 7)
 
 	def test_ipoptmultichange(self):
 		print_header("IP / OptMultiChange")
@@ -1567,6 +1569,7 @@ class DNSTestCase(unittest.TestCase):
 		packet_bytes = get_pcap("tests/packets_dns2.pcap")
 
 		dns2 = ethernet.Ethernet(packet_bytes[5])[dns.DNS]
+		print(ethernet.Ethernet(packet_bytes[5]))
 		ip_to_dns = dns2.get_resolved_addresses()
 		self.assertEqual(len(ip_to_dns), 1)
 		self.assertEqual(ip_to_dns["207.46.130.100"], "time.windows.com")
@@ -2508,6 +2511,9 @@ class BGPTestCase(unittest.TestCase):
 		for bts in packet_bytes:
 			eth = ethernet.Ethernet(bts)
 			bgp_check = eth.highest_layer
+			if bgp_check.dissect_error:
+				print("?" * 20)
+			print("%s" % eth)
 			self.assertFalse(bgp_check.dissect_error)
 
 			if not isinstance(bgp_check, tcp.TCP):
