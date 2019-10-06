@@ -187,34 +187,38 @@ class Radiotap(pypacker.Packet):
 	channel = property(_get_channel, _set_channel)
 
 	def _dissect(self, buf):
-		flags = self._present_flags = unpack_I(buf[4:8])[0]
+		# Needed by _parse_flags()
+		self.present_flags = unpack_I(buf[4:8])[0]
+		#logger.debug("Flags: 0x%X" % flags)
 		pos_end = len(buf)
 
-		if flags & FLAGS_MASK == FLAGS_MASK:
-			off = 0
-
-			if flags & TSFT_MASK == TSFT_MASK:
-				off = 8
-			if buf[off] & 0x10 != 0:
-				#logger.debug("fcs found")
+		# Check for FSC, needs to be skipped for upper layers
+		if self.present_flags & FLAGS_MASK == FLAGS_MASK:
+			#logger.debug("Flags mask matched")
+			flags_off = 8
+			# TSFT present -> Flags values are after TSFT value
+			if self.present_flags & TSFT_MASK == TSFT_MASK:
+				flags_off = 8 + 8
+			if buf[flags_off] & 0x10 != 0:
+				#logger.debug("FCS found")
 				self._fcs = buf[-4:]
 				pos_end = -4
 
 		hdr_len = unpack_H_le(buf[2:4])[0]
-		#logger.debug("hdr length is: %d" % hdr_len)
+		#logger.debug("Bytes for flags (%d): %s" % (hdr_len, buf[8: hdr_len]))
 		self._init_triggerlist("flags", buf[8: hdr_len], self._parse_flags)
 		#logger.debug("rtap bytes:=%r" % buf[:hdr_len])
 		# now we got the correct header length
 		self._init_handler(RTAP_TYPE_80211, buf[hdr_len: pos_end])
-		#logger.debug(adding %d flags" % len(self.flags))
+		#logger.debug("Adding %d flags" % len(self.flags))
 		return hdr_len
 
 	def _parse_flags(self, buf):
 		off = 0
 		flags = []
 
-		# assume order of flags is correctly stated by "present_flags"
-		# we need to know if fcs is present: minimum TSFT and flags must get parsed
+		# Assume order of flags is correctly stated by "present_flags"
+		# We need to know if fcs is present: minimum TSFT and flags must get parsed
 		for mask in RADIO_FIELDS_MASKS:
 			#logger.debug(self.present_flags)
 			# flag not set

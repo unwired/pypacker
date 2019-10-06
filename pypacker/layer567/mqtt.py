@@ -10,19 +10,6 @@ from pypacker.structcbs import pack_B, unpack_H
 
 logger = logging.getLogger("pypacker")
 
-
-class HTTPHeader(TriggerList):
-	def _pack(self, tuple_entry):
-		# logger.debug("packing HTTP-header")
-		# no header = no CRNL
-		if len(self) == 0:
-			# logger.debug("empty buf 2")
-			return b""
-		# return b"\r\n".join([b": ".join(keyval) for keyval in self]) + b"\r\n\r\n"
-		# logger.debug("adding: %r" % (tuple_entry[0] +b": "+ tuple_entry[1] + b"\r\n"))
-		return tuple_entry[0] + b": " + tuple_entry[1] + b"\r\n"
-
-
 # Message Types:
 MSGTYPE_RESERVED = 0
 MSGTYPE_CONNECT = 1
@@ -48,16 +35,16 @@ class Connect(Packet):
 		("version", "B", 0),
 		("conflags", "B", 0),
 		("keepalive", "H", 0),
-		("clientidlen", "B", 0),
+		("clientidlen", "H", 0),
 		("clientid", None, b"")
 	)
 
 	def _dissect(self, buf):
-		pnamelen = unpack_H(buf[:2])
+		pnamelen = unpack_H(buf[:2])[0]
 		self.pname = buf[2: 2 + pnamelen]
 		off_clientidlen = 2 + pnamelen + 1 + 1 + 2
-		clientidlen = buf[off_clientidlen]
-		off_clientid = off_clientidlen + 1
+		clientidlen = unpack_H(buf[off_clientidlen: off_clientidlen + 2])[0]
+		off_clientid = off_clientidlen + 2
 		self.clientid = buf[off_clientid: off_clientid + clientidlen]
 		return 8 + pnamelen + clientidlen
 
@@ -76,7 +63,7 @@ class Publish(Packet):
 	)
 
 	def _dissect(self, buf):
-		topiclen = unpack_H(buf[:2])
+		topiclen = unpack_H(buf[:2])[0]
 		self.topic = buf[2: 2 + topiclen]
 
 		return 2 + topiclen
@@ -114,7 +101,7 @@ class SubRequest(Packet):
 	)
 
 	def _dissect(self, buf):
-		topiclen = unpack_H(buf[2: 4])
+		topiclen = unpack_H(buf[2: 4])[0]
 		self.topic = buf[4: 4 + topiclen]
 
 		return 5 + topiclen
@@ -180,13 +167,13 @@ class MQTTBase(Packet):
 		mlen_len, _ = MQTTBase._decode_length(buf[1:])
 		self.mlen = buf[1: 1 + mlen_len]
 		hlen = 1 + mlen_len
+		#logger.debug("Init handler..., mlen: %s, id: %d, buf: %s" % (mlen_len, (buf[0] & 0xF0) >> 4, buf[hlen:]))
 
 		try:
 			self._init_handler((buf[0] & 0xF0) >> 4, buf[hlen:])
 		except:
 			# no type found
 			pass
-
 		return hlen
 
 	@staticmethod

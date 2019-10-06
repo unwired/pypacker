@@ -160,7 +160,7 @@ class DNS(pypacker.Packet):
 			start = name_end + 8
 			addr_len = unpack_H(buf[start:start + 2])[0]
 			self.address = buf[start + 2:start + 2 + addr_len]
-			# logger.debug("address: %s" % self.address)
+			#logger.debug("address: %s" % self.address)
 			return start + 2 + addr_len
 
 	class Auth(pypacker.Packet):
@@ -178,15 +178,17 @@ class DNS(pypacker.Packet):
 		server_s = pypacker.get_property_dnsname("server", get_bts_for_msg_compression)
 
 		def _dissect(self, buf):
-			# needed set format
-			# find server name by 0-termination
-			idx = buf.find(b"\x00", 12)
-			if idx == -1:
-				idx = len(buf)
-			self.server = buf[12: idx + 1]
-			# logger.debug("server: %s" % self.server)
+			# Needed set format
+			# Find server name by 0-termination
+			off_end = buf.find(b"\x00", 12)
+			if off_end == -1:
+				off_end = len(buf)
+			else:
+				off_end += 1
+			self.server = buf[12: off_end]
+			#logger.debug("server: %s" % self.server)
 
-			return idx + 1
+			return off_end
 
 	class AuthSOA(pypacker.Packet):
 		"""
@@ -217,10 +219,10 @@ class DNS(pypacker.Packet):
 			# set format
 			# find server name by 0-termination
 			idx = buf.find(b"\x00", 12)
-			# logger.debug(buf[12: idx+1])
+			#logger.debug(buf[12: idx+1])
 			# don't add trailing \0
 			self.name = buf[12: idx + 1]
-			# logger.debug("name: %s" % buf[idx + 1: -14])
+			#logger.debug("name: %s" % buf[idx + 1: -14])
 			self.mailbox = buf[idx + 1: -14]
 			return len(buf)
 
@@ -236,9 +238,9 @@ class DNS(pypacker.Packet):
 		)
 
 		def _dissect(self, buf):
-			# logger.debug(buf[0: idx+1])
+			#logger.debug(buf[0: idx+1])
 			self.addr = buf[12:]
-			# logger.debug("addr: %s" % self.addr)
+			#logger.debug("addr: %s" % self.addr)
 			return len(buf)
 
 	class AddRecordRoot(pypacker.Packet):
@@ -286,7 +288,7 @@ class DNS(pypacker.Packet):
 		# parse queries
 		#
 		#logger.debug(">>> parsing questions: %d" % quests_amount)
-		while quests_amount > 0:
+		while quests_amount > 0 and off < len(buf):
 			# find name by 0-termination
 			q_end = off + DNS.get_dns_length(buf[off:]) + 4
 			#logger.debug("name is: %s" % buf[off: q_end-4])
@@ -294,9 +296,9 @@ class DNS(pypacker.Packet):
 			#logger.debug(len(buf[off: q_end]))
 			q = DNS.Query(buf[off: q_end])
 			q.dns_bytes = buf
-			# logger.debug("query is following..")
+			#logger.debug("query is following..")
 			#logger.debug("Query: %s" % q)
-			# logger.debug("query name format: %s" % q._name_format)
+			#logger.debug("query name format: %s" % q._name_format)
 			self.queries.append(q)
 			off = q_end
 			quests_amount -= 1
@@ -305,7 +307,7 @@ class DNS(pypacker.Packet):
 		# parse answers
 		#
 		#logger.debug(">>> parsing answers: %d" % ans_amount)
-		while ans_amount > 0:
+		while ans_amount > 0 and off < len(buf):
 			# find name by label/0-termination
 			# DNS name:x + type:2 + class:2 + ttl:4
 			a_end = off + DNS.get_dns_length(buf[off:]) + 2 + 2 + 4
@@ -317,7 +319,7 @@ class DNS(pypacker.Packet):
 			#logger.debug("Answer is: %r" % buf[off: a_end])
 			a = DNS.Answer(buf[off: a_end])
 			a.dns_bytes = buf
-			# logger.debug("Answer: %s" % a)
+			#logger.debug("Answer: %s" % a)
 			self.answers.append(a)
 			off = a_end
 			ans_amount -= 1
@@ -326,14 +328,14 @@ class DNS(pypacker.Packet):
 		# parse authorative servers
 		#
 		#logger.debug(">>> parsing authorative servers: %d" % authserver_amount)
-		while authserver_amount > 0:
+		while authserver_amount > 0 and off < len(buf):
 			dlen = unpack_H(buf[off + 10: off + 12])[0]
 			authlen = 12 + dlen
-			# logger.debug("Auth: %r" % buf[off: off + authlen])
+			#logger.debug("Auth: %r" % buf[off: off + authlen])
 			a = DNS.Auth(buf[off: off + authlen])
 			a.dns_bytes = buf
 
-			# logger.debug("Auth server: %s" % a)
+			#logger.debug("Auth server: %s" % a)
 			self.auths.append(a)
 			off += authlen
 			authserver_amount -= 1
@@ -342,28 +344,28 @@ class DNS(pypacker.Packet):
 		# parse additional requests
 		#
 		#logger.debug(">>> parsing additional records: %d" % addreq_amount)
-		while addreq_amount > 0:
+		while addreq_amount > 0 and off < len(buf):
 			if buf[off: off + 3] == b"\x00\x00\x29":
 				a = DNS.AddRecordRoot(buf[off: off + 11])
 				off += 11
 			else:
-				# logger.debug(buf[idx:])
-				# logger.debug(buf[off:])
-				# logger.debug("data length via: %r" % buf[idx + 9: idx + 11])
+				#logger.debug(buf[idx:])
+				#logger.debug(buf[off:])
+				#logger.debug("data length via: %r" % buf[idx + 9: idx + 11])
 				dlen = unpack_H(buf[off + 10: off + 10 + 2])[0]
-				# logger.debug("AddRecord: %s" % buf[off: off + 12 + dlen])
+				#logger.debug("AddRecord: %s" % buf[off: off + 12 + dlen])
 				a = DNS.AddRecord(buf[off: off + 12 + dlen])
-				# logger.debug("Additional Record: %s" % a)
+				#logger.debug("Additional Record: %s" % a)
 				off += 12 + dlen
 			self.addrecords.append(a)
 			addreq_amount -= 1
 
-		# logger.debug("dns: %s" % self)
+		#logger.debug("dns: %s" % self)
 		return off
 
 	def _update_fields(self):
 		if self._header_changed:
-			# logger.debug("updating lenghts")
+			#logger.debug("updating lenghts")
 			# Avoid lazy dissect by checking for [b"bytes", dissect_callback]
 			# First assigning to length will trigger _unpack(...)
 			if self.questions_amount_au_active and self._queries.__class__ is not list:
@@ -374,7 +376,7 @@ class DNS(pypacker.Packet):
 				self.authrr_amount = len(self.auths)
 			if self.addrr_amount_au_active and self._addrecords.__class__ is not list:
 				self.addrr_amount = len(self.addrecords)
-			# logger.debug("finished updating lengths")
+			#logger.debug("finished updating lengths")
 
 	def get_resolved_addresses(self):
 		ret = {}

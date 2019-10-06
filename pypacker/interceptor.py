@@ -288,11 +288,9 @@ class Interceptor(object):
 			len_recv, data = get_full_payload(nfa, packet_ptr)
 
 			try:
-				# TODO: test this
 				hw_info = get_packet_hw(nfa).contents
 				hw_addrlen = ntohs(hw_info.hw_addrlen)
 				hw_addr = ctypes.string_at(hw_info.hw_addr, size=hw_addrlen)
-				#hw_addr = None
 			except:
 				# hw address not always present, eg DHCP discover -> offer...
 				hw_addr = None

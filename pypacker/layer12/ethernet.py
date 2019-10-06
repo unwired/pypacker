@@ -201,8 +201,10 @@ class Ethernet(pypacker.Packet):
 					lacppdu_len = 110
 					self._padding = buf[hlen + lacppdu_len:]
 					dlen = lacppdu_len
-			except Exception as ex:
-				logger.exception("could not extract padding info, assuming incomplete ethernet frame: %r", ex)
+			except:
+				# Could not extract padding info, assuming incomplete ethernet frame.
+				# Init of handler will take place after all.
+				pass
 		# logger.debug("len(buf)=%d, len(higher)=%d" % (len(buf), dlen))
 		self._init_handler(eth_type, buf[hlen: hlen + dlen])
 		return hlen
