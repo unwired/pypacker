@@ -15,8 +15,8 @@ from pypacker.structcbs import pack_mac, unpack_mac, pack_ipv4, unpack_ipv4
 from pypacker.lazydict import LazyDict
 
 logger = logging.getLogger("pypacker")
-# logger.setLevel(logging.DEBUG)
-logger.setLevel(logging.WARNING)
+logger.setLevel(logging.DEBUG)
+# logger.setLevel(logging.WARNING)
 
 logger_streamhandler = logging.StreamHandler()
 logger_formatter = logging.Formatter("%(levelname)s (%(funcName)s): %(message)s")
