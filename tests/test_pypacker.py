@@ -2103,7 +2103,7 @@ class PerfTestCase(unittest.TestCase):
 		print("orC = 217847 p/s")
 		print("orP = 409268 p/s")
 
-		print(">>> changing Triggerlist/text based proto (Ethernet + IP + TCP + HTTP)")
+		print(">>> changing dynamic field (Ethernet + IP + TCP + HTTP)")
 		start = time.time()
 		eth1 = ethernet.Ethernet(BYTES_ETH_IP_TCP_HTTP)
 		http1 = eth1[http.HTTP]
@@ -2940,7 +2940,7 @@ suite.addTests(loader.loadTestsFromTestCase(ReadWriteReadTestCase))
 suite.addTests(loader.loadTestsFromTestCase(RadiotapTestCase))
 suite.addTests(loader.loadTestsFromTestCase(BTLETestcase))
 # Disabled: Takes a bit longer
-# suite.addTests(loader.loadTestsFromTestCase(PerfTestCase))
+suite.addTests(loader.loadTestsFromTestCase(PerfTestCase))
 suite.addTests(loader.loadTestsFromTestCase(IEEE80211TestCase))
 suite.addTests(loader.loadTestsFromTestCase(DTPTestCase))
 suite.addTests(loader.loadTestsFromTestCase(TelnetTestCase))

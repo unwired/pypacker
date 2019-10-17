@@ -97,9 +97,10 @@ class HTTP(pypacker.Packet):
 				break
 			try:
 				key, val = split_keyval(line, 1)
-			except ValueError:
-				# not a "key: value" line
+				header.append((key, val))
+			except:
+				# Not a "key: value" line
 				logger.warning("Invalid HTTP line: %s", line)
-			header.append((key, val))
+				header.append(line)
 
 		return header

@@ -9,9 +9,8 @@
 [![License: GPL v2](https://img.shields.io/badge/License-GPL%20v2-blue.svg)](LICENSE)
 
 # General information
-This is Pypacker: The fastest and simplest packet manipulation lib for Python.
-It lets you create packets manually by defining every aspect of all header data,
-dissect packets by parsing raw packet bytes, sending/receiving packets on different layers and intercepting packets.
+This is Pypacker: The fastest and simplest low-level packet manipulation library for Python.
+See below examples for what you can do with it.
 
 If you like this project you can [![Donate with PayPal](https://www.paypalobjects.com/en_US/i/btn/btn_donate_SM.gif)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=M6GGAXJQCUHVC&source=url) via PayPal.
 
@@ -156,7 +155,7 @@ ictor.stop()
   - CPython
   - Linux based system with kernel support for NFQUEUE target. The config option is at:
 	- Networking Options -> Network packet filtering -> Core Netfilter -> NFQUEUE target
-  - iptables
+  - iptables (alternatively nftables)
     - NFQUEUE related rulez can be added eg "iptables -I INPUT 1 -j NFQUEUE --queue-num 0"
   - libnetfilter_queue library (see http://www.netfilter.org/projects/libnetfilter_queue)
 

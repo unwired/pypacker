@@ -138,7 +138,7 @@ class DNS(pypacker.Packet):
 			("address", None, b"1234")		# eg IPv4
 		)
 
-		name_s = pypacker.get_property_dnsname("name", get_bts_for_msg_compression)
+		name_s = pypacker.get_property_dnsname("name", cb_mc_bytes=get_bts_for_msg_compression)
 
 		def _get_address_readable(self):
 			if self.type == DNS_A:
@@ -175,7 +175,7 @@ class DNS(pypacker.Packet):
 			# TODO: add fields for mailbox, serial, refresh etc.
 		)
 
-		server_s = pypacker.get_property_dnsname("server", get_bts_for_msg_compression)
+		server_s = pypacker.get_property_dnsname("server", cb_mc_bytes=get_bts_for_msg_compression)
 
 		def _dissect(self, buf):
 			# Needed set format

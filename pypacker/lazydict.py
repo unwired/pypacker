@@ -19,6 +19,9 @@ class LazyDict(dict):
 
 	# Python predefined overwritten methods
 	# TODO: not all functions overwritten yet
+	def __contains__(self, key):
+		self._lazy_init()
+		return super().__contains__(key)
 
 	def __getitem__(self, key):
 		self._lazy_init()

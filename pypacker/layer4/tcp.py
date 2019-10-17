@@ -179,8 +179,8 @@ class TCP(pypacker.Packet):
 				# pseudoheader didn't change, further check for changes in layers
 				update = self._changed()
 			# logger.debug("lower layer found!")
-		except AttributeError:
-			# assume not an IP packet: we can't calculate the checksum
+		except:
+			# Assume not an IP packet: we can't calculate the checksum
 			# logger.debug("no lower layer found!")
 			update = False
 
@@ -258,8 +258,8 @@ class TCP(pypacker.Packet):
 			# assign via non-shadowed variable to trigger re-packing
 			self.sum = in_cksum(s + tcp_bin)
 			# logger.debug(">>> new checksum: %0X" % self._sum)
-		except (AttributeError, struct.error):
-			# not an IP packet as lower layer (src, dst not present) or invalid src/dst
+		except:
+			# Not an IP packet as lower layer (src, dst not present) or invalid src/dst
 			# logger.debug("could not calculate checksum: %r" % e)
 			pass
 

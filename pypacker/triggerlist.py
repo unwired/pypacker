@@ -68,7 +68,7 @@ class TriggerList(list):
 	def __setitem__(self, k, v):
 		self._lazy_dissect()
 		try:
-			# remove listener from old packet which gets overwritten
+			# Remove listener from old packet which gets overwritten
 			self[k].remove_change_listener(None, remove_all=True)
 		except:
 			pass
@@ -81,7 +81,7 @@ class TriggerList(list):
 		if type(k) is int:
 			itemlist = [self[k]]
 		else:
-			# assume slice: [x:y]
+			# Assume slice: [x:y]
 			itemlist = self[k]
 		super().__delitem__(k)
 		# logger.debug("removed, handle mod")
@@ -132,54 +132,40 @@ class TriggerList(list):
 		connect_packet -- connect packet to this tl and parent packet
 		"""
 		for v in val:
-			try:
-				if connect_packet:
-					if v._triggelistpacket_parent is not None and v._triggelistpacket_parent != self._packet:
-						logger.warning("Packet %s currently in tl of %s is re-added to another tl in %s" %
-							(v.__class__, v._triggelistpacket_parent.__class__, self._packet.__class__))
-						v._remove_change_listener()
-					# Add this TL as change listener to the header-packet
-					# Needed to react on changes of packets in this triggerlist -> call _notify_change on change
-					# TriggerList observes changes on packets:
-					# base packet <- TriggerList (observes changes, set changed status
-					# in basepacket) <- contained packet (changes)
-					lwrapper = lambda: self._notify_change()
-					v._add_change_listener(lwrapper)
-					# allow packet in tl to access packet containing this tl
-					v._triggelistpacket_parent = self._packet
-				else:
-					# remove any old listener
-					v._remove_change_listener()
-					# remove old parent
-					v._triggelistpacket_parent = None
-			except AttributeError:
-				# this will fail if val is not a packet
-				# logger.debug(e)
-				pass
+			# Only react on packets
+			if type(v) in TRIGGERLIST_CONTENT_SIMPLE:
+				continue
+
+			if connect_packet:
+				# Allow packet in TL to access packet containing this TL:
+				# packet1( TL[packet2->"access to packet1"] )
+				v._triggelistpacket_parent = self._packet
+				# TriggerList observes changes on packets:
+				# base packet <- TriggerList (observes changes, set changed status
+				# in basepacket) <- contained packet (changes)
+				# Add change listener to the packet this TL is contained in.
+				lwrapper = lambda: self._notify_change()
+				v._add_change_listener(lwrapper)
+			else:
+				# Remove any old listener
+				v._remove_change_listener()
+				# Remove old parent
+				v._triggelistpacket_parent = None
 		# logger.debug("refreshed listener!")
 		self._notify_change()
 
 	def _notify_change(self):
 		"""
-		Update _header_changed of and _header_format_changed of the Packet having
+		Update _header_changed and _header_format_changed of the Packet having
 		this TriggerList as field and _cached_result.
 		Called by: this list on changes or Packets in this list
 		"""
 		# logger.debug("!!! Packet notified about update: %r -> %r" % (self._packet.__class__, self))
 
-		try:
-			self._packet._header_changed = True
-			self._packet._header_format_changed = True
-		# logger.debug(">>> TriggerList changed!!!")
-		except AttributeError:
-			# this only works on Packets
-			# logger.debug(e)
-			pass
-
-		# list changed: old cache of TriggerList not usable anymore
+		self._packet._header_changed = True
+		self._packet._header_format_changed = True
+		# List changed: old cache of TriggerList not usable anymore
 		self._cached_result = None
-
-	__TYPES_TRIGGERLIST_SIMPLE = {bytes, tuple}
 
 	def bin(self):
 		"""
@@ -202,13 +188,8 @@ class TriggerList(list):
 				elif entry_type is tuple:
 					result_arr.append(self._pack(entry))
 				else:
-					try:
-						# this must be a packet, otherthise invalid entry!
-						result_arr.append(entry.bin())
-					except:
-						logger.warning(
-							"Exception when getting bytes from packet: field=%r, value=%r, in packet: %r",
-							self._headerfield_name, entry, self._packet.__class__)
+					# This Must be a packet, otherthise invalid entry!
+					result_arr.append(entry.bin())
 
 			self._cached_result = b"".join(result_arr)
 		# logger.debug("new cached result: %s" % self._cached_result)
@@ -243,7 +224,7 @@ class TriggerList(list):
 		self._lazy_dissect()
 		try:
 			return self[self.find_pos(search_cb, offset=offset)]
-		except TypeError:
+		except:
 			return None
 
 	def _pack(self, tuple_entry):

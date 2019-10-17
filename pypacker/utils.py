@@ -359,7 +359,7 @@ def get_ipv6_for_iface(iface_name, idx=0):
 
 def get_gwip_for_iface(iface_name):
 	"""
-	return -- IPv4 address of the default gateway for interface iface_name
+	return -- IPv4 address of the default gateway like "1.2.3.4" for interface iface_name or None
 	"""
 	gws = netifaces.gateways()
 	gws_ipv4 = gws.get(netifaces.AF_INET, None)
@@ -377,7 +377,7 @@ def get_gwip_for_iface(iface_name):
 
 def get_arp_cache_entry(ipaddr):
 	"""
-	return -- MAC address for IP addess ipaddr
+	return -- MAC address for IP addess like "1.2.3.4"
 	"""
 	mac = None
 	pattern_mac = re.compile("([0-9A-Fa-f]{2}[:]){5}([0-9A-Fa-f]{2})")
@@ -392,10 +392,16 @@ def get_arp_cache_entry(ipaddr):
 
 
 def add_arp_entry(ip_address, mac_address, interface_name):
+	"""
+	Add an arp entry using linux "arp" command.
+	"""
 	cmd_call = ["arp", "-s", ip_address, "-i", interface_name, mac_address]
 	subprocess.check_call(cmd_call)
 
 
 def flush_arp_cache():
+	"""
+	Remove all arp entries from cache using linux "ip" command.
+	"""
 	cmd_call = ["ip", "-s", "neigh", "flush", "all"]
 	subprocess.check_call(cmd_call)

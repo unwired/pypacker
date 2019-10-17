@@ -66,7 +66,7 @@ def get_setter(varname, is_field_type_simple=True, is_field_static=True):
 		tl = obj.__getattribute__(varname_shadowed)
 
 		if type(tl) is list:
-			# we need to create the original TriggerList in order to unpack correctly
+			# We need to create the original TriggerList in order to unpack correctly
 			# _triggerlistName = [b"bytes", callback] or
 			# _triggerlistName = [b"", callback] (default initiation)
 			# logger.debug(">>> initiating TriggerList")
@@ -77,7 +77,7 @@ def get_setter(varname, is_field_type_simple=True, is_field_static=True):
 				headerfield_name=varname_shadowed
 			)
 			object.__setattr__(obj, varname_shadowed, tl)
-		# this will trigger unpacking
+		# This will trigger unpacking
 
 		del tl[:]
 

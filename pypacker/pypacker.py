@@ -15,8 +15,8 @@ from pypacker.structcbs import pack_mac, unpack_mac, pack_ipv4, unpack_ipv4
 from pypacker.lazydict import LazyDict
 
 logger = logging.getLogger("pypacker")
-logger.setLevel(logging.DEBUG)
-# logger.setLevel(logging.WARNING)
+# logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.WARNING)
 
 logger_streamhandler = logging.StreamHandler()
 logger_formatter = logging.Formatter("%(levelname)s (%(funcName)s): %(message)s")
@@ -76,8 +76,7 @@ class Packet(object, metaclass=MetaPacket):
 
 	A header definition like __hdr__ = (("name", "12s", b"defaultvalue"),) will define a header field
 	having the name "name", format "12s" and default value b"defaultvalue" as bytestring. Fields will
-	be added in order of definition. The static variable __byte_order__ can be set to override the
-	default value '>'. Extending classes should overwrite the "_dissect"-method in order to dissect
+	be added in order of definition. Extending classes should overwrite the "_dissect"-method in order to dissect
 	given data.
 
 	Requirements
@@ -85,7 +84,7 @@ class Packet(object, metaclass=MetaPacket):
 
 	- Auto-decoding of headers via given format-patterns (defined via __hdr__)
 	- Auto-decoding of body-handlers (IP -> parse IP-data -> add TCP-handler to IP -> parse TCP-data..)
-	- Access of higher layers via layer1.layer2.layerX or "layer1[layerX]" notation
+	- Access of higher layers via layer1.higher_layer or "layer1[layerX]" notation
 	- There are three types of headers:
 	1) Simple constant fields (constant format)
 		Format for __hdr__: ("name", "format", value [, FLAGS])
@@ -102,7 +101,7 @@ class Packet(object, metaclass=MetaPacket):
 	(see pypacker_meta.py). This will create a variable XXX_au_active one time for a field XXX
 	which can be used activate/deactivate the auto-update externally and which can be read in
 	the bin()-method internally.
-	- Convenient access for standard types (MAC, IP address) using string-representations
+	- Convenient access for standard types (e.g. MAC, IP address) using string-representations
 		This is done by appending "_s" to the attributename:
 		ip.src_s = "127.0.0.1"
 		ip_src_str = ip.src_s
@@ -131,7 +130,7 @@ class Packet(object, metaclass=MetaPacket):
 			-> _dissect(): has to be overwritten, get to know/verify the real header-structure
 				-> (optional): call _init_handler() initiating a handler representing an upper-layer
 				-> (optional): call _init_triggerlist(name, b"bytes", dissect_callback)
-				to initiate a TriggerList field
+					to initiate a TriggerList field
 				Note: headers won't be updated to buffer values until dissect finishes
 			-> (optional) on access to simple headers: _unpack() sets all header values
 			-> (optional) on access to TriggerList headers: lazy parsing gets triggered
@@ -303,7 +302,7 @@ class Packet(object, metaclass=MetaPacket):
 		return -- handler object or None if not present.
 		"""
 		if self._lazy_handler_data is not None:
-			self._initialize_handler()
+			self._lazy_initialize_handler()
 		return self._higher_layer
 
 	@staticmethod
@@ -315,7 +314,7 @@ class Packet(object, metaclass=MetaPacket):
 		"""
 		try:
 			return Packet._handlerclass_id_dct[origin_class][handler_class]
-		except KeyError:
+		except:
 			# logger.debug("Could not find body handler id for %s in current class %s",
 			# hndl.__class__, self.__class__)
 			pass
@@ -356,13 +355,10 @@ class Packet(object, metaclass=MetaPacket):
 	higher_layer = property(_get_higherlayer, _set_higherlayer)
 
 	def _set_lower_layer(self, val):
-		try:
+		if self._lower_layer is not None:
 			# remove upper layer (us) from current lower layer before
 			# setting a new lower layer
 			self._lower_layer.higher_layer = None
-		except:
-			# no lower layer, don't mind
-			pass
 
 		self._lower_layer = val
 
@@ -421,7 +417,7 @@ class Packet(object, metaclass=MetaPacket):
 
 		return self
 
-	def _initialize_handler(self):
+	def _lazy_initialize_handler(self):
 		"""
 		Lazy initialize the handler previously set by _init_handler.
 		Make sure this is not called more than once
@@ -437,7 +433,7 @@ class Packet(object, metaclass=MetaPacket):
 			self._set_higherlayer(type_instance)
 			# this was a lazy init: same as direct dissecting -> no body change
 			self._body_changed = False
-		except Exception as ex:
+		except:
 			# error on lazy dissecting: set raw bytes
 			self._errors |= ERROR_DISSECT
 			self._body_bytes = handler_data[1]
@@ -530,7 +526,7 @@ class Packet(object, metaclass=MetaPacket):
 
 		try:
 			self.higher_layer.dissect_full()
-		except AttributeError:
+		except:
 			# no handler present
 			pass
 
@@ -598,7 +594,7 @@ class Packet(object, metaclass=MetaPacket):
 			try:
 				# Try to get convenient name
 				value_alt = " = " + getattr(self, name_real + "_s")
-			except AttributeError:
+			except:
 				# Not set
 				pass
 
@@ -610,7 +606,7 @@ class Packet(object, metaclass=MetaPacket):
 				if value_translated != "":
 					# Nothing found
 					value_translated = " = " + value_translated
-			except AttributeError:
+			except:
 				# Not set
 				pass
 
@@ -681,7 +677,7 @@ class Packet(object, metaclass=MetaPacket):
 		#logger.debug([self_getattr(name) for name in self._header_field_names])
 		try:
 			header_unpacked = self._header_format.unpack(self._header_cached)
-		except struct.error:
+		except:
 			self._errors |= ERROR_NOT_UNPACKED
 			# just warn user about incomplete data
 			errormsg = "could not unpack in: %s, format: %s, names: %s, value to unpack: %s (%d bytes)," \
@@ -733,10 +729,9 @@ class Packet(object, metaclass=MetaPacket):
 
 	def _init_handler(self, hndl_type, buffer):
 		"""
-		Called by overwritten "_dissect()":
-		Initiate the handler-parser using the given buffer and set it using _set_higherlayer()
-		later on (lazy init). This will use the calling class and given handler type to retrieve
-		the resulting handler. On any error this will set raw bytes given for body data.
+		Called by overwritten "_dissect()". 1) Store handler for later dissect or 2) directly dissect it.
+		Notes for 2): Initiate the handler-parser using the given buffer and set it using _set_higherlayer()
+		On any error this will set raw bytes given for body data.
 
 		hndl_type -- A value to place the handler in the handler-dict like
 			dict[Class.__name__][hndl_type] (eg type-id, port-number)
@@ -771,7 +766,7 @@ class Packet(object, metaclass=MetaPacket):
 			#errormsg = "Unknown upper layer type for %s: %d, feel free to implement" % (
 			#	self.__class__, hndl_type)
 			#logger.warning(errormsg)
-		except Exception as ex:
+		except:
 			#logger.warning("Can't set handler data (malformed?): base=%s handler_type/id=%r, reason: %s",
 			#	self.__class__, Packet._id_handlerclass_dct[self.__class__][hndl_type], ex)
 			# set raw bytes as data (eg handler class not found)
@@ -872,8 +867,8 @@ class Packet(object, metaclass=MetaPacket):
 
 			self.__setattr__(self._id_fieldname,
 				Packet._handlerclass_id_dct[self.__class__][handler_clz])
-		except KeyError:
-			# no type id found, something like eth + Telnet
+		except:
+			# No type id found, something like eth + Telnet
 			# logger.debug("no type id found for %s, class: %s -> %s" %
 			#	(self._higher_layer.__class__, self.__class__, handler_clz))
 			pass
@@ -964,12 +959,8 @@ class Packet(object, metaclass=MetaPacket):
 					header_format_append("%ds" % len(val[0]))
 					#logger.debug("adding format for: %s, %s, val: %s", self.__class__, name, val[0])
 				else:
-					try:
-						header_format_append("%ds" % len(val.bin()))
-					except AttributeError as err:
-						raise InvalidValuetypeException("Unknown value-type in %s for header"
-							" field %s: %s, allowed: int, bytes, Packets, tuples"
-							" (depending on context)" % (self.__class__, name[1:], type(val))) from err
+					# Assume packet
+					header_format_append("%ds" % len(val.bin()))
 
 		self._header_format = Struct("".join(header_format))
 		self._header_len = self._header_format.size
@@ -1011,22 +1002,13 @@ class Packet(object, metaclass=MetaPacket):
 				if val.__class__ == list:
 					header_values_append(val[0])
 				else:
-					try:
-						header_values_append(val.bin())
-					except AttributeError as err:
-						raise InvalidValuetypeException("Unknown value-type in %s for header"
-							" field %s: %s, allowed: int, bytes, Packets, tuples"
-							" (depending on context)" % (self.__class__, name[1:], type(val))) from err
+					# Assume packet
+					header_values_append(val.bin())
 
 		# logger.debug("header bytes for %s: %s = %s",
 		# 	self.__class__.__name__, self._header_format.format, header_bytes)
-		# info: individual unpacking is about 4 times slower than cumulative
-		try:
-			self._header_cached = self._header_format.pack(*header_values)
-		except Exception as e:
-			logger.warning("Could not pack header data. Did some header value exceed specified format?"
-				" (e.g. 500 -> 'B'): %s", e)
-			return None
+		# Individual unpacking is about 4 times slower than cumulative
+		self._header_cached = self._header_format.pack(*header_values)
 		# logger.debug(">>> cached header: %s (%d)", self._header_cached, len(self._header_cached))
 		self._header_changed = False
 
@@ -1069,7 +1051,7 @@ class Packet(object, metaclass=MetaPacket):
 		"""
 		try:
 			self._changelistener.add(listener_cb)
-		except AttributeError:
+		except:
 			# change listener not yet initiated
 			self._changelistener = set([listener_cb])
 
@@ -1077,11 +1059,8 @@ class Packet(object, metaclass=MetaPacket):
 		"""
 		Remove all change listener.
 		"""
-		try:
+		if self._changelistener is not None:
 			self._changelistener.clear()
-		except AttributeError:
-			# change listener not yet initiated
-			pass
 
 	def _notify_changelistener(self):
 		"""
@@ -1090,17 +1069,13 @@ class Packet(object, metaclass=MetaPacket):
 		on changes in packets like Triggerlist[packet1, packet2, ...].
 		"""
 		#logger.debug("packet is notifying!!!")
+		# no listener added so far -> nothing to notify
+		if self._changelistener is None:
+			return
 
-		try:
-			for listener_cb in self._changelistener:
-				try:
-					#logger.debug("notify...")
-					listener_cb()
-				except Exception as e:
-					logger.exception("error when informing listener: %s", e)
-		except TypeError:
-			# no listener added so far -> nothing to notify
-			pass
+		for listener_cb in self._changelistener:
+			#logger.debug("notify...")
+			listener_cb()
 
 	@classmethod
 	def load_handler(cls, clz_add, handler):
@@ -1267,9 +1242,10 @@ def dns_name_decode(name, cb_mc_bytes=lambda: b""):
 			name_decoded.append(buf[off:off + size].decode())
 			off += size + 1
 		else:
-			# dns message compression
+			# DNS message compression
 			off = (((buf[off - 1] & 0b00111111) << 8) | buf[off]) + 1
 			buf = cb_mc_bytes()
+			#logger.debug("Got compressed DNS: %s" % buf)
 
 			if off in parsed_pointers:
 				# dns message loop, abort...
@@ -1354,8 +1330,7 @@ def get_property_bytes_num(var, format_target):
 def get_property_translator(
 	varname,
 	varname_regex,
-	cb_get_description=lambda value,
-	value_name_dct: value_name_dct[value]):
+	cb_get_description=lambda value, value_name_dct: value_name_dct[value]):
 	"""
 	Get a descriptor allowing to make a value->name translation for variable values
 
@@ -1376,11 +1351,11 @@ def get_property_translator(
 	ldict = LazyDict(collect_cb)
 
 	def descricptor_cb(value):
-		try:
-			#logger.debug("Trying to get description!")
-			return cb_get_description(value, ldict)
-		except:
+		if value not in ldict:
 			return ""
+
+		#logger.debug("Trying to get description!")
+		return cb_get_description(value, ldict)
 
 	# Only get access
 	return property(
