@@ -6,7 +6,7 @@ import struct
 import sys
 import pprint
 
-from pypacker import pypacker, checksum
+from pypacker import pypacker, checksum, triggerlist
 from pypacker.psocket import SocketHndl
 import pypacker.ppcap as ppcap
 import pypacker.pcapng as pcapng
@@ -347,28 +347,50 @@ class GeneralTestCase(unittest.TestCase):
 
 	def test_dissectfail(self):
 		print_header("Dissectfail")
+		# Raises Exception because of not enough bytes for dissecting
+		self.assertRaises(Exception, lambda: ethernet.Ethernet(b"XXX"))
+
 		tcp_bytes_fail = b"\x00" * 16
 		pkt1 = ethernet.Ethernet() + ip.IP() + tcp_bytes_fail
 		pkt1_bts = pkt1.bin()
 		self.assertTrue(pkt1_bts.endswith(tcp_bytes_fail))
 		pkt1 = ethernet.Ethernet(pkt1_bts)
 		pkt_tcp = pkt1.higher_layer.higher_layer
-		print("TCP for dissectfail #1: %r" % pkt_tcp)
+		print("TCP for dissectfail #1 (higher layer not present, via higher_layer): %r" % pkt_tcp)
 		self.assertIsNone(pkt_tcp)
 
 		pkt1 = ethernet.Ethernet(pkt1_bts)
 		pkt_tcp = pkt1[tcp.TCP]
-		print("TCP for dissectfail #2: %r" % pkt_tcp)
+		print("TCP for dissectfail #2 (higher layer not present, via pkt[tcp.TCP]): %r" % pkt_tcp)
 		self.assertIsNone(pkt_tcp)
-
-		# retrieving body type on failed dissect only works 1st time (returns None)
-		# 2nd time raises Exception
-		# pkt_tcp = pkt1.ip.tcp
-		self.assertRaises(Exception, lambda: pkt1.ip.tcp)
 
 		ip_bytes_orig = pkt1_bts[-len(tcp_bytes_fail):]
 		ip_bytes = pkt1.higher_layer.body_bytes
 		self.assertEqual(ip_bytes, ip_bytes_orig)
+
+		print("TirrgerList dissect fail")
+
+		class PktTlist(pypacker.Packet):
+			__hdr__ = (
+				("field1", "H", 0x0),
+				("field2", None, triggerlist.TriggerList)
+			)
+
+			@staticmethod
+			def tlist_cb_fail(bts):
+				raise Exception()
+
+			def _dissect(self, buf):
+					self._init_triggerlist("field2", buf[2:10], PktTlist.tlist_cb_fail)
+					return 10
+
+		# Triggerlist dissect fail: raw bytes must be present after all
+		field1_content = b"\x00" * 2
+		field2_content = b"\x01" * 8
+		pkt_tlistfail = PktTlist(field1_content + field2_content + b"2" * 16)
+
+		self.assertEqual(pkt_tlistfail.field1, 0)
+		self.assertEqual(pkt_tlistfail.field2[0], field2_content)
 
 	def test_handlerid_update(self):
 		print_header("Auto update of handler id")
@@ -2940,7 +2962,7 @@ suite.addTests(loader.loadTestsFromTestCase(ReadWriteReadTestCase))
 suite.addTests(loader.loadTestsFromTestCase(RadiotapTestCase))
 suite.addTests(loader.loadTestsFromTestCase(BTLETestcase))
 # Disabled: Takes a bit longer
-suite.addTests(loader.loadTestsFromTestCase(PerfTestCase))
+#suite.addTests(loader.loadTestsFromTestCase(PerfTestCase))
 suite.addTests(loader.loadTestsFromTestCase(IEEE80211TestCase))
 suite.addTests(loader.loadTestsFromTestCase(DTPTestCase))
 suite.addTests(loader.loadTestsFromTestCase(TelnetTestCase))

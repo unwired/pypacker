@@ -221,7 +221,7 @@ class IP(pypacker.Packet):
 			# Update header length. NOTE: needs to be a multiple of 4 Bytes.
 			# logger.debug("updating: %r" % self._packet)
 				# options length need to be multiple of 4 Bytes
-			self.hl = int(self.header_len / 4) & 0xf
+			self.hl = int(self.header_len / 4) & 0xF
 		if self.sum_au_active:
 			# length changed so we have to recalculate checksum
 			# logger.debug(">>> IP: calculating sum, current: %0X" % self.sum)

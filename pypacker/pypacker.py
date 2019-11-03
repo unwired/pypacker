@@ -171,7 +171,7 @@ class Packet(object, metaclass=MetaPacket):
 
 		if args:
 			if len(args) > 1:
-				# assume packet, target class given until which we unpack
+				# Assume packet, target class given until which we unpack
 				self._final_unpack_clz = args[1]._final_unpack_clz
 			# Any Exception will be forwarded (SomePkt(bytes) or lazy dissect)
 			# If this is the lowest layer the Exception has to be caught
@@ -190,7 +190,7 @@ class Packet(object, metaclass=MetaPacket):
 				# _dissect(...) didn't call _init_handler(): set raw bytes.
 				self._body_bytes = args[0][header_len:]
 			#logger.warning("could not dissect in %s: %r" % (self.__class__.__name__, e))
-			# reset the changed-flags: original unpacked value = no changes
+			# Reset the changed-flags: original unpacked value = no changes
 			self._reset_changed()
 			self._unpacked = False
 		else:
@@ -302,7 +302,7 @@ class Packet(object, metaclass=MetaPacket):
 		return -- handler object or None if not present.
 		"""
 		if self._lazy_handler_data is not None:
-			self._lazy_initialize_handler()
+			self._lazy_init_handler()
 		return self._higher_layer
 
 	@staticmethod
@@ -417,7 +417,7 @@ class Packet(object, metaclass=MetaPacket):
 
 		return self
 
-	def _lazy_initialize_handler(self):
+	def _lazy_init_handler(self):
 		"""
 		Lazy initialize the handler previously set by _init_handler.
 		Make sure this is not called more than once
@@ -737,17 +737,28 @@ class Packet(object, metaclass=MetaPacket):
 			dict[Class.__name__][hndl_type] (eg type-id, port-number)
 		buffer -- The buffer to be used to create the handler
 		"""
-		# empty buffer must lead to empty body
-		# initiating packets using empty buffer would lead to wrong (default) values
+		# Empty buffer must lead to empty body. Initiating packets using empty buffer
+		# would lead to wrong (default) values
 		if len(buffer) == 0:
 			# logger.debug("empty buffer given for _init_handler()!")
+			return
+		
+		# self.__class__ MUST be contained, otherwise calling _init_handler() would be illegal
+		try:
+			# Likely to succeed
+			clz = Packet._id_handlerclass_dct[self.__class__][hndl_type]
+		except:
+			self.body_bytes = buffer
+			self._errors |= ERROR_UNKNOWN_PROTO
+			#errormsg = "Unknown upper layer type for %s: %d, feel free to implement" % (
+			#	self.__class__, hndl_type)
+			#logger.warning(errormsg)
 			return
 
 		try:
 			if self._final_unpack_clz is None or self._final_unpack_clz is self.__class__:
 				# set lazy handler data, __getattr__() will be called on access
 				# to handler (field not yet initiated)
-				clz = Packet._id_handlerclass_dct[self.__class__][hndl_type]
 				# logger.debug("setting handler name: %s -> %s", self.__class__.__name__, clz_name)
 				self._lazy_handler_data = [clz, buffer]
 				# set name although we don't set a handler (needed for direction() et al)
@@ -758,14 +769,8 @@ class Packet(object, metaclass=MetaPacket):
 				# Continue parsing next upper layer, happens on "__iter__()": avoid unneeded lazy-data
 				# handling/creating uneeded meta data for later body handling
 				#logger.debug("--------> direct init in: %s", self.__class__.__name__)
-				type_instance = Packet._id_handlerclass_dct[self.__class__][hndl_type](buffer, self)
+				type_instance = clz(buffer, self)
 				self._set_higherlayer(type_instance)
-		except KeyError:
-			self.body_bytes = buffer
-			self._errors |= ERROR_UNKNOWN_PROTO
-			#errormsg = "Unknown upper layer type for %s: %d, feel free to implement" % (
-			#	self.__class__, hndl_type)
-			#logger.warning(errormsg)
 		except:
 			#logger.warning("Can't set handler data (malformed?): base=%s handler_type/id=%r, reason: %s",
 			#	self.__class__, Packet._id_handlerclass_dct[self.__class__][hndl_type], ex)

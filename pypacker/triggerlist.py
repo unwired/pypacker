@@ -33,7 +33,7 @@ class TriggerList(list):
 		self._headerfield_name = headerfield_name
 
 	def _lazy_dissect(self):
-		if self._packet._unpacked is not None and not self._packet._unpacked:
+		if self._packet._unpacked == False:
 			# Before changing TriggerList we need to unpack or
 			# cached header won't fit on _unpack(...)
 			# This is called before any changes to TriggerList so place it here.
@@ -44,7 +44,14 @@ class TriggerList(list):
 			# already dissected, ignore
 			return
 
-		initial_list_content = self._dissect_callback(self._cached_result)
+		try:
+			logger.debug("Dissecting in TL")
+			initial_list_content = self._dissect_callback(self._cached_result)
+		except:
+			# If anything goes wrong: raw bytes will be accessible in any case
+			logger.debug("Failed to dissect in TL")
+			initial_list_content = [self._cached_result]
+
 		self._dissect_callback = None
 		# This is re-calling _lazy_dissect() but directly returning after second if
 		# extend() is clearing cache -> remember cache
@@ -132,7 +139,7 @@ class TriggerList(list):
 		connect_packet -- connect packet to this tl and parent packet
 		"""
 		for v in val:
-			# Only react on packets
+			# Ignore non-packets
 			if type(v) in TRIGGERLIST_CONTENT_SIMPLE:
 				continue
 
