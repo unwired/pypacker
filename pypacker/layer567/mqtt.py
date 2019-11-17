@@ -195,7 +195,7 @@ class MQTTBase(Packet):
 	def _encode_length(num):
 		"""
 		num -- Positive integer like 256
-		return -- Encoded number as bytes like b"\x81\xFF"
+		return -- Encoded number as bytes like b"\x81\xff"
 		"""
 		bts = []
 		while num > 0:

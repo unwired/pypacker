@@ -19,14 +19,14 @@ class VRRP(pypacker.Packet):
 		return self.vtype >> 4
 
 	def __set_v(self, v):
-		self.vtype = (self.vtype & ~0xf) | (v << 4)
+		self.vtype = (self.vtype & ~0xF) | (v << 4)
 	v = property(__get_v, __set_v)
 
 	def __get_type(self):
-		return self.vtype & 0xf
+		return self.vtype & 0xF
 
 	def __set_type(self, v):
-		self.vtype = (self.vtype & ~0xf0) | (v & 0xf)
+		self.vtype = (self.vtype & ~0xF0) | (v & 0xF)
 	type = property(__get_type, __set_type)
 
 	def _update_fields(self):

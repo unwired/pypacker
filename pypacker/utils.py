@@ -17,7 +17,7 @@ logger = logging.getLogger("pypacker")
 try:
 	import netifaces
 except ImportError:
-	logger.debug("Couldn't load netifaces, some utils won't work")
+	logger.warning("Couldn't load netifaces, some utils won't work")
 
 log = math.log
 mac_bytes_to_str = pypacker.mac_bytes_to_str
@@ -125,7 +125,7 @@ def is_interface_present(iface_name):
 def set_interface_state(iface_name, state_active=True):
 	state_str = "up" if state_active else "down"
 	output = subprocess.getoutput("ip link set dev %s %s" % (iface_name, state_str))
-	logger.debug(output)
+	logger.info(output)
 
 
 PROG_CHANNEL = re.compile(br"Channel ([\d]+) :")
@@ -230,7 +230,7 @@ def _load_mac_vendor():
 def get_vendor_for_mac(mac):
 	"""
 	mac -- First three bytes of mac address at minimum eg "AA:BB:CC...", "AABBCC..." or
-		byte representation b"\xAA\xBB\xCC\xDD\xEE\xFF"
+		byte representation b"\xaa\xbb\xcc\xdd\xee\xff"
 	return -- found vendor string or empty string
 	"""
 	if len(MAC_VENDOR) == 1:
@@ -243,7 +243,7 @@ def get_vendor_for_mac(mac):
 			MAC_VENDOR["test"] = "test"
 
 	if type(mac) == bytes:
-		# \xAA\xBB\xCC\xDD\xEE\xFF -> AA:BB:CC:DD:EE:FF -> AABBCC"
+		# b"\xaa\xbb\xcc\xdd\xee\xff" -> AA:BB:CC:DD:EE:FF -> AABBCC"
 		mac = pypacker.mac_bytes_to_str(mac)[0:8].replace(":", "")
 	else:
 		# AA:BB:CC -> AABBCC

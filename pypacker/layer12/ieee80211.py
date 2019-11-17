@@ -64,8 +64,8 @@ INTER_DS_FLAG		= 3
 # name : (mask, offset)
 _FRAMECTRL_SUBHEADERDATA = {
 	"version": (0x0300, 8),
-	"type": (0x0c00, 10),
-	"subtype": (0xf000, 12),
+	"type": (0x0C00, 10),
+	"subtype": (0xF000, 12),
 	"to_ds": (0x0001, 0),
 	"from_ds": (0x0002, 1),
 	"more_frag": (0x0004, 2),
@@ -105,7 +105,7 @@ class IEEE80211(pypacker.Packet):
 		# AAAABBCC | 00000000
 		# AAAA = subtype BB = type CC = version
 		("framectl", "H", 0),
-		("duration", "H", 0x3a01)  # 314 microseconds
+		("duration", "H", 0x3A01)  # 314 microseconds
 	)
 
 	__hdr_sub__ = _subheader_properties
@@ -409,9 +409,9 @@ class IEEE80211(pypacker.Packet):
 
 	class Deauth(pypacker.Packet):
 		__hdr__ = (
-			("dst", "6s", b"\xFF" * 6),
+			("dst", "6s", b"\xff" * 6),
 			("src", "6s", b"\x00" * 6),
-			("bssid", "6s", b"\xFF" * 6),
+			("bssid", "6s", b"\xff" * 6),
 			("seq_frag", "H", 0),
 			("reason", "H", 0x0700)  # class 3 frame received from non associated client
 		)

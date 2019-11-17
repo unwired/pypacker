@@ -15,14 +15,14 @@ class PIM(pypacker.Packet):
 		return self.v_type >> 4
 
 	def __set_v(self, v):
-		self.v_type = (v << 4) | (self.v_type & 0xf)
+		self.v_type = (v << 4) | (self.v_type & 0xF)
 	v = property(__get_v, __set_v)
 
 	def __get_type(self):
-		return self.v_type & 0xf
+		return self.v_type & 0xF
 
 	def __set_type(self, pimtype):
-		self.v_type = (self.v_type & 0xf0) | pimtype
+		self.v_type = (self.v_type & 0xF0) | pimtype
 	type = property(__get_type, __set_type)
 
 	def _update_fields(self):

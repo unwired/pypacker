@@ -104,15 +104,15 @@ class IP(pypacker.Packet):
 		return self.v_hl >> 4
 
 	def __set_v(self, value):
-		self.v_hl = (value << 4) | (self.v_hl & 0xf)
+		self.v_hl = (value << 4) | (self.v_hl & 0xF)
 	# version
 	v = property(__get_v, __set_v)
 
 	def __get_hl(self):
-		return self.v_hl & 0x0f
+		return self.v_hl & 0x0F
 
 	def __set_hl(self, value):
-		self.v_hl = (self.v_hl & 0xf0) | value
+		self.v_hl = (self.v_hl & 0xF0) | value
 	# header length
 	hl = property(__get_hl, __set_hl)
 
@@ -174,7 +174,7 @@ class IP(pypacker.Packet):
 	p_t = pypacker.get_property_translator("p", "IP_PROTO_")
 
 	def _dissect(self, buf):
-		total_header_length = ((buf[0] & 0xf) << 2)
+		total_header_length = ((buf[0] & 0xF) << 2)
 		options_length = total_header_length - 20  # total IHL - standard IP-len = options length
 
 		if options_length > 0:
@@ -261,9 +261,9 @@ IP_TOS_PREC_PRIORITY		= 0x20
 IP_TOS_PREC_IMMEDIATE		= 0x40
 IP_TOS_PREC_FLASH		= 0x60
 IP_TOS_PREC_FLASHOVERRIDE	= 0x80
-IP_TOS_PREC_CRITIC_ECP		= 0xa0
-IP_TOS_PREC_INTERNETCONTROL	= 0xc0
-IP_TOS_PREC_NETCONTROL		= 0xe0
+IP_TOS_PREC_CRITIC_ECP		= 0xA0
+IP_TOS_PREC_INTERNETCONTROL	= 0xC0
+IP_TOS_PREC_NETCONTROL		= 0xE0
 
 # Fragmentation flags (ip_off)
 IP_RF				= 0x4			# reserved

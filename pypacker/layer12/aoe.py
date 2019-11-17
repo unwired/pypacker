@@ -50,14 +50,14 @@ class AOE(pypacker.Packet):
 		return self.ver_fl >> 4
 
 	def _set_ver(self, ver):
-		self.ver_fl = (ver << 4) | (self.ver_fl & 0xf)
+		self.ver_fl = (ver << 4) | (self.ver_fl & 0xF)
 
 	ver = property(_get_ver, _set_ver)
 
 	def _get_fl(self):
-		return self.ver_fl & 0xf
+		return self.ver_fl & 0xF
 
 	def _set_fl(self, fl):
-		self.ver_fl = (self.ver_fl & 0xf0) | fl
+		self.ver_fl = (self.ver_fl & 0xF0) | fl
 
 	fl = property(_get_fl, _set_fl)

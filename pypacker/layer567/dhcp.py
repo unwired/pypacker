@@ -103,7 +103,7 @@ class DHCP(pypacker.Packet):
 		("hrd", "B", arp.ARP_HRD_ETH),		# just like ARP.hrd
 		("hln", "B", 6),			# and ARP.hln
 		("hops", "B", 0),
-		("xid", "I", 0xdeadbeef),
+		("xid", "I", 0xDEADBEEF),
 		("secs", "H", 0),
 		("flags", "H", 0),
 		("ciaddr", "4s", b"\x00" * 4),
@@ -142,7 +142,7 @@ class DHCP(pypacker.Packet):
 			# logger.debug("DHCP: adding option type %d" % t)
 
 			# last option
-			if t in [0, 0xff]:
+			if t in [0, 0xFF]:
 				p = DHCPOpt(type=t, len=0)
 				i += 1
 			else:
@@ -153,7 +153,7 @@ class DHCP(pypacker.Packet):
 			# logger.debug("new option: %s" % p)
 			opts.append(p)
 
-			if t == 0xff:
+			if t == 0xFF:
 				if i < len(buf):
 					# padding is part of the options
 					opts.append(Padding(buf[i:]))

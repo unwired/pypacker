@@ -88,7 +88,6 @@ class PcapPktHdr(pypacker.Packet):
 def pcap_cb_init_write(self, snaplen=1500, linktype=DLT_EN10MB, **initdata):
 	self._timestamp = 0
 	header = PcapFileHdr(magic=TCPDUMP_MAGIC_NANO, snaplen=snaplen, linktype=linktype)
-	logger.debug("writing fileheader %r", header)
 	self._fh.write(header.bin())
 
 
@@ -229,7 +228,7 @@ class PcapHandler(FileHandler):
 				ismatch = callbacks[2](self, **initdata)
 
 				if ismatch:
-					logger.debug("found handler for file: %x", pcaptype)
+					#logger.debug("found handler for file: %x", pcaptype)
 					# read callback
 					self.__next__ = types.MethodType(callbacks[3], self)
 					# bytes-to-packet callback

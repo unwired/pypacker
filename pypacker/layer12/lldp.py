@@ -550,12 +550,12 @@ LLDP_TLV_CLS = {
 }
 
 LLDP_ORG_SPEC_TLV_CLS = {
-	(0x0080c2, 0x01): LLDPDot1PortVlanId,
-	(0x0080c2, 0x08): DCBXCongestionNotification,
-	(0x0080c2, 0x09): DCBXConfiguration,
-	(0x0080c2, 0x0a): DCBXRecommendation,
-	(0x0080c2, 0x0b): DCBXPriorityBasedFlowControlConfiguration,
-	(0x0080c2, 0x0c): DCBXApplicationPriority,
+	(0x0080C2, 0x01): LLDPDot1PortVlanId,
+	(0x0080C2, 0x08): DCBXCongestionNotification,
+	(0x0080C2, 0x09): DCBXConfiguration,
+	(0x0080C2, 0x0A): DCBXRecommendation,
+	(0x0080C2, 0x0B): DCBXPriorityBasedFlowControlConfiguration,
+	(0x0080C2, 0x0C): DCBXApplicationPriority,
 }
 
 

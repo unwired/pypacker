@@ -37,6 +37,7 @@ Explanation:
 
 - Auto-update header should only be recalculated if VARNAME_au_active is True
 - Strings are written using double quotes like "string_xyz"
+- Constant names are written in the format [High level: Class/Topic]_[Low level: Descriptive name] like ICMP_ECHO_REPLY (see layer3/icmp.py)
 - Readability is more important than performance
 - Avoid overwriting "__getattribute__"
 

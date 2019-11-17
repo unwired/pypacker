@@ -1,5 +1,5 @@
 # set this to the NEXT (not yet published) version
-VERSION="4.8"
+VERSION="4.9"
 
 function msg {
 	echo ""
@@ -59,7 +59,7 @@ case "$1" in
 	#git ls-files --others --exclude-standard | grep -v -P ".pyc|doc_sphinx_generated|.idea|dist"
 	git ls-files --others --exclude-from=.git/.gitignore
 
-	msg "python string instead of bytes? (no output=OK)"
+	msg "Header definition: string instead of bytes?"
 	grep -ir -Po "\"\ds\", *\".+"
 
 	msg "set(...) instead of {...}? (still needed for list which need to be made unique)"
@@ -68,7 +68,10 @@ case "$1" in
 	#grep -ir -Po " {[^\:]+}" | grep ".py:" | uniq
 
 	msg "Lower case hex?"
-	grep -r -P "0x[0-9]*?[a-f]+" *.py
+	# Hex numbers in uppercase
+	grep -r -P "0x[0-9]{0,1}[a-f]{1,2}"
+	# Hex bytes in lowercase
+	grep -r -P "\\\\x[0-9]{0,1}[A-F]{1,2}"
 
 	msg "Old style unpack like unpack('H', value)? (non precompiled structs)"
 	grep -ir -P "unpack\([\"\']" | grep  -P ".py:"

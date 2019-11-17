@@ -7,7 +7,7 @@ IPX_HDR_LEN = 30
 
 class IPX(pypacker.Packet):
 	__hdr__ = (
-		("sum", "H", 0xffff),
+		("sum", "H", 0xFFFF),
 		("len", "H", IPX_HDR_LEN),
 		("tc", "B", 0),
 		("pt", "B", 0),

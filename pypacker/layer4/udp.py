@@ -39,7 +39,7 @@ UDP_PROTO_ISO15118	= 15118
 
 class UDP(pypacker.Packet):
 	__hdr__ = (
-		("sport", "H", 0xdead),
+		("sport", "H", 0xDEAD),
 		("dport", "H", 0, FIELD_FLAG_AUTOUPDATE | FIELD_FLAG_IS_TYPEFIELD),
 		("ulen", "H", 8, FIELD_FLAG_AUTOUPDATE),  # header + body, min 8
 		("sum", "H", 0, FIELD_FLAG_AUTOUPDATE)
@@ -118,7 +118,7 @@ class UDP(pypacker.Packet):
 			csum = in_cksum(s + udp_bin)
 
 			if csum == 0:
-				csum = 0xffff    # RFC 768, p2
+				csum = 0xFFFF    # RFC 768, p2
 
 			# get the checksum of concatenated pseudoheader+TCP packet
 			# assign via non-shadowed variable to trigger re-packing

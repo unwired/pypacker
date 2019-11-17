@@ -24,10 +24,10 @@ PRIVATE			= 7
 
 class NTP(pypacker.Packet):
 	__hdr__ = (
-		("flags", "B", 0x1c),		# li | v | mode
+		("flags", "B", 0x1C),		# li | v | mode
 		("stratum", "B", 0x2),
 		("interval", "B", 0x4),
-		("precision", "B", 0xe9),
+		("precision", "B", 0xE9),
 		("delay", "I", 0),
 		("dispersion", "I", 0),
 		("id", "4s", b"\x00\x01\x02\x03"),
@@ -50,7 +50,7 @@ class NTP(pypacker.Packet):
 		return (self.flags >> 6) & 0x3
 
 	def __set_li(self, value):
-		self.flags = (self.flags & ~0xc0) | ((value & 0x3) << 6)
+		self.flags = (self.flags & ~0xC0) | ((value & 0x3) << 6)
 	li = property(__get_li, __set_li)
 
 	def __get_mode(self):

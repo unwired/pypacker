@@ -532,30 +532,28 @@ class Packet(object, metaclass=MetaPacket):
 
 	def __add__(self, packet_or_bytes_to_add):
 		"""
-		Handle concatination of layers like "Ethernet + IP + TCP" and make them accessible
-		via "ethernet[IP] or ethernet[TCP]".
-		This is the same as "pkt.highest_layer.higher_layer = pkt_to_set"
+		Concatinate a packet with another packet or bytes.
+		Note: Beware of side effects as Packets remain connected until removed, eg via pkt.higher_layer = None.
 
 		packet_or_bytes_to_add -- The packet or bytes to be added as highest layer
 		"""
 		if type(packet_or_bytes_to_add) is not bytes:
 			self.highest_layer.higher_layer = packet_or_bytes_to_add
 		else:
-			self.highest_layer.body_bytes = packet_or_bytes_to_add
+			self.highest_layer.body_bytes += packet_or_bytes_to_add
 		return self
 
 	def __iadd__(self, packet_or_bytes_to_add):
 		"""
-		Handle concatination of layers like "Ethernet + IP + TCP" and make them accessible
-		via "ethernet[IP] or ethernet[TCP]".
-		This is the same as "pkt.highest_layer.higher_layer = pkt_to_set"
+		Concatinate a packet with another packet or bytes.
+		Note: Beware of side effects as Packets remain connected
 
 		packet_or_bytes_to_add -- The packet or bytes to be added as highest layer
 		"""
 		if type(packet_or_bytes_to_add) is not bytes:
 			self.highest_layer.higher_layer = packet_or_bytes_to_add
 		else:
-			self.highest_layer.body_bytes = packet_or_bytes_to_add
+			self.highest_layer.body_bytes += packet_or_bytes_to_add
 		return self
 
 	def split_layers(self):
@@ -742,7 +740,7 @@ class Packet(object, metaclass=MetaPacket):
 		if len(buffer) == 0:
 			# logger.debug("empty buffer given for _init_handler()!")
 			return
-		
+
 		# self.__class__ MUST be contained, otherwise calling _init_handler() would be illegal
 		try:
 			# Likely to succeed

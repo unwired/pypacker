@@ -45,11 +45,11 @@ class TriggerList(list):
 			return
 
 		try:
-			logger.debug("Dissecting in TL")
+			#logger.debug("Dissecting in TL")
 			initial_list_content = self._dissect_callback(self._cached_result)
 		except:
 			# If anything goes wrong: raw bytes will be accessible in any case
-			logger.debug("Failed to dissect in TL")
+			#logger.debug("Failed to dissect in TL")
 			initial_list_content = [self._cached_result]
 
 		self._dissect_callback = None

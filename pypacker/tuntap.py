@@ -20,6 +20,12 @@ mknod /dev/net/tapB c 10 200
 ping4 -c 1  -I tunA0 192.168.12.35; ping4  -c 1 -I tunB0 192.168.12.34
 ping4 -c 1  -I tapA0 192.168.12.35; ping4  -c 1 -I tapB0 192.168.12.34
 
+> Notes
+Routing (fd -> tun/tap -> eth -> internet -> eth -> tun/tap -> fd):
+	tap works (mac_src=anything, mac_dst=tap, ip_src/dst: like tun)
+	tun works (ip_src=tun, ip_dst=server)
+		Advantage over tap: no icmp-messages on returning packets.
+
 > Useful commands
 ip tuntap add dev tun0 mode tun user mike group users
 ip addr add 192.168.3.1/24 dev tun0
@@ -47,7 +53,7 @@ from pypacker import utils
 logger = logging.getLogger("pypacker")
 
 # Some constants used to ioctl the device file
-TUNSETIFF	= 0x400454ca
+TUNSETIFF	= 0x400454CA
 TUNSETOWNER	= TUNSETIFF + 2
 SG_SET_TIMEOUT	= 0x2201
 IFF_TUN		= 0x0001
@@ -55,11 +61,11 @@ IFF_TAP		= 0x0002
 #  The kernel adds a 4-byte preamble to the frame, avoid this
 # TODO: set lowest layer based on meta info
 """
-  3.2 Frame format:
-  If flag IFF_NO_PI is not set each frame format is:
-     Flags [2 bytes]
-     Proto [2 bytes]
-     Raw protocol(IP, IPv6, etc) frame.
+3.2 Frame format:
+If flag IFF_NO_PI is not set each frame format is:
+	Flags [2 bytes]
+	Proto [2 bytes]
+	Raw protocol(IP, IPv6, etc) frame.
 """
 IFF_NO_PI	= 0x1000
 
@@ -71,7 +77,7 @@ TYPE_STR_DCT = {TYPE_TUN: "tun", TYPE_TAP: "tap"}
 
 def exec_syscmd(cmd):
 	output = subprocess.getoutput(cmd)
-	logger.debug(output)
+	logger.info(output)
 
 
 class TuntapInterface(object):
@@ -113,11 +119,7 @@ class TuntapInterface(object):
 		# ioctl(self._iface_fd, TUNSETOWNER, 1000)
 
 		if ip_src is not None and ip_dst is not None:
-			TuntapInterface.configure_interface(
-				iface_name,
-				ip_src, ip_dst,
-				is_local_tunnel=is_local_tunnel
-			)
+			TuntapInterface.configure_interface(iface_name, ip_src, ip_dst, is_local_tunnel=is_local_tunnel)
 		utils.set_interface_state(iface_name, state_active=True)
 
 	is_newly_created = property(lambda self: self._is_newly_created)
@@ -129,10 +131,10 @@ class TuntapInterface(object):
 		devnode -- Name of the devnode which will be created: "/dev/net/devnode"
 		"""
 		if pathlib.Path(devnode).exists():
-			logger.debug("devnode %s already exists" % devnode)
+			#logger.debug("devnode %s already exists" % devnode)
 			return
 
-		logger.debug("Creating devnode: %s" % devnode)
+		#logger.debug("Creating devnode: %s" % devnode)
 		exec_syscmd("mkdir /dev/net")
 		exec_syscmd("mknod %s c 10 200" % devnode)
 
@@ -143,12 +145,11 @@ class TuntapInterface(object):
 			where tun0 and tun1 are both local interfaces)
 		"""
 		# Wait for interface to be created
-		time.sleep(1)
+		#time.sleep(1)
 		#output = exec_syscmd("ifconfig %s %s/24" % (iface_name, ip_src))
 		#output = exec_syscmd("ifconfig %s %s/24 pointopoint %s" % (iface_name, ip_src, ip_dst))
 		#output = exec_syscmd("ifconfig %s %s pointopoint %s" % (iface_name, ip_src, ip_dst))
-		output = exec_syscmd("ifconfig %s %s/24" % (iface_name, ip_src))
-		logger.debug(output)
+		exec_syscmd("ifconfig %s %s/24" % (iface_name, ip_src))
 
 		if is_local_tunnel:
 			# Packet with target ip_dst goes through "lo" if ip_dst is on the same host.
@@ -190,13 +191,11 @@ class TuntapInterface(object):
 		self._closed = True
 
 		try:
-			logger.debug("Closing %s", self._iface_name)
 			#self._iface_fd.close()
 			# TODO: read is blocking although socket is closed -> removing interface is not possible
 			os.close(self._fileno_iface_fd)
 			self._fileno_iface_fd = None
 		except Exception as ex:
-			logger.warning("Could not close %s", self._iface_name)
 			print(ex)
 
 		if self._is_local_tunnel:
@@ -211,7 +210,6 @@ class LocalTunnel(object):
 		self._ifacetype = TYPE_TAP
 		islocaltunnel = True
 		ifacetype_str = TYPE_STR_DCT[self._ifacetype]
-		logger.debug("Base interface name: %s" % ifacetype_str)
 		self._state_active = False
 
 		iface_name_A = ifacetype_str + "A0"
@@ -230,7 +228,7 @@ class LocalTunnel(object):
 			ip_src=ip_iface_B,
 			is_local_tunnel=islocaltunnel
 		)
-		logger.debug("Configuring ARP cache")
+
 		utils.flush_arp_cache()
 		#mac_A = utils.get_mac_for_iface(iface_name_A)
 		#mac_B = utils.get_mac_for_iface(iface_name_B)
@@ -250,32 +248,28 @@ class LocalTunnel(object):
 
 	@staticmethod
 	def read_write_cycler(obj, iface_in, iface_out, name):
-		logger.debug("starting cycler %s" % name)
-
 		while obj._state_active:
 			try:
 				bts = iface_in.read()
 				try:
-					pkt = ip.IP(bts) if obj._ifacetype == TYPE_TUN else ethernet.Ethernet(bts)
-					logger.debug("Sending in cycler %s (%s -> %s):\n%s\n%s" %
-						(name, iface_in._iface_name, iface_out._iface_name, bts, pkt))
+					ip.IP(bts) if obj._ifacetype == TYPE_TUN else ethernet.Ethernet(bts)
+					#logger.debug("Sending in cycler %s (%s -> %s):\n%s\n%s" %
+					#	(name, iface_in._iface_name, iface_out._iface_name, bts, pkt))
 					iface_out.write(bts)
 				except:
 					pass
 			except ValueError as ex:
-				logger.warning(ex)
+				logger.exception(ex)
 				break
 			except OSError as ex:
-				logger.warning(ex)
+				logger.exception(ex)
 				break
 			except Exception as ex:
-				logger.debug(ex)
+				logger.exception(ex)
 				break
-		logger.debug("Cycler finished")
 
 	def set_state(self, state_active):
 		if self._state_active is None:
-			logger.warning("Tunnel was already closed!")
 			return
 
 		if state_active == self._state_active:
@@ -286,11 +280,9 @@ class LocalTunnel(object):
 		if state_active:
 			self._start_cycler_threads()
 		else:
-			logger.debug("Closing interfaces!")
 			self._dev_A.close()
 			self._dev_B.close()
 
-			logger.debug("Waiting for cycler threads to finish")
 			for th in [self._rs_thread_A, self._rs_thread_B]:
 				try:
 					th.join()

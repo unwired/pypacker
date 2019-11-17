@@ -206,10 +206,10 @@ class IP6RoutingHeader(pypacker.Packet):
 	)
 
 	def __get_sl_bits(self):
-		return self.rsvd_sl_bits & 0xffffff
+		return self.rsvd_sl_bits & 0xFFFFFF
 
 	def __set_sl_bits(self, v):
-		self.rsvd_sl_bits = (self.rsvd_sl_bits & ~0xfffff) | (v & 0xfffff)
+		self.rsvd_sl_bits = (self.rsvd_sl_bits & ~0xFFFFF) | (v & 0xFFFFF)
 	sl_bits = property(__get_sl_bits, __set_sl_bits)
 
 	def _dissect(self, buf):
@@ -242,14 +242,14 @@ class IP6FragmentHeader(pypacker.Packet):
 		return self.frag_off_resv_m >> 3
 
 	def __set_frag_off(self, v):
-		self.frag_off_resv_m = (self.frag_off_resv_m & ~0xfff8) | (v << 3)
+		self.frag_off_resv_m = (self.frag_off_resv_m & ~0xFFF8) | (v << 3)
 	frag_off = property(__get_frag_off, __set_frag_off)
 
 	def __get_m_flag(self):
 		return self.frag_off_resv_m & 1
 
 	def __set_m_flag(self, v):
-		self.frag_off_resv_m = (self.frag_off_resv_m & ~0xfffe) | v
+		self.frag_off_resv_m = (self.frag_off_resv_m & ~0xFFFE) | v
 	m_flag = property(__get_m_flag, __set_m_flag)
 
 

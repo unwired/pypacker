@@ -393,7 +393,7 @@ class DNS(pypacker.Packet):
 
 		for answer in self.answers:
 			# Assume answer for first query
-			if answer.name == b"\xC0\x0C" and answer.type in [DNS_A, DNS_AAAA]:
+			if answer.name == b"\xc0\x0c" and answer.type in [DNS_A, DNS_AAAA]:
 				ret[answer.address_s] = question_dns[:-1]
 
 		return ret

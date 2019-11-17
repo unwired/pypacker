@@ -112,9 +112,9 @@ def cb_get_flag_description(value, value_name):
 
 class TCP(pypacker.Packet):
 	__hdr__ = (
-		("sport", "H", 0xdead),
+		("sport", "H", 0xDEAD),
 		("dport", "H", 0, FIELD_FLAG_IS_TYPEFIELD),
-		("seq", "I", 0xdeadbeef),
+		("seq", "I", 0xDEADBEEF),
 		("ack", "I", 0),
 		("off_x2", "B", ((5 << 4) | 0), FIELD_FLAG_AUTOUPDATE),  # 10*4 Byte
 		("flags", "B", TH_SYN),  # acces via (obj.flags & TH_XYZ)
@@ -131,7 +131,7 @@ class TCP(pypacker.Packet):
 		return self.off_x2 >> 4
 
 	def __set_off(self, value):
-		self.off_x2 = (value << 4) | (self.off_x2 & 0xf)
+		self.off_x2 = (value << 4) | (self.off_x2 & 0xF)
 	off = property(__get_off, __set_off)
 
 	# return real header length based on header info

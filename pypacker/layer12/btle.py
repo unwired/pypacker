@@ -72,7 +72,7 @@ def reverse_bts_to_str(bts):
 	return str_upper(bytes_decode(hexlify(bts_rev)))
 
 
-# set properties to access flags
+# Set properties to access flags
 for name, mask_off in FLAGS_NAME_MASK.items():
 	subheader = [
 		name,
@@ -109,7 +109,7 @@ def parse_advdata(bts):
 
 class AdvInd(pypacker.Packet):
 	__hdr__ = (
-		("adv_addr", "6s", b"\xFF" * 6),
+		("adv_addr", "6s", b"\xff" * 6),
 		("adv_data", None, triggerlist.TriggerList),
 	)
 
@@ -123,7 +123,7 @@ class AdvInd(pypacker.Packet):
 
 class AdvNonconnInd(pypacker.Packet):
 	__hdr__ = (
-		("adv_addr", "6s", b"\xFF" * 6),
+		("adv_addr", "6s", b"\xff" * 6),
 		("adv_data", None, triggerlist.TriggerList)
 	)
 
@@ -137,8 +137,8 @@ class AdvNonconnInd(pypacker.Packet):
 
 class ScanRequest(pypacker.Packet):
 	__hdr__ = (
-		("scan_addr", "6s", b"\xFF" * 6),
-		("adv_addr", "6s", b"\xFF" * 6),
+		("scan_addr", "6s", b"\xff" * 6),
+		("adv_addr", "6s", b"\xff" * 6),
 	)
 
 	scan_addr_s = property(lambda obj: reverse_bts_to_str(obj.scan_addr))
@@ -147,7 +147,7 @@ class ScanRequest(pypacker.Packet):
 
 class ScanResponse(pypacker.Packet):
 	__hdr__ = (
-		("adv_addr", "6s", b"\xFF" * 6),
+		("adv_addr", "6s", b"\xff" * 6),
 		("adv_data", None, triggerlist.TriggerList)
 	)
 
@@ -161,16 +161,16 @@ class ScanResponse(pypacker.Packet):
 
 class ConnRequest(pypacker.Packet):
 	__hdr__ = (
-		("init_addr", "6s", b"\xFF" * 6),
-		("adv_addr", "6s", b"\xFF" * 6),
-		("access_addr", "4s", b"\xFF" * 6),
-		("crcinit", "3s", b"\xFF" * 3),
+		("init_addr", "6s", b"\xff" * 6),
+		("adv_addr", "6s", b"\xff" * 6),
+		("access_addr", "4s", b"\xff" * 6),
+		("crcinit", "3s", b"\xff" * 3),
 		("winsize", "B", 0),
 		("winoff", "H", 0),
 		("interval", "H", 0),
 		("latency", "H", 0),
 		("timeout", "H", 0),
-		("chanmap", "5s", b"\xFF" * 5),
+		("chanmap", "5s", b"\xff" * 5),
 		("hop_sleep", "B", 0)
 	)
 
@@ -332,13 +332,13 @@ PDU_TYPE_DATA_LLID3			= 3
 
 
 def _get_property_subtype_get(obj):
-	if obj.access_addr == b"\xD6\xBE\x89\x8E":
+	if obj.access_addr == b"\xd6\xbe\x89\x8e":
 		return obj.info & 0x0F
 	return obj.info & 0x03
 
 
 def _get_property_subtype_set(obj, val):
-	if obj.access_addr == b"\xD6\xBE\x89\x8E":
+	if obj.access_addr == b"\xd6\xbe\x89\x8e":
 		obj.info = (obj.info & ~0x0F) | val
 	else:
 		obj.info = (obj.info & ~0x03) | val
@@ -357,7 +357,7 @@ _subheader_btle_properties = [
 	lambda _obj: _obj.info & 0x03,
 	lambda _obj, _val: (_obj.info & ~0x03) | _val],
 	["is_adv",
-	lambda _obj: _obj.access_addr == b"\xD6\xBE\x89\x8E"]
+	lambda _obj: _obj.access_addr == b"\xd6\xbe\x89\x8e"]
 ]
 
 
@@ -387,7 +387,7 @@ class BTLE(pypacker.Packet):
 		hlen = 6
 		#logger.debug("buf: %r" % buf)
 
-		if buf[: 4] == b"\xD6\xBE\x89\x8E":
+		if buf[: 4] == b"\xd6\xbe\x89\x8e":
 			#logger.debug("got ADV... packet")
 			btle_type = buf[4] & 0x0F
 		else:
@@ -433,7 +433,7 @@ class BTLEHdr(pypacker.Packet):
 		("signal", "B", 0),
 		("noise", "B", 0),
 		("aaoffense", "B", 0),
-		("refaddr", "4s", b"\xFF" * 4),
+		("refaddr", "4s", b"\xff" * 4),
 		("flags", "H", 0),
 	)
 

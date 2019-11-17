@@ -127,7 +127,7 @@ try:
 			print("bssid: %s, ssid: %s (Signal: -%d dB, Quality: %d)"
 				% (mac_ap,
 				ie_ssid,
-				0xffffffff ^ drvinfo.dids[3].value,
+				0xFFFFFFFF ^ drvinfo.dids[3].value,
 				drvinfo.dids[4].value)
 			)
 			bc_cnt += 1

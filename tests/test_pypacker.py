@@ -120,18 +120,18 @@ class GeneralTestCase(unittest.TestCase):
 		eth = ethernet.Ethernet()
 		# print(str(eth))
 		self.assertEqual(eth.bin(), b"\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\x08\x00")
-		eth = ethernet.Ethernet(dst=b"\x00\x01\x02\x03\x04\x05", src=b"\x06\x07\x08\x09\x0A\x0B", type=2048)
+		eth = ethernet.Ethernet(dst=b"\x00\x01\x02\x03\x04\x05", src=b"\x06\x07\x08\x09\x0a\x0b", type=2048)
 		print(str(eth))
 		print(eth.bin())
-		self.assertEqual(eth.bin(), b"\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0A\x0B\x08\x00")
+		self.assertEqual(eth.bin(), b"\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x08\x00")
 
 		# test packet creation (default, keyword, bytes + keyword)
 		bts = get_pcap("tests/packets_ether.pcap")[0]
 		eth = ethernet.Ethernet()
 		self.assertEqual(eth.src_s, "FF:FF:FF:FF:FF:FF")
-		eth = ethernet.Ethernet(src=b"\xAA\xAA\xAA\xAA\xAA\xAA")
+		eth = ethernet.Ethernet(src=b"\xaa" * 6)
 		self.assertEqual(eth.src_s, "AA:AA:AA:AA:AA:AA")
-		eth = ethernet.Ethernet(dst=b"\xAA\xAA\xAA\xAA\xAA\xAA")
+		eth = ethernet.Ethernet(dst=b"\xaa" * 6)
 		self.assertEqual(eth.dst_s, "AA:AA:AA:AA:AA:AA")
 
 	def test_reverse(self):
@@ -632,7 +632,7 @@ class EthTestCase(unittest.TestCase):
 		# Ethernet + QinQ(double tags, type 0x8100 ) + IP
 		# Outer tag: type=0x81A8, prio=1, cfi=1, vid=5
 		# Inner tag: type=0x8100, prio=2, cfi=0, vid=99
-		s = b"\x00\x00\x00\x00\x00\xaa\x00\x00\x00\x00\x00\xbb\x88\xA80\x05\x81\x00@c"\
+		s = b"\x00\x00\x00\x00\x00\xaa\x00\x00\x00\x00\x00\xbb\x88\xa80\x05\x81\x00@c"\
 		    b"\x08\x00E\x00\x00&\x00\x01\x00\x00@\x00|\xd5\x7f\x00\x00\x01\x7f\x00\x00"\
 		    b"\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
 		eth1 = ethernet.Ethernet(s)
@@ -679,7 +679,7 @@ class EthTestCase(unittest.TestCase):
 class AOETestCase(unittest.TestCase):
 	def test_aoe(self):
 		s = b"\x01\x02\x03\x04\x05\x06\x11\x12\x13\x14\x15\x16\x88\xa2\x10\x00\x00\x01\x02\x01\x80\x00\x00"\
-		    b"\x00\x12\x34\x00\x00\x00\x00\x04\x00" + b"\0xed" * 1024
+		    b"\x00\x12\x34\x00\x00\x00\x00\x04\x00" + b"\0xED" * 1024
 		aoecfg = aoe.AOECFG(s[14 + 10:])
 		self.assertEqual(aoecfg.bufcnt, 0x1234)
 
@@ -753,13 +753,13 @@ class CANTestCase(unittest.TestCase):
 		can_pkts[0].bin()
 		self.assertEqual(can_pkts[0].extended, 1)
 
-		can1 = can.CAN(id=0x7ff)
+		can1 = can.CAN(id=0x7FF)
 		self.assertEqual(can1.extended, 0)
 		# set extended althouth it isn't
 		can1.extended = 1
 		can1.bin(update_auto_fields=False)
 		self.assertEqual(can1.extended, 1)
-		can1.id = 0x7ff
+		can1.id = 0x7FF
 		can1.bin()
 		self.assertEqual(can1.extended, 0)
 		can1.id = 0x800
@@ -802,7 +802,7 @@ class IPTestCase(unittest.TestCase):
 		print("IP sum 1 (original): %s" % ip2.sum)
 		print("IP len 1 (original): %d" % ip2.len)
 		print("IP hl 1 (original): %d" % ip2.hl)
-		self.assertEqual(ip2.sum, 0x8e60)
+		self.assertEqual(ip2.sum, 0x8E60)
 		print("setting protocol")
 		ip2.p = 6
 		ip2.bin()
@@ -814,7 +814,7 @@ class IPTestCase(unittest.TestCase):
 		ip2.p = 17
 		ip2.bin()
 		print("IP sum 3: %s" % ip2.sum)
-		self.assertEqual(ip2.sum, 0x8e60)
+		self.assertEqual(ip2.sum, 0x8E60)
 
 		print("IP options..")
 		# IP + options: Skip Ethernet/up to before UDP
@@ -921,7 +921,7 @@ class TCPTestCase(unittest.TestCase):
 		self.assertTrue(tcp1.is_direction(tcp2, pypacker.Packet.DIR_REV))
 		# checksum (no IP-layer means no checksum change)
 		tcp1.win = 1234
-		self.assertEqual(tcp1.sum, 0x9c2d)
+		self.assertEqual(tcp1.sum, 0x9C2d)
 		# checksum (IP + TCP)
 		ip_tcp_bytes = packet_bytes[0][14:]
 		ip1 = ip.IP(ip_tcp_bytes)
@@ -931,24 +931,24 @@ class TCPTestCase(unittest.TestCase):
 		self.assertEqual(ip1.bin(), ip_tcp_bytes)
 
 		print("sum 1: %X" % tcp2.sum)
-		self.assertEqual(tcp2.sum, 0x9c2d)
+		self.assertEqual(tcp2.sum, 0x9C2d)
 		print("tcp: %r" % tcp2)
 		print("tcp off: %r" % tcp2.off)
 		win_original = tcp2.win
 		tcp2.win = win_original
 		tcp2.bin()
-		self.assertEqual(tcp2.sum, 0xea57)
+		self.assertEqual(tcp2.sum, 0xEA57)
 
 		tcp2.win = 0x0073
 		tcp2.bin()
 
 		print("sum 2: %X" % tcp2.sum)
-		self.assertEqual(tcp2.sum, 0xea57)
+		self.assertEqual(tcp2.sum, 0xEA57)
 
 		tcp2.win = win_original
 		tcp2.bin()
 		print("sum 3: %X" % tcp2.sum)
-		self.assertEqual(tcp2.sum, 0xea57)
+		self.assertEqual(tcp2.sum, 0xEA57)
 
 		# options
 		print("tcp options: %d" % len(tcp2.opts))
@@ -998,7 +998,7 @@ class UDPTestCase(unittest.TestCase):
 		print("direction: %d" % udp1.direction(udp2))
 		self.assertTrue(udp1.is_direction(udp2, pypacker.Packet.DIR_SAME))
 		# checksum
-		self.assertEqual(udp1.sum, 0xf6eb)
+		self.assertEqual(udp1.sum, 0xF6eb)
 
 		udp_bin = udp1.bin()
 		print(udp1.ulen)
@@ -1010,13 +1010,13 @@ class UDPTestCase(unittest.TestCase):
 		print(udp_bin)
 		print(udp1.sum)
 		print("sum 1: %X" % udp1.sum)
-		self.assertEqual(udp1.sum, 0xf6eb)
+		self.assertEqual(udp1.sum, 0xF6eb)
 
 		# print("setting new port")
 		udp1.dport = 1234
 		udp1.bin()
 		print("sum 2: %X" % udp1.sum)
-		self.assertEqual(udp1.sum, 0xf24e)
+		self.assertEqual(udp1.sum, 0xF24E)
 
 		udp2 = ethernet.Ethernet() + ip.IP() + udp.UDP()
 		udp2[udp.UDP].body_bytes = b"A" * 10
@@ -1068,12 +1068,12 @@ class ChecksumTestCase(unittest.TestCase):
 		pseudoheader = b"\xc0\xa8\xb2\x01\xc0\xa8\xb2\x16\x00\x11" + struct.pack(">H", len(udp))
 		print(len(udp))
 		csum = checksum.in_cksum(pseudoheader + udp)
-		self.assertEqual(csum, 0x32bf)
+		self.assertEqual(csum, 0x32BF)
 
 	def test_fletcher_checksum(self):
 		print_header("fletcher checksum")
 
-		bts = b"\xff\xff\xff\xff"
+		bts = b"\xff" * 5
 		csum = checksum.fletcher32(bts, 2)
 		self.assertEqual(csum, 4294967295)
 
@@ -1086,7 +1086,7 @@ class ChecksumTestCase(unittest.TestCase):
 		csum = checksum.fletcher32(bts, 2)
 		self.assertEqual(csum, 65537)
 
-		# C: 0x00ff0000 (uint32_t)
+		# C: 0x00FF0000 (uint32_t)
 		bts = b"\x00\x00\x00\xff"
 		csum = checksum.fletcher32(bts, 2)
 		self.assertEqual(csum, 16711935)
@@ -1352,18 +1352,18 @@ class ICMPTestCase(unittest.TestCase):
 		self.assertEqual(icmp1.type, 8)
 		# checksum handling
 		print("sum 1: %d" % icmp1.sum)  # 0xEC66 = 22213
-		self.assertEqual(icmp1.sum, 0x425c)
+		self.assertEqual(icmp1.sum, 0x425C)
 		self.assertEqual(icmp1.higher_layer.seq, 2304)
 		print("code 1: %d" % icmp1.code)
 		icmp1.code = 123
 		print("code 2: %d" % icmp1.code)
 		eth.bin()
 		print("code 3: %d" % icmp1.code)
-		self.assertNotEqual(icmp1.sum, 0x425c)
+		self.assertNotEqual(icmp1.sum, 0x425C)
 		icmp1.code = 0
 		icmp1 = eth[icmp.ICMP]
 		eth.bin()
-		self.assertEqual(icmp1.sum, 0x425c)
+		self.assertEqual(icmp1.sum, 0x425C)
 
 
 class ICMP6TestCase(unittest.TestCase):
@@ -1472,7 +1472,7 @@ class DHCPTestCase(unittest.TestCase):
 		print("%r" % dhcp2)
 		self.assertEqual(len(dhcp2.opts), 6)
 		self.assertEqual(dhcp2.opts[0].type, 0x35)
-		self.assertEqual(dhcp2.opts[1].type, 0x3d)
+		self.assertEqual(dhcp2.opts[1].type, 0x3D)
 
 		eth = ethernet.Ethernet(s)
 		dhcp2 = eth[dhcp.DHCP]
@@ -1515,7 +1515,7 @@ class SomeIPTestCase(unittest.TestCase):
 		someip1_bts = ethernet.Ethernet(packet_bytes[0]).highest_layer.body_bytes
 		someip1 = someip.SomeIP(someip1_bts)
 		self.assertEqual(someip1.length, 8 + len(someip1.body_bytes))
-		someip1.body_bytes += b"\xFF"
+		someip1.body_bytes += b"\xff"
 		someip1.bin()
 		self.assertEqual(someip1.length, 8 + len(someip1.body_bytes))
 
@@ -1616,7 +1616,7 @@ class NTPTestCase(unittest.TestCase):
 		# NTP, port=123 (0x7B)
 		# sport=38259, dport=53
 		BYTES_UDP = b"\x95\x73\x00\x35\x00\x23\x81\x49"
-		BYTES_NTP = BYTES_UDP[:3] + b"\x7B" + BYTES_UDP[4:] +\
+		BYTES_NTP = BYTES_UDP[:3] + b"\x7b" + BYTES_UDP[4:] +\
 			b"\x24\x02\x04\xef\x00\x00\x00\x84\x00\x00\x33\x27" +\
 			b"\xc1\x02\x04\x02\xc8\x90\xec\x11\x22\xae\x07\xe5\xc8\x90\xf9\xd9\xc0\x7e\x8c\xcd\xc8" +\
 			b"\x90" +\
@@ -1680,13 +1680,13 @@ class SCTPTestCase(unittest.TestCase):
 		self.assertEqual(eth_ip_sct.bin(), sct1_bytes)
 		# checksum (CRC32)
 		# print("sctp sum1: %X" % sct.sum)
-		# self.assertTrue(sct.sum == 0x6db01882)
+		# self.assertTrue(sct.sum == 0x6DB01882)
 
 		# print(sct)
 		# sct.vtag = sct.vtag
 		# print("sctp sum3: %X" % sct.sum)
 		# print(sct)
-		# self.assertTrue(sct.sum == 0x6db01882)
+		# self.assertTrue(sct.sum == 0x6DB01882)
 
 		self.assertEqual(sct.sport, 16384)
 		self.assertEqual(sct.dport, 2944)
@@ -1696,13 +1696,13 @@ class SCTPTestCase(unittest.TestCase):
 		self.assertEqual(chunk.type, sctp.DATA)
 		self.assertEqual(chunk.len, 91)
 		# dynamic fields
-		# sct.chunks.append((sctp.DATA, 0xff, b"\x00\x01\x02"))
-		sct.chunks.append(sctp.Chunk(type=sctp.DATA, flags=0xff, len=8, body_bytes=b"\x00\x01\x02\x03"))
+		# sct.chunks.append((sctp.DATA, 0xFF, b"\x00\x01\x02"))
+		sct.chunks.append(sctp.Chunk(type=sctp.DATA, flags=0xFF, len=8, body_bytes=b"\x00\x01\x02\x03"))
 		self.assertEqual(len(sct.chunks), 2)
 		self.assertEqual(sct.chunks[1].body_bytes, b"\x00\x01\x02\x03")
 		# lazy init of chunks
 		sct2 = sctp.SCTP()
-		sct2.chunks.append((sctp.DATA, 0xff, b"\x00\x01\x02\x03"))
+		sct2.chunks.append((sctp.DATA, 0xFF, b"\x00\x01\x02\x03"))
 		self.assertEqual(len(sct2.chunks), 1)
 
 
@@ -1718,7 +1718,7 @@ class ReaderTestCase(unittest.TestCase):
 		for ts, buf in reader:
 			if cnt == 0:
 				# check timestamp (big endian)
-				self.assertEqual(ts, (0x5118d5d0 * 10 ** 9) + 335929000)
+				self.assertEqual(ts, (0x5118D5D0 * 10 ** 9) + 335929000)
 
 			cnt += 1
 			# print("%02d TS: %.40f LEN: %d" % (cnt, ts, len(buf)))
@@ -1900,7 +1900,7 @@ class RadiotapTestCase(unittest.TestCase):
 		self.assertEqual(rad.version, 0)
 		print("len: %d" % rad.len)
 		self.assertEqual(rad.len, 4608)  # 0x1200 = 18
-		self.assertEqual(rad.present_flags, 0x2e480000)
+		self.assertEqual(rad.present_flags, 0x2E480000)
 		# channel_bytes = rad.flags[bytes([radiotap.CHANNEL_MASK])][0][1]
 		channel_bytes = rad.flags.find_value(lambda v: v[0] == radiotap.CHANNEL_MASK)[1]
 		channel = radiotap.get_channelinfo(channel_bytes)
@@ -1929,7 +1929,7 @@ class BTLETestcase(unittest.TestCase):
 		self.assertEqual(crc_reordered, 0xAAAAAA)
 
 		# ADV data
-		data = b"\xAA\xd6\xbe\x89\x8e\x04\x16\x3e\xab\xcf\xbc\xbd\x78\x0f\x08\x5b\x54\x56\x5d\x20" +\
+		data = b"\xaa\xd6\xbe\x89\x8e\x04\x16\x3e\xab\xcf\xbc\xbd\x78\x0f\x08\x5b\x54\x56\x5d\x20" +\
 		       b"\x55\x45\x34\x38\x4a\x36\x32\x35\x30\xd0\x3e\xbf"
 		crc_correct = checksum.crc_btle_check(data[1:], 0xAAAAAA)
 		self.assertTrue(crc_correct)
@@ -2242,7 +2242,7 @@ class IEEE80211TestCase(unittest.TestCase):
 		self.assertEqual(ieee.higher_layer.dst, b"\x01\x00\x5e\x7f\xff\xfa")
 		self.assertEqual(ieee.higher_layer.src, b"\x00\x1e\xe5\xe0\x8c\x06")
 		self.assertEqual(ieee.higher_layer.bssid, b"\x00\x22\x3f\x89\x0d\xd4")
-		self.assertEqual(ieee.higher_layer.seq_frag, 0x501e)
+		self.assertEqual(ieee.higher_layer.seq_frag, 0x501E)
 		print(ieee.higher_layer.body_bytes)
 		self.assertEqual(ieee.higher_layer.body_bytes,
 			b"\x62\x22\x39\x61\x98\xd1\xff\x34" +
@@ -2277,7 +2277,7 @@ class IEEE80211TestCase(unittest.TestCase):
 		self.assertEqual(ieee.higher_layer.bssid, b"\x24\x65\x11\x85\xe9\xae")
 		self.assertEqual(ieee.higher_layer.src, b"\x00\xa0\x0b\x21\x37\x84")
 		self.assertEqual(ieee.higher_layer.dst, b"\x24\x65\x11\x85\xe9\xac")
-		self.assertEqual(ieee.higher_layer.seq_frag, 0xd008)
+		self.assertEqual(ieee.higher_layer.seq_frag, 0xD008)
 		print(ieee.higher_layer.body_bytes)
 		self.assertEqual(ieee.higher_layer.body_bytes,
 			b"\xaa\xaa\x03\x00\x00\x00\x08\x06\x00\x01" +
@@ -2293,7 +2293,7 @@ class IEEE80211TestCase(unittest.TestCase):
 		self.assertEqual(rtap_ieee.version, 0)
 		print("len: %d" % rtap_ieee.len)
 		self.assertEqual(rtap_ieee.len, 0x1200)  # 0x1200 = 18
-		self.assertEqual(rtap_ieee.present_flags, 0x2e480000)
+		self.assertEqual(rtap_ieee.present_flags, 0x2E480000)
 
 	def test_assoc_ieee(self):
 		print_header("Assoc/Reassoc")

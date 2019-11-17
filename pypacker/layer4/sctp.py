@@ -114,7 +114,7 @@ class SCTP(pypacker.Packet):
 	def _calc_sum(self):
 		# mark as changed
 		self.sum = 0
-		s = checksum.crc32_add(0xffffffff, self._pack_header())
+		s = checksum.crc32_add(0xFFFFFFFF, self._pack_header())
 		padlen = len(self.padding)
 
 		if padlen == 0:

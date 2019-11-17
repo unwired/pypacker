@@ -84,7 +84,6 @@ def sm_state(state_type=STATE_TYPE_INTERM, timeout=None, timeout_cb=None):
 			return ret
 
 		if state_type == STATE_TYPE_BEGIN:
-			#logger.debug("setting inital state cb: %r", old_f)
 			new_f._state_method_begin = True
 		return new_f
 	return gen
@@ -97,7 +96,6 @@ class AutomateMeta(type):
 			state_method = getattr(val, "_state_method_begin", None)
 
 			if state_method is not None:
-				#logger.debug("initial method found: %r %r" % (key, val))
 				t._state = key
 				break
 		return t
@@ -120,8 +118,6 @@ class StateMachine(object, metaclass=AutomateMeta):
 
 		if self._state is None:
 			logger.exception("no initial state defined!")
-		else:
-			logger.debug("initial state: %r", self._state)
 
 		self._receive_thread = threading.Thread(
 			target=StateMachine.receive_cycler,
