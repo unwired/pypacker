@@ -119,7 +119,6 @@ class ICMP6(pypacker.Packet):
 
 	@staticmethod
 	def _parse_icmp6opt(buf):
-		# TODO: create generic TLV-parser
 		opts = []
 		off = 0
 

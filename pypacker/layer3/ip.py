@@ -75,8 +75,7 @@ class IP(pypacker.Packet):
 		("tos", "B", 0),
 		("len", "H", 20, FIELD_FLAG_AUTOUPDATE),
 		("id", "H", 0),
-		# TODO: rename to frag_off
-		("off", "H", 0),
+		("frag_off", "H", 0),
 		("ttl", "B", 64),
 		("p", "B", IP_PROTO_TCP, FIELD_FLAG_IS_TYPEFIELD),
 		("sum", "H", 0, FIELD_FLAG_AUTOUPDATE),
@@ -117,17 +116,17 @@ class IP(pypacker.Packet):
 	hl = property(__get_hl, __set_hl)
 
 	def __get_flags(self):
-		return (self.off & 0xE000) >> 13
+		return (self.frag_off & 0xE000) >> 13
 
 	def __set_flags(self, value):
-		self.off = (self.off & ~0xE000) | (value << 13)
+		self.frag_off = (self.frag_off & ~0xE000) | (value << 13)
 	flags = property(__get_flags, __set_flags)
 
 	def __get_offset(self):
-		return self.off & ~0xE000
+		return self.frag_off & ~0xE000
 
 	def __set_offset(self, value):
-		self.off = (self.off & 0xE000) | value
+		self.frag_off = (self.frag_off & 0xE000) | value
 	offset = property(__get_offset, __set_offset)
 
 	def create_fragments(self, fragment_len=1480):

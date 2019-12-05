@@ -259,7 +259,7 @@ class Interceptor(object):
 					continue
 				except OSError as e:
 					# Ignore ENOBUFS errors, we can't handle this anyway
-					# TODO: alternative is to set NETLINK_NO_ENOBUFS socket option
+					# Alternative is to set NETLINK_NO_ENOBUFS socket option
 					if e.errno == errno.ENOBUFS:
 						#logger.debug("Droppin' a packet, consider increasing receive buffer")
 						continue
@@ -306,7 +306,7 @@ class Interceptor(object):
 
 		nfq_handle = ll_open_queue()  # 2
 
-		# TODO: This call is obsolete, Linux kernels from 3.8 onwards ignore it.
+		# This call is obsolete, Linux kernels from 3.8 onwards ignore it.
 		#unbind_pf(nfq_handle, socket.AF_INET)
 		#bind_pf(nfq_handle, socket.AF_INET)
 
@@ -327,7 +327,7 @@ class Interceptor(object):
 
 		if self._rcvbufsiz is not None:
 			ret = nfnl_rcvbufsiz(nf, self._rcvbufsiz)
-			logger.debug("Update rcvbufsiz: %d", ret)
+			#logger.debug("Update rcvbufsiz: %d", ret)
 
 		# TODO: better solution to check for running state? close socket and raise exception does not work in stop()
 		nfq_socket.settimeout(1)

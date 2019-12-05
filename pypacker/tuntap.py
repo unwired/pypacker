@@ -107,7 +107,6 @@ class TuntapInterface(object):
 		TuntapInterface.create_devnode(devnode)
 
 		# Open TUN or TAP device file
-		# TODO: use multiqueue?
 		self._iface_fd = open(devnode, "r+b", buffering=0)
 		tuntap_opt = IFF_TUN if ifacetype == TYPE_TUN else IFF_TAP
 		self._ifr = struct.pack("16sH", iface_name.encode("UTF-8"), tuntap_opt | IFF_NO_PI)
@@ -160,7 +159,6 @@ class TuntapInterface(object):
 			# does not recognize them as being addressed to the local host. (we removed the rule above)
 			# Solution: distinct routing decisions and configure routing in such a way that the local
 			# type routes are only "seen" by the input routing decision
-			# TODO: different tid needed?
 			tid = 13
 			exec_syscmd("ip route add local %s dev %s table %d" % (ip_src, iface_name, tid))
 			# make sure previous rules have been removed
@@ -192,7 +190,6 @@ class TuntapInterface(object):
 
 		try:
 			#self._iface_fd.close()
-			# TODO: read is blocking although socket is closed -> removing interface is not possible
 			os.close(self._fileno_iface_fd)
 			self._fileno_iface_fd = None
 		except Exception as ex:

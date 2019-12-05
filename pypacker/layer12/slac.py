@@ -18,7 +18,6 @@ MASK_MMTYPEMSB_LE = 0x0006
 
 module_this = sys.modules[__name__]
 
-# TODO: extend
 # who defined all that useless messages???
 TYPEINFO_DESCRIPTION = {
 	# Central <-> Station

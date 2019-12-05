@@ -1056,7 +1056,7 @@ class Packet(object, metaclass=MetaPacket):
 			self._changelistener.add(listener_cb)
 		except:
 			# change listener not yet initiated
-			self._changelistener = set([listener_cb])
+			self._changelistener = {listener_cb}
 
 	def _remove_change_listener(self):
 		"""
@@ -1342,12 +1342,10 @@ def get_property_translator(
 	return -- property allowing get-access to get an descriptive name
 	"""
 	# Get globals of calling module containing the variables in question
-	# TODO: avoid globals? Too high delay for collecting? (just one time start)
 	globals_caller = inspect.stack()[1][0].f_globals
 
 	def collect_cb():
 		varname_pattern = re.compile(varname_regex)
-		# TODO: avoid globals? Too high delay for collecting? (just one time start)
 		return {value: name for name, value in globals_caller.items() if
 			type(value) in VARFILTER_TYPES and varname_pattern.match(name)}
 

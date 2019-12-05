@@ -276,7 +276,6 @@ class BGP(pypacker.Packet):
 						("type", "B", 0),
 						("len", "B", 0)
 					)
-					# TODO: auto-set length
 
 			class NextHop(pypacker.Packet):
 				__hdr__ = (

@@ -172,7 +172,6 @@ class DNS(pypacker.Packet):
 			("ttl", "I", 0),
 			("dlen", "H", 0),		# length of the rest of header: server + x, x becmoes body content
 			("server", None, b"\x03www\x04test\x03com\x00")
-			# TODO: add fields for mailbox, serial, refresh etc.
 		)
 
 		server_s = pypacker.get_property_dnsname("server", cb_mc_bytes=get_bts_for_msg_compression)

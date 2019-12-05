@@ -384,7 +384,6 @@ def get_arp_cache_entry(ipaddr):
 
 	with open("/proc/net/arp", "r") as fd:
 		for line in fd:
-			# TODO: might need updating
 			if line.startswith(ipaddr + " "):
 				mac = pattern_mac.search(line).group(0)
 				break

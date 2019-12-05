@@ -166,7 +166,7 @@ def pcap_cb_btstopkt(self, meta, bts):
 # Generic/filetype invariant related
 
 FILETYPE_PCAP	= 0
-FILETYPE_PCAPNG	= 1  # TODO: to be merged with pcapng.py
+FILETYPE_PCAPNG	= 1
 
 # type_id : [
 #	cb_init_write(obj, **initdata),

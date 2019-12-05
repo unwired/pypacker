@@ -267,11 +267,6 @@ class GeneralTestCase(unittest.TestCase):
 		print_header("Find value")
 		bts_list = get_pcap("tests/packets_rtap_sel.pcap")
 
-		# TODO: remove
-		rtap = radiotap.Radiotap(bts_list[0])
-		# print("%r" % bts_list[0])
-		print("type: %d subtype: %d" % (rtap.higher_layer.type, rtap.higher_layer.subtype))
-
 		beacon = radiotap.Radiotap(bts_list[0])[ieee80211.IEEE80211.Beacon]
 		essid = beacon.params.find_value(lambda v: v.id == 0).body_bytes
 		print(essid)
@@ -1121,8 +1116,6 @@ class HTTPTestCase(unittest.TestCase):
 		http1.body_bytes = b""
 		print("http bin: %s" % http1.bin())
 		self.assertEqual(http1.bin(), s3)
-		# TODO: set ether + ip + tcp + http
-		# print("HTTP headers: %s" % http1.headers)
 
 		print("Parsing raw bytes: HTTP without header")
 		raw = b'\xf4\xec8\xa8\xa0\xf2\x1coeN7\r\x08\x00E\x00\x05\x8cQk@\x00\x80\x06\xd7&\xc0\xa8\x01d\n\x00'\
@@ -1247,7 +1240,7 @@ class AccessConcatTestCase(unittest.TestCase):
 		print(">>> Testing keyword construction")
 		# create layers using keyword-constructor
 		eth2 = ethernet.Ethernet(dst=eth1.dst, src=eth1.src, type=eth1.type)
-		ip2 = ip.IP(v_hl=ip1.v_hl, tos=ip1.tos, len=ip1.len, id=ip1.id, off=ip1.off, ttl=ip1.ttl, p=ip1.p,
+		ip2 = ip.IP(v_hl=ip1.v_hl, tos=ip1.tos, len=ip1.len, id=ip1.id, frag_off=ip1.frag_off, ttl=ip1.ttl, p=ip1.p,
 			sum=ip1.sum, src=ip1.src, dst=ip1.dst)
 		tcp2 = tcp.TCP(sport=tcp1.sport, dport=tcp1.dport, seq=tcp1.seq, ack=tcp1.ack, off_x2=tcp1.off_x2,
 			flags=tcp1.flags, win=tcp1.win, sum=tcp1.sum, urp=tcp1.urp)
@@ -1287,8 +1280,6 @@ class IterateTestCase(unittest.TestCase):
 
 		for bts in bts_list:
 			eth1 = ethernet.Ethernet(bts)
-			# TODO: tcp not parsed/shown using %r?
-			# print("%r" % eth1.ip.tcp)
 
 			for layer in eth1:
 				print("Iterated Layer: %r" % layer)
@@ -1476,9 +1467,6 @@ class DHCPTestCase(unittest.TestCase):
 
 		eth = ethernet.Ethernet(s)
 		dhcp2 = eth[dhcp.DHCP]
-		# TODO: use "append/extend"
-		# dhcp2.opts += [(dhcp.DHCP_OPT_TCPTTL, b"\x00\x01\x02")]
-		# dhcp2.opts.insert(4, (dhcp.DHCP_OPT_TCPTTL, b"\x00\x01\x02"))
 		dhcp2.opts.insert(4, dhcp.DHCPOpt(type=dhcp.DHCP_OPT_TCPTTL, len=5, body_bytes=b"\x00\x01\x02"))
 		print("new TLlen: %d" % len(dhcp2.opts))
 		self.assertEqual(len(dhcp2.opts), 7)

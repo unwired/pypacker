@@ -705,7 +705,6 @@ class IEEE80211(pypacker.Packet):
 
 			dlen = buf[off + 1]
 			#logger.debug("IE parser is: %d = %s = %s" % (ie_id, parser, buf[off: off+2+dlen]))
-			# TODO: make sure there are enough bytes for the IE class
 			try:
 				ie = parser(buf[off: off + 2 + dlen])
 				ies.append(ie)

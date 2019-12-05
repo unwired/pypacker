@@ -13,15 +13,17 @@ fi
 
 case "$1" in
 "stable")
+	pyfiles=$(find . -name "*.py")
 	msg "Any TODOs open?"
-	grep -r "TODO"
+	for f in $pyfiles; do
+		grep -H "TODO" $f
+	done
 
 	msg "changing debug level to WARNING"
 	sed -r -i "s/# (logger.setLevel\(logging.WARNING\))/\1/g;s/^(logger.setLevel\(logging.DEBUG\))/# \1/g" pypacker/pypacker.py
 
 	msg "replacing version numbers"
 	sed -r -i "s/version=\".+\"/version=\"$VERSION\"/g" setup.py
-	#sed -r -i "s/version = '.+'/version = '$VERSION'/g; s/release = '.+'/release = '$VERSION'/g" doc_sphinx_generated/conf.py
 
 	msg "searching for not disabled debug output"
 	grep -ir -R "^[^#]*logger.debug" *
@@ -35,8 +37,6 @@ case "$1" in
 
 	#msg "Pylint"
 	#pylint --rcfile=./.pylintrc $pydir/*.py
-
-	#prospector --profile .landscape.yaml
 
 	if [ "$2" = "rebuilddoc" ]; then
 		msg "regenerating doc"
@@ -67,11 +67,13 @@ case "$1" in
 	# show set usages of form {...}
 	#grep -ir -Po " {[^\:]+}" | grep ".py:" | uniq
 
-	msg "Lower case hex?"
-	# Hex numbers in uppercase
-	grep -r -P "0x[0-9]{0,1}[a-f]{1,2}"
-	# Hex bytes in lowercase
-	grep -r -P "\\\\x[0-9]{0,1}[A-F]{1,2}"
+	msg "Lower case hex numbers/upper case hex strings?"
+	for f in $pyfiles; do
+		# Hex numbers in uppercase
+		grep -H -P "0x[0-9]{0,1}[a-f]{1,2}" $f
+		# Hex bytes in lowercase
+		grep -H -P "\\\\x[0-9]{0,1}[A-F]{1,2}" $f
+	done
 
 	msg "Old style unpack like unpack('H', value)? (non precompiled structs)"
 	grep -ir -P "unpack\([\"\']" | grep  -P ".py:"
@@ -85,7 +87,7 @@ case "$1" in
 		git tag "v$VERSION"
 	fi
 
-	msg "if everything is OK call: git push -u origin master --tags; python setup.py sdist upload"
+	msg "If everything is OK call: git push -u origin master --tags; python setup.py sdist upload"
 ;;
 "dev")
 	msg "changing debug level to DEBUG"

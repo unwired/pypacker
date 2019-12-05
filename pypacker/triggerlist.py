@@ -128,8 +128,6 @@ class TriggerList(list):
 		super().clear()
 		self.__refresh_listener(items, connect_packet=False)
 
-	# TODO: pop(...) needed?
-
 	def __refresh_listener(self, val, connect_packet=True):
 		"""
 		Handle modifications of this TriggerList (adding, removing, ...).

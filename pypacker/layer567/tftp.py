@@ -54,6 +54,5 @@ class TFTP(Packet):
 			self.ttype = ttype + b"\x00"
 			hlen = 2 + len(self.file) + len(self.ttype)
 		elif opcode == OP_ERR:
-			# TODO: update
 			pass
 		return hlen
