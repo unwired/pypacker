@@ -116,7 +116,7 @@ class NewProtocol(pypacker.Packet):
 		self._init_triggerlist("options", tl_bts, NewProtocol._parse_options)
 
 		# self._init_handler(...) must be called to initiate the handler of the next
-		# upper layer and makes it accessible (eg "ip" in "ethernet" via "ethernet.ip" or ethernet[ip.IP]).
+		# upper layer and makes it accessible (eg via ethernet[ip.IP]).
 		# Which handler to be initialized generally depends on the type information (here higher_layer_type)
 		# found in the current layer (see layer12/ethernet.Ethernet -> type).
 		# Here higher_layer_type can become the value 0x66 (defined by __handler__ field) and

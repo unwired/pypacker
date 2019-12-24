@@ -266,7 +266,7 @@ class Interceptor(object):
 					raise e
 
 				handle_packet(nfq_handle, bts, len(bts))
-		except OSError as ex:
+		except OSError:
 			# eg "Bad file descriptor": started and nothing read yet
 			#logger.error(ex)
 			pass

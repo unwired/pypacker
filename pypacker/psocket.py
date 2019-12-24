@@ -4,6 +4,7 @@ For all other use cases standard python sockets
 should be used.
 """
 import socket
+import ssl
 import logging
 
 from pypacker import pypacker
@@ -187,7 +188,7 @@ class SocketHndl(object):
 			pass
 
 
-def get_sslsocket(hostname, port, timeout=5, **sslparams):
+def get_ssl_clientsocket(hostname, port, timeout=5, **sslparams):
 	"""
 	return -- SSL wrapped TCP socket, not complaining about any server certificates
 	"""
@@ -196,3 +197,70 @@ def get_sslsocket(hostname, port, timeout=5, **sslparams):
 	socket_ssl = context.wrap_socket(socket_simple, server_hostname=hostname, **sslparams)
 	socket_ssl.settimeout(timeout)
 	return socket_ssl
+
+
+def get_ssl_serversocket(file_certchain, file_privatekey, bindoptions, password_privkey=None):
+	"""
+	Create a SSL based server socket. Useage:
+	conn, addr = ssock.accept()
+	data = conn.recv()
+	conn.send(data)
+
+	Certificate/private key can be create via:
+	openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365
+
+	return -- SSL wrapped TCP server socket
+	"""
+	context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+	context.load_cert_chain(file_certchain, file_privatekey, password=password_privkey)
+
+	socket_simple = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
+	socket_simple.bind(bindoptions)
+	socket_simple.listen(5)
+
+	return context.wrap_socket(socket_simple, server_side=True)
+
+
+# TCP/UDP server and client example code
+# Server
+"""
+# ncat 127.0.0.1 80
+serversocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM) # IPv6: AF_INET6
+serversocket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+serversocket.bind(("127.0.0.1", 80))
+serversocket.listen(5)
+(ssock, address) = serversocket.accept()
+data = ssock.recv(1024)
+print(data)
+ssock.send(data)
+"""
+
+"""
+# ncat 127.0.0.1 80 -u
+serversocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # IPv6: AF_INET6
+serversocket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+serversocket.bind(("127.0.0.1", 80))
+data, address = serversocket.recvfrom(1024)
+print(data)
+serversocket.sendto(data, address)
+"""
+
+# Client
+"""
+# ncat -l 80
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM) # IPv6: AF_INET6
+s.connect(("127.0.0.1", 80))
+data = s.recv(1024)
+print(data)
+s.send(data)
+"""
+
+"""
+# ncat -l 80 -u
+s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # IPv6: AF_INET6
+s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+#s.bind(("127.0.0.1", 1234))
+s.sendto(b"testtest", ("127.0.0.1", 80))
+data, address = s.recvfrom(1024)
+print(data)
+"""

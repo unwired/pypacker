@@ -320,7 +320,7 @@ def get_ipv4_for_iface(iface_name, idx=0):
 	"""
 	try:
 		return netifaces.ifaddresses(iface_name)[netifaces.AF_INET][idx]["addr"]
-	except Exception as ex:
+	except:
 		return None
 
 
@@ -334,7 +334,7 @@ def get_ipv4_addressinfo(iface_name, idx=0):
 	try:
 		addressinfo = netifaces.ifaddresses(iface_name)[netifaces.AF_INET][idx]
 		return addressinfo["addr"], addressinfo["netmask"], addressinfo["broadcast"]
-	except Exception as ex:
+	except:
 		return None
 
 
@@ -353,7 +353,7 @@ def get_ipv6_for_iface(iface_name, idx=0):
 	"""
 	try:
 		return netifaces.ifaddresses(iface_name)[netifaces.AF_INET6][idx]["addr"]
-	except Exception as ex:
+	except:
 		return None
 
 

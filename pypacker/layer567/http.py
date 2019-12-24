@@ -24,7 +24,7 @@ class HTTPHeader(triggerlist.TriggerList):
 # key: value\r\n
 # \r\n
 # [body]
-PROG_STARTLINE		= re.compile(b"[\w\./]{3,10} +[\w\./]{1,400} +[\w\./]{1,20}.+")
+PROG_STARTLINE		= re.compile(rb"[\w\./]{3,10} +[\w\./]{1,400} +[\w\./]{1,20}.+")
 PROG_SPLIT_HEADBODY	= re.compile(b"\r\n\r\n")
 split_headbody		= PROG_SPLIT_HEADBODY.split
 PROG_SPLIT_HEADER	= re.compile(b"\r\n")
