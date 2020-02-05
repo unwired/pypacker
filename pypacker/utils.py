@@ -266,41 +266,72 @@ def is_special_mac(mac_str):
 ENTROPY_GRANULARITY_QUADRUPLE	= 0
 
 
-def get_entropy(bts, granularity):
+def calculate_entropy(elements, granularity_bytes=0, blocksize_bytes=64, log_base=2):
 	"""
-	Calcualte entropy of bts
+	Calcualte entropy of elements
 
-	granularity -- ENTROPY_GRANULARITY_QUADRUPLE
-	return -- entropy
+	elements -- list of elements (each of same length) or a string
+	granularity_bytes -- amount of bytes from which entropy has to be calculated
+	blocksize_bytes -- if elements is a string: size of the block which is splittet in granularity_bytes
+		long strings to calculate the entropy
+	return -- entropy or None on error
 	"""
+	if len(elements) == 0:
+		return None
+
+	if type(elements) != list:
+		# Only strings allowed
+		if type(elements) not in [str, bytes] or granularity_bytes > blocksize_bytes:
+			return None
+		# Get entropy of a string using a blocksize of blocksize_bytes and granularity of granularity_bytes
+		# Example with blocksize_bytes=4, granularity_bytes=1:
+		# "12345678" -> "1234", "5678" -> E("1", "2", "3", "4"), E("5", "6", "7", "8")
+		# Change default parameter
+		if granularity_bytes == 0:
+			granularity_bytes = 1
+		entropies = []
+
+		for off1 in range(0, len(elements), blocksize_bytes):
+			block = elements[off1: off1 + blocksize_bytes]
+			#print(block)
+			tokens = [block[off2: off2 + granularity_bytes] for off2 in range(0, len(block), granularity_bytes)]
+			#print(tokens)
+			entropy_block = calculate_entropy(tokens)
+			#print(entropy_block)
+			entropies.append(entropy_block)
+			#time.sleep(60)
+		return entropies
+	elif granularity_bytes != 0:
+		# Get Entropy of subsets of bytes of elements: ["1234", "5678"] -> [E("1", "5", ...), ...]
+		element_len = len(elements[0])
+		entropies = []
+
+		for off in range(0, element_len, granularity_bytes):
+			elements_part = []
+
+			for element in elements:
+				elements_part.append(element[off: off + granularity_bytes])
+			entropy_part = calculate_entropy(elements_part)
+			entropies.append(entropy_part)
+		return entropies
+
 	symbol_count = {}
-	symbol_len = 0
-	if granularity == ENTROPY_GRANULARITY_QUADRUPLE:
-		symbol_amount = 16
 
-		for bt in bts:
-			q1 = bt >> 4
-			q2 = bt & 0x0F
-
-			for val in [q1, q2]:
-				try:
-					symbol_count[val] += 1
-				except:
-					symbol_count[val] = 1
-
-		symbol_len = len(bts) * 2  # 2 quadruples per byte
-	else:
-		logger.warning("invalid granularity: %d", granularity)
-		return -1
-
+	for element in elements:
+		# Faster than using exceptions
+		if element in symbol_count:
+			symbol_count[element] += 1
+		else:
+			symbol_count[element] = 1
+	#print(symbol_count)
 	entropy = 0
-	#symbol_amount = len(symbol_count)
+	symbols_total = sum(val for _, val in symbol_count.items())
 
 	for _, count in symbol_count.items():
-		p = count / symbol_len
-		entropy += -log(p, symbol_amount) * p
+		p = count / symbols_total
+		entropy += log(p, log_base) * p
 
-	return entropy
+	return abs(entropy)
 
 
 def get_mac_for_iface(iface_name):
