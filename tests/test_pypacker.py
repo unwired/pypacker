@@ -5,6 +5,7 @@ import random
 import struct
 import sys
 import pprint
+import os
 
 from pypacker import pypacker, checksum, triggerlist
 from pypacker.psocket import SocketHndl
@@ -19,6 +20,7 @@ from pypacker.layer4 import tcp, udp, ssl, sctp
 from pypacker.layer567 import diameter, dhcp, dns, der, hsrp, http, mqtt, ntp, pmap, radius, rip, rtp, someip,\
 	telnet, tpkt
 
+DIR_CURRENT = os.path.dirname(os.path.realpath(__file__)) + "/"
 
 # General testcases:
 # - Length comparing before/after parsing
@@ -535,6 +537,20 @@ class GeneralTestCase(unittest.TestCase):
 		self.assertIsNone(ip0._lazy_handler_data)
 		self.assertEqual(bin0a, bts_ip1)
 
+	def test_pcapmerge(self):
+		pcap_files_in = [DIR_CURRENT + "packets_dns.pcap", DIR_CURRENT + "packets_ether.pcap"]
+		pcap_file_out = DIR_CURRENT + "packets_testmerged.pcap"
+		cnt = [0]
+		def filter_accept(bts):
+			pkt = ethernet.Ethernet(bts)
+			accept = pkt[tcp.TCP] is not None
+			if accept:
+				cnt[0] += 1
+			return accept
+			
+		ppcap.merge_pcaps(pcap_files_in, pcap_file_out, filter_accept)
+		merged_bts = ppcap.Reader(filename=pcap_file_out).read()
+		self.assertTrue(len(merged_bts), cnt[0])
 
 class LazydictTestCase(unittest.TestCase):
 	def test_dict(self):

@@ -81,6 +81,19 @@ for ts, buf in preader:
 pwriter.close()
 ```
 
+Merge multiple pcap files to one file. Tries to read corrupted pcap files and allows filtering by pypacker callback.
+```
+from pypacker import ppcap
+from pypacker.layer4 import tcp
+
+def filter_accept(bts):
+    # Get all TCP packets
+    pkt = ethernet.Ethernet(bts)
+    return pkt[tcp.TCP] is not None
+
+ppcap.merge_pcaps(["file_in1.pcap", "file_in2.pcap"], "file_out.pcap", filter_accept=filter_accept)
+```
+
 Send/receive layer 2 packets:
 
 ```python

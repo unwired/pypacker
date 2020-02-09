@@ -287,6 +287,13 @@ class PcapHandler(FileHandler):
 			except StopIteration:
 				break
 
+	def read(self):
+		"""
+		Get all packets as list.
+		return -- [(ts, bts), ...]
+		"""
+		return [(ts, bts) for ts, bts in self]
+
 
 class Writer(PcapHandler):
 	"""
@@ -302,3 +309,28 @@ class Reader(PcapHandler):
 	"""
 	def __init__(self, filename, filetype=FILETYPE_PCAP, **initdata):
 		super().__init__(filename, PcapHandler.MODE_READ, **initdata)
+
+
+def merge_pcaps(pcap_filenames_in, pcap_filename_out, filter_accept=lambda bts: True, linktype=DLT_EN10MB):
+	"""
+	Merge multiple pcap files.
+	pcap_filenames_in -- List of pcap filenames to be merged
+	pcap_filename_out -- The final merged pcap file
+	filter -- A callback "lambda bts: [True|False]" for filtering packets. True = merge packet to output file.
+	linktype -- Linktype for pcap_filename_out
+	"""
+	fp_out = Writer(filename=pcap_filename_out, linktype=linktype)
+
+	for pcap_filename_in in pcap_filenames_in:
+		fp_in = Reader(filename=pcap_filename_in)
+		cnt = 1
+		try:
+			for _, bts in fp_in:
+				if filter_accept(bts):
+					fp_out.write(bts)
+				cnt += 1
+		except Exception as ex:
+			logger.warning("Terminated reading %s at packet %d" % (pcap_filename_in, cnt))
+			logger.exception(ex)
+		fp_in.close()
+	fp_out.close()
