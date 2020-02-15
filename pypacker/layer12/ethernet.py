@@ -10,7 +10,6 @@ from pypacker import pypacker, triggerlist
 from pypacker.pypacker import FIELD_FLAG_IS_TYPEFIELD
 from pypacker.structcbs import unpack_H
 
-# handler
 from pypacker.layer12 import arp, dtp, pppoe, flow_control, lacp
 from pypacker.layer3 import ip, ip6, ipx
 from pypacker.layer567 import ptpv2
@@ -142,7 +141,7 @@ class Ethernet(pypacker.Packet):
 
 		# any VLAN tag present? in this case: type field is actually a vlan tag
 		if eth_type in VLAN_TAG_START:
-			# TODO: use _init_triggerlist()
+			# Using _init_triggerlist() would be bad benefit/cost relation
 			if eth_type == ETH_TYPE_8021Q:
 				# logger.debug(">>> got vlan tag")
 				vlan_tag = Dot1Q(buf[12: 16])

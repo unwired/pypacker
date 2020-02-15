@@ -354,6 +354,10 @@ class GeneralTestCase(unittest.TestCase):
 		pkt1 = ethernet.Ethernet(pkt1_bts)
 		pkt_tcp = pkt1.higher_layer.higher_layer
 		print("TCP for dissectfail #1 (higher layer not present, via higher_layer): %r" % pkt_tcp)
+		#print(pkt_tcp)
+		print(pkt1_bts)
+		print(pkt1)
+		print(pkt1.higher_layer)
 		self.assertIsNone(pkt_tcp)
 
 		pkt1 = ethernet.Ethernet(pkt1_bts)
@@ -2226,13 +2230,6 @@ class IEEE80211TestCase(unittest.TestCase):
 		self.assertEqual(beacon.seq_frag, 0x702D)
 		self.assertEqual(beacon.capa, 0x3104)
 
-	# self.assertTrue(beacon.capa == 0x0431)
-	# TODO: test IEs
-	# self.assertTrue(ieee.capability.privacy == 1)
-	# self.assertTrue(ieee.mgmtframe.beacon.body_bytes == "CAEN")
-	# self.assertTrue(ieee.rate.body_bytes == b"\x82\x84\x8b\x0c\x12\x96\x18\x24")
-	# self.assertTrue(ieee.ds.body_bytes == b"\x01")
-	# self.assertTrue(ieee.tim.body_bytes == b"\x00\x01\x00\x00")
 
 	def test_data(self):
 		print_header("Data")
@@ -2890,7 +2887,6 @@ class ReassembleTestCase(unittest.TestCase):
 		self.assertEqual(segments_ra, bts_assembled[:len(segments_ra)])
 
 
-"""
 class DERTestCase(unittest.TestCase):
 	def test_der(self):
 		print_header("DER")
@@ -2905,22 +2901,20 @@ class DERTestCase(unittest.TestCase):
 				# b'U\x04\n' = 2.5.4.10 - id-at-organizationName
 				# b'U\x04\x0b' = 2.5.4.11 - id-at-organizationalUnitName
 				# print(tlv_list)
-				# TODO: extract hash, signature, modulus
 				v1, v2 = tlv_list[0][2], tlv_list[1][2]
 				result_dct[v1] = v2
 			else:
 				pass
 
 		result = []
-		raw = open("tests/cert1.der", "rb").read()
+		raw = open("tests/wiki_gentoo.der", "rb").read()
 		der.decode_der(raw, result, extract_cb=extract_cb)
-		#pprint.pprint(result)
+		pprint.pprint(result)
 		#pprint.pprint(result[0][2][0][2][5][2])
-		result_dct[result[0][2][0][2][5][2][0][2][0][2]] = result[0][2][0][2][5][2][1][2]
-		result_dct[result[0][2][1][2][0][2]] = result[0][2][2][2]
-		print("===")
+		#result_dct[result[0][2][0][2][5][2][0][2][0][2]] = result[0][2][0][2][5][2][1][2]
+		#result_dct[result[0][2][1][2][0][2]] = result[0][2][2][2]
+		print("=" * 20)
 		pprint.pprint(result_dct)
-"""
 
 suite = unittest.TestSuite()
 loader = unittest.defaultTestLoader

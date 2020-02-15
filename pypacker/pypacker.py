@@ -160,25 +160,26 @@ class Packet(object, metaclass=MetaPacket):
 		"""
 		Packet constructors:
 
-		Packet(bytestring, target_class)
-			Note: target_class is only meant for internal usage
+		Packet(bytestring [, lower_layer_object])
+			Note: lower_layer_object only for internal usage
 		Packet(keyword1=val1, keyword2=val2, ...)
 
 		bytestring -- packet bytes to build packet from, nonempty values are NOT allowed
-		target_class -- For internal usage only: unpack until this class (meant eg for __getitem__(...))
+		lower_layer_object -- For internal usage only. Used by _dissect()
+			Ideally the current layer is agnostic to the lower layer. But sometimes...
 		keywords -- keyword arguments correspond to header fields to be set
 		"""
 
 		if args:
 			if len(args) > 1:
-				# Assume packet, target class given until which we unpack
-				self._final_unpack_clz = args[1]._final_unpack_clz
-			# Any Exception will be forwarded (SomePkt(bytes) or lazy dissect)
-			# If this is the lowest layer the Exception has to be caught
-			# logger.debug("dissecting: %s", self.__class__.__name__)
+				# Make lower layer accessible for _dissect. This won't change the body
+				self._lower_layer = args[1]
+			# Any exception will be forwarded (SomePkt(bytes) or lazy dissect)
+			# If this is the lowest layer the Exception has to be caught.
+			#logger.debug("Dissecting %s using this bytes: %s" % (self.__class__.__name__, args[0]))
 			header_len = self._dissect(args[0])
-			# logger.debug("init header (+ body bytes): %s", self.__class__.__name__)
-			# problem: len(args[0]) < _header_len -> can't be unpacked
+			# Not enough bytes means packet can't be unpacked.
+			# Check this here and not in _dissect() as its always the same for all dissects.
 			if len(args[0]) < header_len:
 				raise Exception("Not enough bytes for packet class %s: given=%d < expected=%d" %
 					(self.__class__, len(args[0]), header_len))
@@ -187,7 +188,7 @@ class Packet(object, metaclass=MetaPacket):
 			self._header_cached = args[0][:header_len]
 
 			if not self._body_changed:
-				# _dissect(...) didn't call _init_handler(): set raw bytes.
+				# _dissect(...) didn't call _init_handler(): set raw bytes
 				self._body_bytes = args[0][header_len:]
 			#logger.warning("could not dissect in %s: %r" % (self.__class__.__name__, e))
 			# Reset the changed-flags: original unpacked value = no changes
@@ -235,16 +236,16 @@ class Packet(object, metaclass=MetaPacket):
 			return self.header_len + len(self._body_bytes)
 
 	#
-	# public access to header length: keep it uptodate
+	# Public access to header length: keep it uptodate
 	#
 	def _get_header_len(self):
 		if self._header_changed and self._header_format_changed:
-			# header has NOT changed if __init__ just finished -> avoid unneeded re-formating
+			# Header has NOT changed if __init__ just finished -> avoid unneeded re-formating
 			# update format to get the real length
 			self._update_header_format()
 		return self._header_len
 
-	# update format if needed and return actual header size
+	# Update format if needed and return actual header size
 	header_len = property(_get_header_len)
 
 	def _get_dissect_error(self):
@@ -354,13 +355,14 @@ class Packet(object, metaclass=MetaPacket):
 	# Get/set body handler. Note: this will force lazy dissecting when reading
 	higher_layer = property(_get_higherlayer, _set_higherlayer)
 
-	def _set_lower_layer(self, val):
+	def _set_lower_layer(self, hndl):
 		if self._lower_layer is not None:
-			# remove upper layer (us) from current lower layer before
+			# Remove upper layer (us) from current lower layer before
 			# setting a new lower layer
 			self._lower_layer.higher_layer = None
 
-		self._lower_layer = val
+		if hndl is not None:
+			hndl.higher_layer = self
 
 	# Get/set next lower body handler
 	lower_layer = property(lambda pkt: pkt._lower_layer, _set_lower_layer)
@@ -377,8 +379,6 @@ class Packet(object, metaclass=MetaPacket):
 		current = self
 
 		# unpack all layer, assuming string class will be never found
-		self._final_unpack_clz = str.__class__
-
 		while current.higher_layer is not None:
 			current = current.higher_layer
 
@@ -426,15 +426,13 @@ class Packet(object, metaclass=MetaPacket):
 
 		try:
 			# Instantiate handler class using lazy data buffer
-			# See _init_handler() for 2nd place where handler instantation takes place
 			# logger.debug("lazy parsing using: %s", handler_data)
-			type_instance = handler_data[0](handler_data[1], self)
-
-			self._set_higherlayer(type_instance)
-			# this was a lazy init: same as direct dissecting -> no body change
+			handler_obj = handler_data[0](handler_data[1], self)
+			self.upper_layer = handler_obj
+			# This was a lazy init: same as direct dissecting -> no body change
 			self._body_changed = False
 		except:
-			# error on lazy dissecting: set raw bytes
+			# Error on lazy dissecting: set raw bytes
 			self._errors |= ERROR_DISSECT
 			self._body_bytes = handler_data[1]
 			#logger.warning("Can't set handler data (malformed packet?): base=%s handler_type/handlerclass=%r, reason: %s",
@@ -447,37 +445,35 @@ class Packet(object, metaclass=MetaPacket):
 		and return the first matched instance or None if nothing was found.
 
 		packet_type -- Packet class to search for like TCP or combined
-			multi-value like Ethernet,IP,TCP. For multi-value the last
-			given Type in sequence will be returned.
+			multi-value like Ethernet, IP, TCP. For multi-value the last
+			given Type in sequence will be returned (pkt[A, B, C] -> gets C).
 		return -- First finding of packet_type or None if nothing was found
 		"""
 		p_instance = self
 
-		# multi-value index search
+		# Multi-value index search
 		if type(packet_type) is tuple:
+			# Keep unpacking until packet_type is found (no intermediate storing)
 			type_cnt = 0
 			packet_type_len = len(packet_type)
 
 			for pkt_clz in packet_type:
 				if pkt_clz != p_instance.__class__:
-					# mismatch
+					# Mismatch
 					return None
 
 				type_cnt += 1
-				# highest layer reached
-				if p_instance.higher_layer is None:
+				# Highest layer reached (no more layers or end of needle reached)
+				if p_instance.higher_layer is None or type_cnt == packet_type_len:
 					break
-				elif type_cnt != packet_type_len:
-					# end of match sequence in packet_type not reached, go higher
-					p_instance = p_instance.higher_layer
+				# End of match sequence in packet_type not reached, go higher
+				p_instance = p_instance.higher_layer
 
-			# return last matching layer
+			# Return last matching layer
 			return p_instance if type_cnt == packet_type_len else None
-		# single-value index search
+		# Single-value index search
 		else:
-			# set most top layer to be unpacked, __getattr__() could be called unpacking lazy data
-			self._final_unpack_clz = packet_type
-
+			# Keep unpacking until packet_type is found (no intermediate storing)
 			while not type(p_instance) is packet_type:
 				# this will auto-parse lazy handler data via _get_higherlayer()
 				p_instance = p_instance.higher_layer
@@ -495,11 +491,9 @@ class Packet(object, metaclass=MetaPacket):
 		"""
 		p_instance = self
 		# Unpack until highest layer; assume string class never gets found as layer
-		self._final_unpack_clz = str.__class__
-
 		while p_instance is not None:
 			yield p_instance
-			# this will auto-parse lazy handler data via _get_higherlayer()
+			# This will auto-parse lazy handler data via _get_higherlayer()
 			p_instance = p_instance.higher_layer
 
 			if p_instance is None:
@@ -565,7 +559,7 @@ class Packet(object, metaclass=MetaPacket):
 		layers = [layer for layer in self]
 
 		for layer in layers:
-			# avoid overwriting bytes, only reset handler
+			# Avoid overwriting bytes, only reset handler
 			if layer._body_bytes is None:
 				layer.higher_layer = None
 			layer.lower_layer = None
@@ -575,12 +569,12 @@ class Packet(object, metaclass=MetaPacket):
 		"""
 		Print a summary of this layer state. Shows all header, even deactivated ones.
 		"""
-		# values need to be unpacked to be shown
+		# Values need to be unpacked to be shown
 		if not self._unpacked:
 			self._unpack()
 
-		# create key=value descriptions
-		# show all header even deactivated ones
+		# Create key=value descriptions
+		# Show all header even deactivated ones
 		layer_sums_l = []
 
 		for name in self._header_field_names:
@@ -638,11 +632,11 @@ class Packet(object, metaclass=MetaPacket):
 		return layer_sums
 
 	def __str__(self):
-		# recalculate fields like checksums, lengths etc
+		# Recalculate fields like checksums, lengths etc
 		if self._header_changed or self._body_changed:
 			# logger.debug("header/body changed: need to reparse (%s)", self.__class__)
 			self.bin()
-		# this does lazy init of handler
+		# This does lazy init of handler
 		upperlayer_str = "\n%s" % self.higher_layer if self.higher_layer is not None else ""
 		return self._summarize() + upperlayer_str
 
@@ -657,8 +651,8 @@ class Packet(object, metaclass=MetaPacket):
 		# Needed to set here (and not at the end) to avoid recursive calls
 		self._unpacked = True
 		# logger.debug("unpacking header: %s", self._header_field_names)
-		# we need the whole format when:
-		# format changed or some TriggestLists are non-empty (not yet dissected)
+		# We need the whole format when:
+		# Format changed or some TriggestLists are non-empty (not yet dissected)
 		if self._header_format_changed:
 			self._update_header_format()
 
@@ -677,7 +671,7 @@ class Packet(object, metaclass=MetaPacket):
 			header_unpacked = self._header_format.unpack(self._header_cached)
 		except:
 			self._errors |= ERROR_NOT_UNPACKED
-			# just warn user about incomplete data
+			# Just warn user about incomplete data
 			errormsg = "could not unpack in: %s, format: %s, names: %s, value to unpack: %s (%d bytes)," \
 				" invalid value for format?" % (
 					self.__class__.__name__,
@@ -699,12 +693,12 @@ class Packet(object, metaclass=MetaPacket):
 		# 	[self_getattr(name + "_format") for name in self._header_field_names],
 		# 	[self_getattr(name + "_active") for name in self._header_field_names])
 		for name in self._header_field_names:
-			# only set values if active simple field
+			# Only set values if active simple field
 			if self_getattr(name + "_active"):
 				if self_getattr(name + "_format") is not None:
 					#logger.debug("!!!!! unpacking value: %s -> %s", name, header_unpacked[cnt])
 					self_setattr(name, header_unpacked[cnt])
-				# inactive fields are not in unpacked list
+				# Inactive fields are not in unpacked list
 				cnt += 1
 
 	def reverse_address(self):
@@ -754,25 +748,18 @@ class Packet(object, metaclass=MetaPacket):
 			return
 
 		try:
-			if self._final_unpack_clz is None or self._final_unpack_clz is self.__class__:
-				# set lazy handler data, __getattr__() will be called on access
-				# to handler (field not yet initiated)
-				# logger.debug("setting handler name: %s -> %s", self.__class__.__name__, clz_name)
-				self._lazy_handler_data = [clz, buffer]
-				# set name although we don't set a handler (needed for direction() et al)
-				self._body_bytes = None
-				# avoid setting body_bytes by _unpack()
-				self._body_changed = True
-			else:
-				# Continue parsing next upper layer, happens on "__iter__()": avoid unneeded lazy-data
-				# handling/creating uneeded meta data for later body handling
-				#logger.debug("--------> direct init in: %s", self.__class__.__name__)
-				type_instance = clz(buffer, self)
-				self._set_higherlayer(type_instance)
+			# Set lazy handler data, __getattr__() will be called on access
+			# to handler (field not yet initiated)
+			# logger.debug("setting handler name: %s -> %s", self.__class__.__name__, clz_name)
+			self._lazy_handler_data = [clz, buffer]
+			# Set name although we don't set a handler (needed for direction() et al)
+			self._body_bytes = None
+			# Avoid setting body_bytes by _unpack()
+			self._body_changed = True
 		except:
 			#logger.warning("Can't set handler data (malformed?): base=%s handler_type/id=%r, reason: %s",
 			#	self.__class__, Packet._id_handlerclass_dct[self.__class__][hndl_type], ex)
-			# set raw bytes as data (eg handler class not found)
+			# Set raw bytes as data (eg handler class not found)
 			self.body_bytes = buffer
 			self._errors |= ERROR_DISSECT
 
@@ -803,13 +790,13 @@ class Packet(object, metaclass=MetaPacket):
 		# logger.debug("direction of %s: %d", self.__class__, dir_ext)
 
 		try:
-			# check upper layers and combine current result
+			# Check upper layers and combine current result
 			# logger.debug("direction? checking next layer")
 			dir_upper = self.higher_layer.direction_all(other_packet.higher_layer)
 
 			return dir_ext & dir_upper
 		except AttributeError:
-			# one of both _higher_layer was None
+			# One of both _higher_layer was None
 			# Example: TCP ACK (last step of handshake, no payload) <-> TCP ACK + Telnet
 			# logger.debug("AttributeError, direction: %d", dir_ext)
 			# logger.debug(e)
@@ -847,7 +834,7 @@ class Packet(object, metaclass=MetaPacket):
 		If updating the type id is more complex than a simple assignmet this method has to
 		be overwritten.
 		"""
-		# do nothing if:
+		# Do nothing if:
 		# type id field not known or this is a parsed packet (non self-made) or we got no body handler
 		# or nothing has changed
 		# logger.debug("%s -> _id_fieldname: %s", self.__class__, self._id_fieldname)
@@ -921,7 +908,7 @@ class Packet(object, metaclass=MetaPacket):
 
 		if self._lazy_handler_data is not None:
 			# logger.debug("Got lazy data layer: %s -> %s", self.__class__, self._lazy_handler_data[0])
-			# no need to parse, just take lazy handler data bytes
+			# No need to parse, just take lazy handler data bytes
 			bodybytes_tmp = self._lazy_handler_data[1]
 		elif self._higher_layer is not None:
 			# logger.debug("Got upper layer: %s -> %s", self.__class__, self._higher_layer.__class__)
@@ -929,12 +916,12 @@ class Packet(object, metaclass=MetaPacket):
 			bodybytes_tmp = self.higher_layer.bin(update_auto_fields=False)
 		else:
 			# logger.debug("Got raw bytes in %s", self.__class__)
-			# raw bytes
+			# Raw bytes
 			bodybytes_tmp = self._body_bytes
 
 		header_tmp = self._pack_header()
 
-		# now every layer got informed about our status, reset it
+		# Now every layer got informed about our status, reset it
 		self._reset_changed()
 		return header_tmp + bodybytes_tmp
 
@@ -952,11 +939,11 @@ class Packet(object, metaclass=MetaPacket):
 
 			val = self_getattr(name)
 
-			if val.__class__ in HEADER_TYPES_SIMPLE:  # assume bytes/int
+			if val.__class__ in HEADER_TYPES_SIMPLE:  # Assume bytes/int
 				header_format_append(self_getattr(name + "_format"))
 				# logger.debug("adding format for (simple): %s, %s, val: %s format: %s",
 				# self.__class__, name, self_getattr(name), self_getattr(name + "_format"))
-			else:  # assume TriggerList
+			else:  # Assume TriggerList
 				if val.__class__ == list:
 					# TriggerList not yet initiated: take cached value
 					header_format_append("%ds" % len(val[0]))
@@ -974,18 +961,18 @@ class Packet(object, metaclass=MetaPacket):
 		Return header as byte string.
 		"""
 		if not self._header_changed:
-			# return cached data if nothing changed
+			# Return cached data if nothing changed
 			#logger.warning("returning cached header (hdr changed=%s): %s->%s",
 			# self._header_changed, self.__class__.__name__, self._header_cached)
 			return self._header_cached
 
 		if not self._unpacked:
-			# this happens on: Packet(b"bytes") -> only changes to TriggerList. We need to unpack buffer values
+			# This happens on: Packet(b"bytes") -> only changes to TriggerList. We need to unpack buffer values
 			# to re-read them for header packing
 			self._unpack()
 		elif self._header_format_changed:
 			# _unpack will call _update_header_format() if needed
-			# real format needed for correct packing
+			# Real format needed for correct packing
 			self._update_header_format()
 
 		self_getattr = self.__getattribute__
@@ -996,12 +983,12 @@ class Packet(object, metaclass=MetaPacket):
 			if not self_getattr(name + "_active"):
 				continue
 			val = self_getattr(name)
-			# two options:
+			# Two options:
 			# - simple type (int, bytes, ...)	-> add given value
 			# - TriggerList	(found via format None) -> call bin()
 			if val.__class__ in HEADER_TYPES_SIMPLE:  # assume bytes/int
 				header_values_append(val)
-			else:  # assume TriggerList
+			else:  # Assume TriggerList
 				if val.__class__ == list:
 					header_values_append(val[0])
 				else:
@@ -1017,7 +1004,7 @@ class Packet(object, metaclass=MetaPacket):
 
 		return self._header_cached
 
-	# readonly access to header
+	# Readonly access to header
 	header_bytes = property(_pack_header)
 
 	def _changed(self):
@@ -1034,10 +1021,10 @@ class Packet(object, metaclass=MetaPacket):
 				changed = True
 				break
 			elif p_instance._lazy_handler_data is None:
-				# one layer up, stop if next layer is not yet initiated which means: no change
+				# One layer up, stop if next layer is not yet initiated which means: no change
 				p_instance = p_instance.higher_layer
 			else:
-				# nothing changed upwards: lazy handler data still present/nothing got parsed
+				# Nothing changed upwards: lazy handler data still present/nothing got parsed
 				break
 		return changed
 
@@ -1055,7 +1042,7 @@ class Packet(object, metaclass=MetaPacket):
 		try:
 			self._changelistener.add(listener_cb)
 		except:
-			# change listener not yet initiated
+			# Change listener not yet initiated
 			self._changelistener = {listener_cb}
 
 	def _remove_change_listener(self):
@@ -1072,7 +1059,7 @@ class Packet(object, metaclass=MetaPacket):
 		on changes in packets like Triggerlist[packet1, packet2, ...].
 		"""
 		#logger.debug("packet is notifying!!!")
-		# no listener added so far -> nothing to notify
+		# No listener added so far -> nothing to notify
 		if self._changelistener is None:
 			return
 
@@ -1092,7 +1079,7 @@ class Packet(object, metaclass=MetaPacket):
 			#logger.debug("handler already loaded: %s", clz_name)
 			return
 
-		# logger.debug("adding classes as handler: [%s] = %s", clz_add, handler)
+		#logger.debug("adding classes as handler: [%s] = %s", clz_add, handler)
 
 		Packet._id_handlerclass_dct[clz_add] = {}
 		Packet._handlerclass_id_dct[clz_add] = {}
@@ -1108,7 +1095,7 @@ class Packet(object, metaclass=MetaPacket):
 				# pypacker.Packet.load_handler(IP, { (ID1, ID2, ...) : class } )
 				for id_x in handler_id:
 					Packet._id_handlerclass_dct[clz_add][id_x] = packetclass
-				# ambiguous relation of "handler class -> type ids", take 1st one
+				# Ambiguous relation of "handler class -> type ids", take 1st one
 				Packet._handlerclass_id_dct[clz_add][packetclass] = handler_id[0]
 
 	def hexdump(self, length=16, only_header=False):
@@ -1137,10 +1124,10 @@ class Packet(object, metaclass=MetaPacket):
 		return "\n".join(res)
 
 #
-# utility functions
+# Utility functions
 # These could be put into separate modules but this would lead to recursive import problems.
 #
-# avoid unneeded references for performance reasons
+# Avoid unneeded references for performance reasons
 randint = random.randint
 
 

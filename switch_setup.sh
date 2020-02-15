@@ -28,9 +28,9 @@ case "$1" in
 	msg "searching for not disabled debug output"
 	grep -ir -R "^[^#]*logger.debug" *
 
-	msg "doing style checks"
-	msg "PEP8"
-	pep8  --config=./qa_config.txt ./
+	#msg "doing style checks"
+	#msg "PEP8"
+	#pep8  --config=./qa_config.txt ./
 
 	msg "flake8"
 	flake8 --config=./qa_config.txt ./pypacker

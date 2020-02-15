@@ -290,6 +290,7 @@ class PcapHandler(FileHandler):
 	def read(self):
 		"""
 		Get all packets as list.
+		limit -- Maximum amount of
 		return -- [(ts, bts), ...]
 		"""
 		return [(ts, bts) for ts, bts in self]

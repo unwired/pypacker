@@ -37,7 +37,6 @@ Limitation:
 
 	( 'A`)< Only file reading...
 
-TODO: generic interface for different reader/writer
 """
 import struct
 
@@ -234,7 +233,6 @@ class ISBLe(ISB):
 		__byte_order__ = "<"
 
 
-# TODO: Writer
 class Writer(object):
 	def __init__(self):
 		pass

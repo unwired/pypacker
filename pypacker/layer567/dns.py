@@ -282,7 +282,7 @@ class DNS(pypacker.Packet):
 			raise Exception("Adress count too high, invalid packet")
 		off = 12
 
-		# TODO: use lazy dissect, dns seems to be too shitty for this
+		# Lazy dissect not possible, dns seems to be too shitty for this
 		#
 		# parse queries
 		#

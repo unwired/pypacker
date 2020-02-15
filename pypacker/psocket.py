@@ -17,13 +17,15 @@ class SocketHndl(object):
 	"""
 	Simple socket handler for layer 2 reading/writing.
 	"""
-	ETH_P_ALL		= 0x0003
-	ETH_P_IPV4		= 0x0800
+	ETH_P_ALL	= 0x0003
+	ETH_P_IPV4	= 0x0800
 
-	def __init__(self, iface_name="lo",
+	def __init__(self,
+		iface_name="lo",
 		timeout=3,
 		buffersize_recv=None,
-		buffersize_send=None, **params):
+		buffersize_send=None,
+		**params):
 		"""
 		iface_name -- Bind to the given interface
 		timeout -- read timeout in seconds
@@ -206,7 +208,7 @@ def get_ssl_serversocket(file_certchain, file_privatekey, bindoptions, password_
 	data = conn.recv()
 	conn.send(data)
 
-	Certificate/private key can be create via:
+	Certificate/private key can be created via:
 	openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365
 
 	return -- SSL wrapped TCP server socket

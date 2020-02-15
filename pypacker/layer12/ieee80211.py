@@ -529,29 +529,6 @@ class IEEE80211(pypacker.Packet):
 	# Data frames
 	#
 	class Dataframe(pypacker.Packet):
-		"""
-		DataFrames need special care: there are too many types of field combinations
-		to create classes for every one. Solution: initiate giving lower type "subType"
-		via constructor. In order to use "src/dst/bssid" instead of addrX set from_to_ds
-		of "subType" to one of the following values:
-
-		[Bit 0: from DS][Bit 1: to DS] = [order of fields]
-
-		00 = 0 = dst, src, bssid
-		01 = 1 = bssid, src, dst
-		10 = 2 = dst, bssid, src
-		11 = 3 = RA, TA, DA, SA
-		"""
-		def __init__(self, *arg, **kwargs):
-			if len(arg) > 1:
-				# logger.debug("extracting lower layer type: %r" % arg[1])
-				self.dtype = arg[1]
-			else:
-				self.dtype = self
-				self._from_to_ds_value = 0
-			#logger.debug("dstype: %r" % self.dtype.from_to_ds)
-			super().__init__(*arg, **kwargs)
-
 		__hdr__ = (
 			("addr1", "6s", b"\x00" * 6),
 			("addr2", "6s", b"\x00" * 6),
@@ -571,44 +548,50 @@ class IEEE80211(pypacker.Packet):
 		seq = property(_get_seq, _set_seq)
 
 		def reverse_address(self):
-			if self.dtype.from_to_ds == 0:
+			if self.from_to_ds == 0:
 				self.addr1, self.addr2 = self.addr2, self.addr1
-			elif self.dtype.from_to_ds == 1:
+			elif self.from_to_ds == 1:
 				self.addr2, self.addr3 = self.addr3, self.addr2
-			elif self.dtype.from_to_ds == 2:
+			elif self.from_to_ds == 2:
 				self.addr1, self.addr3 = self.addr3, self.addr1
 
 		def _get_from_to_ds(self):
-			return self._from_to_ds_value
-		# same property structure as in IEEE80211 class
-		from_to_ds = property(_get_from_to_ds)
+			try:
+				return self._lower_layer.from_to_ds
+			except:
+				return self._from_to_ds
 
-		# FromDs, ToDS
-		# 00 = dst, src, bssid
-		# 01 = bssid, src, dst
-		# 10 = dst, bssid, src
-		# 11 = RA, TA, DA, SA
+		_from_to_ds = 0
+
+		def _set_from_to_ds(self, value):
+			try:
+				self._lower_layer.from_to_ds = value
+			except:
+				self._from_to_ds = value
+
+		# Same property structure as in IEEE80211 class
+		from_to_ds = property(_get_from_to_ds, _set_from_to_ds)
 
 		def __get_src(self):
-			return self.addr2 if self.dtype.from_to_ds in [0, 1] else self.addr3
+			return self.addr2 if self.from_to_ds in [0, 1] else self.addr3
 
 		def __set_src(self, src):
-			if self.dtype.from_to_ds in [0, 1]:
+			if self.from_to_ds in [0, 1]:
 				self.addr2 = src
 			else:
 				self.addr3 = src
 
 		def __get_dst(self):
-			return self.addr1 if self.dtype.from_to_ds in [0, 2] else self.addr3
+			return self.addr1 if self.from_to_ds in [0, 2] else self.addr3
 
 		def __set_dst(self, dst):
-			if self.dtype.from_to_ds in [0, 2]:
+			if self.from_to_ds in [0, 2]:
 				self.addr1 = dst
 			else:
 				self.addr3 = dst
 
 		def __get_bssid(self):
-			dstype = self.dtype.from_to_ds
+			dstype = self.from_to_ds
 
 			if dstype == 0:
 				return self.addr3
@@ -618,7 +601,8 @@ class IEEE80211(pypacker.Packet):
 				return self.addr2
 
 		def __set_bssid(self, bssid):
-			dstype = self.dtype.from_to_ds
+			dstype = self.from_to_ds
+
 			if dstype == 0:
 				self.addr3 = bssid
 			elif dstype == 1:
@@ -639,13 +623,25 @@ class IEEE80211(pypacker.Packet):
 			# logger.debug("starting dissecting, buflen: %r" % str(buf))
 			header_len = 30
 
-			try:
-				is_qos = True if self.dtype.subtype in IEEE80211.Dataframe.__QOS_SUBTYPES else False
-				is_protected = self.dtype.protected == 1
-				is_bridge = True if self.dtype.from_ds == 1 and self.dtype.to_ds == 1 else False
-			except Exception:
-				# logger.debug(e)
-				# default is fromds
+			"""
+			DataFrames need special care: there are too many types of field combinations
+			to create classes for every one. Solution: initiate by taking from_to_ds of lower_layer
+			In order to use "src/dst/bssid" instead of addrX set from_to_ds
+			to one of the following values:
+
+			[Bit 0: from DS][Bit 1: to DS] = [order of fields]
+
+			00b = 0 = dst, src, bssid
+			01b = 1 = bssid, src, dst
+			10b = 2 = dst, bssid, src
+			11b = 3 = RA, TA, DA, SA
+			"""
+			if self._lower_layer.__class__ == IEEE80211:
+				is_qos = self._lower_layer.subtype in IEEE80211.Dataframe.__QOS_SUBTYPES
+				is_protected = self._lower_layer.protected == 1
+				is_bridge = self._lower_layer.from_ds == 1 and self._lower_layer.to_ds == 1
+			else:
+				# Default is fromds
 				is_qos = False
 				is_protected = False
 				is_bridge = False
