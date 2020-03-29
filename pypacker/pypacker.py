@@ -565,7 +565,7 @@ class Packet(object, metaclass=MetaPacket):
 			layer.lower_layer = None
 		return layers
 
-	def _summarize(self):
+	def summarize(self):
 		"""
 		Print a summary of this layer state. Shows all header, even deactivated ones.
 		"""
@@ -638,7 +638,7 @@ class Packet(object, metaclass=MetaPacket):
 			self.bin()
 		# This does lazy init of handler
 		upperlayer_str = "\n%s" % self.higher_layer if self.higher_layer is not None else ""
-		return self._summarize() + upperlayer_str
+		return self.summarize() + upperlayer_str
 
 	def _unpack(self):
 		"""
@@ -1322,7 +1322,8 @@ def get_property_translator(
 	varname_regex,
 	cb_get_description=lambda value, value_name_dct: value_name_dct[value]):
 	"""
-	Get a descriptor allowing to make a value->name translation for variable values
+	Get a descriptor allowing to make a "value -> variable name representation" translation.
+	The variable name representation can actually be used to assign values to the field in question.
 
 	varname_regex -- The regex to find variables.
 	cb_get_description -- lambda value, value_name_dct: Description

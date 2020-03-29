@@ -178,14 +178,11 @@ class TCP(pypacker.Packet):
 			if not self._lower_layer._header_changed:
 				# pseudoheader didn't change, further check for changes in layers
 				update = self._changed()
-			# logger.debug("lower layer found!")
 		except:
 			# Assume not an IP packet: we can't calculate the checksum
-			# logger.debug("no lower layer found!")
 			update = False
 
 		if update and self.sum_au_active:
-			# logger.debug(">>> updating checksum")
 			self._calc_sum()
 
 	def _dissect(self, buf):
@@ -203,7 +200,6 @@ class TCP(pypacker.Packet):
 
 		try:
 			# source or destination port should match
-			# logger.debug("TCP handler: %r" % self._id_handlerclass_dct[TCP])
 			htype = [x for x in ports if x in self._id_handlerclass_dct[TCP]][0]
 			#logger.debug("TCP: trying to set handler, type: %d = %s" %
 			#(type, self._id_handlerclass_dct[TCP][type]))
@@ -305,7 +301,6 @@ class TCP(pypacker.Packet):
 				logger.warning("seq of new segment is lower than start")
 				seq_store += 0xFFFF
 
-			#logger.debug("adding tcp segment: %r", segment.body_bytes)
 			self.ra_segments[seq_store] = segment.body_bytes
 			bts_cnt += len(segment.body_bytes)
 
@@ -313,8 +308,8 @@ class TCP(pypacker.Packet):
 
 	def ra_bin(self):
 		"""
-		Assemble retrieved TCP segments in sorted order (body bytes of TCP segments).
-		Does NOT flush the internal buffer; this is done via self.ra_segments.clear()
+		Assemble retrieved TCP segments in sorted order (body bytes of TCP segments) and
+		flushes the internal buffer.
 		"""
 		self.ra_segments[self.seq] = self.body_bytes
 		sorted_list = sorted(self.ra_segments.items(), key=lambda t: t[0])

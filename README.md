@@ -198,52 +198,52 @@ Tests are executed as follows:
 
 **Performance test results: pypacker**
 ```
-orC = Intel Core2 Duo CPU @ 1,866 GHz, 2GB RAM, CPython v3.6
-orP = Intel Core2 Duo CPU @ 1,866 GHz, 2GB RAM, Pypy 5.10.1
+orC = Intel CPU, 4 Cores @ 3GHz, CPython v3.6
+orP = Intel CPU, 4 Cores @ 3GHz, PyPy v7.3.0
 rounds per test: 10000
 =====================================
->>> parsing (IP + ICMP)
-orC = 86064 p/s
-orP = 208346 p/s
->>> creating/direct assigning (IP only header)
-orC = 41623 p/s
-orP = 59370 p/s
->>> bin() without change (IP)
-orC = 170356 p/s
-orP = 292133 p/s
->>> output with change/checksum recalculation (IP)
-orC = 10104 p/s
-orP = 23851 p/s
->>> basic/first layer parsing (Ethernet + IP + TCP + HTTP)
-orC = 62748 p/s
-orP = 241047 p/s
->>> changing Triggerlist element value (Ethernet + IP + TCP + HTTP)
-orC = 101552 p/s
-orP = 201994 p/s
->>> changing Triggerlist/text based proto (Ethernet + IP + TCP + HTTP)
-orC = 37249 p/s
-orP = 272972 p/s
->>> direct assigning and concatination (Ethernet + IP + TCP + HTTP)
-orC = 7428 p/s
-orP = 14315 p/s
 >>> full packet parsing (Ethernet + IP + TCP + HTTP)
-orC = 6886 p/s
-orP = 17040 p/s
+orC = 28300 p/s
+orP = 78232 p/s
+>>> parsing (IP + ICMP)
+orC =  405921 p/s
+orP =  1018554 p/s
+>>> creating/direct assigning (IP only header)
+orC =  166124 p/s
+orP =  263307 p/s
+>>> bin() without change (IP)
+orC =  722147 p/s
+orP =  1255403 p/s
+>>> output with change/checksum recalculation (IP)
+orC =  37826 p/s
+orP =  77582 p/s
+>>> basic/first layer parsing (Ethernet + IP + TCP + HTTP)
+orC =  380642 p/s
+orP =  907858 p/s
+>>> changing Triggerlist element value (Ethernet + IP + TCP + HTTP)
+orC =  303882 p/s
+orP =  596451 p/s
+>>> changing dynamic field (Ethernet + IP + TCP + HTTP)
+orC = 511238 p/s
+orP =  1041597 p/s
+>>> direct assigning and concatination (Ethernet + IP + TCP + HTTP)
+time diff: 0.2921011447906494s
+orC = 34229 p/s
+orP = 59600 p/s
 ```
 
 **Performance test results: pypacker vs. dpkt vs. scapy**
 ```
 Comparing pypacker, dpkt and scapy performance (parsing Ethernet + IP + TCP + HTTP)
-orC = Intel Core2 Duo CPU @ 1,866 GHz, 2GB RAM, CPython v3.6
-orC2 = Intel Core2 Duo CPU @ 1,866 GHz, 2GB RAM, CPython v2.7
+orC = Intel CPU, 4 Cores @ 3GHz, CPython v3.6
 rounds per test: 10000
 =====================================
 >>> testing pypacker parsing speed
-orC = 17938 p/s
+orC = 131770 p/s
 >>> testing dpkt parsing speed
-orC = 12431 p/s
+(Not working anymore)
 >>> testing scapy parsing speed
-orC2 = 726 p/s
+orC = 2213 p/s
 ```
 
 # FAQ

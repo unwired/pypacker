@@ -786,15 +786,15 @@ class IEEE80211(pypacker.Packet):
 		IE_HT_INFO	: IE
 	}
 
-# handler for IEEE80211
+# Handler for IEEE80211
 # position in list = type-ID
 dicts			= [IEEE80211.m_decoder, IEEE80211.c_decoder, IEEE80211.d_decoder]
 decoder_dict_complete	= {}
 
 for pos, decoder_dict in enumerate(dicts):
 	for key_decoder, val_decoder in decoder_dict.items():
-		# same subtype-ID for different type-IDs, distinguish via "type_factor + subtype"
-		# not doing so would lead to eg: type:0 + subtype:1 == type:1 + subtype:0
+		# Same subtype-ID for different type-IDs, distinguish via "type_factor + subtype"
+		# Not doing so would lead to eg: type:0 + subtype:1 == type:1 + subtype:0
 		decoder_dict_complete[TYPE_FACTORS[pos] + key_decoder] = val_decoder
 
 pypacker.Packet.load_handler(IEEE80211, decoder_dict_complete)

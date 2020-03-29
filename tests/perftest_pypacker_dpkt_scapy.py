@@ -14,11 +14,8 @@ pkt_eth_ip_tcp_bts = b'\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\x08\x00E
 LOOP_CNT = 10000
 
 print("Comparing pypacker, dpkt and scapy performance (parsing Ethernet + IP + TCP + HTTP)")
-print("Run twice because scapy needs Python2: 1) using python3 2) python2")
 print("")
 print("nr = new results on this machine")
-print("orC = old results (Intel Core2 Duo CPU @ 1,866 GHz, 2GB RAM, CPython v3.6)")
-print("orP = old results (Intel Core2 Duo CPU @ 1,866 GHz, 2GB RAM, Pypy 5.10.1)")
 print("rounds per test: %d" % LOOP_CNT)
 
 try:
@@ -40,8 +37,6 @@ try:
 	t_end = time.time()
 
 	print("nr = %d p/s" % (LOOP_CNT / (t_end - t_start)))
-	print("orC = 12527 p/s")
-	print("orP =  p/s")
 except Exception as ex:
 	print("Could not execute pypacker tests: %r" % ex)
 
@@ -59,8 +54,6 @@ try:
 	t_end = time.time()
 
 	print("nr = %d p/s" % (LOOP_CNT / (t_end - t_start)))
-	print("orC = 12028 p/s")
-	print("orP =  p/s")
 except Exception as ex:
 	print("Could not execute dpkt tests: %r" % ex)
 
@@ -79,7 +72,5 @@ try:
 	t_end = time.time()
 
 	print("nr = %d p/s" % (LOOP_CNT / (t_end - t_start)))
-	print("orC = 771 p/s")
-	print("orP =  p/s")
 except Exception as ex:
 	print("Could not execute scapy tests: %r" % ex)

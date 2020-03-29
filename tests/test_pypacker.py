@@ -2022,7 +2022,8 @@ class BTLETestcase(unittest.TestCase):
 
 
 class PerfTestCase(unittest.TestCase):
-	def test_perf(self):
+	def test_perf_pypacker(self):
+		print_header("Performance test pypacker")
 		# dst="52:54:00:12:35:02" src="08:00:27:a9:93:9e" type="0x08x00", type=2048
 		BYTES_ETH = b"\x52\x54\x00\x12\x35\x02\x08\x00\x27\xa9\x93\x9e\x08\x00"
 		# src="10.0.2.15", dst="10.32.194.141", type=6 (TCP)
@@ -2043,8 +2044,6 @@ class PerfTestCase(unittest.TestCase):
 		cnt = 10000
 		print_header("Performance Tests")
 		print("nr = new results on this machine")
-		print("orC = old results (Intel Core2 Duo CPU @ 3 GHz, 8GB RAM, CPython v3.6)")
-		print("orP = old results (Intel Core2 Duo CPU @ 3 GHz, 8GB RAM, Pypy 6.0.0)")
 		print("rounds per test: %d" % cnt)
 		print("=====================================")
 
@@ -2064,14 +2063,22 @@ class PerfTestCase(unittest.TestCase):
 		ip1 = ip.IP(s)
 		time.sleep(999)
 		"""
+		print(">>> full packet parsing (Ethernet + IP + TCP + HTTP)")
+
+		start = time.time()
+		for i in range(cnt):
+			p = ethernet.Ethernet(BYTES_ETH_IP_TCP_HTTP)
+			p.dissect_full()
+
+		print("time diff: %ss" % (time.time() - start))
+		print("nr = %d p/s" % (cnt / (time.time() - start)))
+
 		print(">>> parsing (IP + ICMP)")
 		start = time.time()
 		for i in range(cnt):
 			ip1 = ip.IP(s)
 		print("time diff: %ss" % (time.time() - start))
 		print("nr = %d p/s" % (cnt / (time.time() - start)))
-		print("orC = 261628 p/s")
-		print("orP = 585477 p/s")
 
 		print(">>> creating/direct assigning (IP only header)")
 		start = time.time()
@@ -2082,8 +2089,6 @@ class PerfTestCase(unittest.TestCase):
 		# ip = IP(src=b"\x01\x02\x03\x04", dst=b"\x05\x06\x07\x08", p=17, len=1234, body_bytes=b"abcd")
 		print("time diff: %ss" % (time.time() - start))
 		print("nr = %d p/s" % (cnt / (time.time() - start)))
-		print("orC = 81398 p/s")
-		print("orP = 127003 p/s")
 
 		print(">>> bin() without change (IP)")
 		ip2 = ip.IP(src=b"\x01\x02\x03\x04", dst=b"\x05\x06\x07\x08", p=17, len=1234, body_bytes=b"abcd")
@@ -2094,8 +2099,6 @@ class PerfTestCase(unittest.TestCase):
 			ip2.bin()
 		print("time diff: %ss" % (time.time() - start))
 		print("nr = %d p/s" % (cnt / (time.time() - start)))
-		print("orC = 335635 p/s")
-		print("orP = 632825 p/s")
 
 		print(">>> output with change/checksum recalculation (IP)")
 		ip3 = ip.IP(src=b"\x01\x02\x03\x04", dst=b"\x05\x06\x07\x08", p=17, len=1234, body_bytes=b"abcd")
@@ -2106,8 +2109,6 @@ class PerfTestCase(unittest.TestCase):
 			ip3.bin()
 		print("time diff: %ss" % (time.time() - start))
 		print("nr = %d p/s" % (cnt / (time.time() - start)))
-		print("orC = 23355 p/s")
-		print("orP = 66935 p/s")
 
 		print(">>> basic/first layer parsing (Ethernet + IP + TCP + HTTP)")
 		start = time.time()
@@ -2116,8 +2117,6 @@ class PerfTestCase(unittest.TestCase):
 			eth = ethernet.Ethernet(BYTES_ETH_IP_TCP_HTTP)
 		print("time diff: %ss" % (time.time() - start))
 		print("nr = %d p/s" % (cnt / (time.time() - start)))
-		print("orC = 229626 p/s")
-		print("orP = 653684 p/s")
 
 		print(">>> changing Triggerlist element value (Ethernet + IP + TCP + HTTP)")
 		start = time.time()
@@ -2130,8 +2129,6 @@ class PerfTestCase(unittest.TestCase):
 			tcp1.opts[0].type = tcp.TCP_OPT_WSCALE
 		print("time diff: %ss" % (time.time() - start))
 		print("nr = %d p/s" % (cnt / (time.time() - start)))
-		print("orC = 217847 p/s")
-		print("orP = 409268 p/s")
 
 		print(">>> changing dynamic field (Ethernet + IP + TCP + HTTP)")
 		start = time.time()
@@ -2142,8 +2139,6 @@ class PerfTestCase(unittest.TestCase):
 			http1.startline = b"GET / HTTP/1.1"
 		print("time diff: %ss" % (time.time() - start))
 		print("nr = %d p/s" % (cnt / (time.time() - start)))
-		print("orC = 312150 p/s")
-		print("orP = 552318 p/s")
 
 		print(">>> direct assigning and concatination (Ethernet + IP + TCP + HTTP)")
 		start = time.time()
@@ -2152,22 +2147,83 @@ class PerfTestCase(unittest.TestCase):
 				src_s="127.0.0.1", dst_s="192.168.0.1") + tcp.TCP(sport=1234, dport=123) + http.HTTP()
 		print("time diff: %ss" % (time.time() - start))
 		print("nr = %d p/s" % (cnt / (time.time() - start)))
-		print("orC = 17246 p/s")
-		print("orP = 34661 p/s")
 
-		print(">>> full packet parsing (Ethernet + IP + TCP + HTTP)")
 
-		start = time.time()
-		for i in range(cnt):
-			p = ethernet.Ethernet(BYTES_ETH_IP_TCP_HTTP)
-			p.dissect_full()
+	def test_perf_pypacker_dpkt_scapy(self):
+		print_header("Performance test pypacker vs. dpkt vs. scapy")
+		"""
+		pkt_eth_ip_tcp = Ethernet() + ip.IP() + tcp.TCP(dport=80)
+		http_l = http.HTTP(startline=b"GET / HTTP/1.1", hdr=[(b"header1", b"value1")], body_bytes=b"Content123")
+		pkt_eth_ip_tcp += http_l
+		pkt_eth_ip_tcp_bts = pkt_eth_ip_tcp.bin()
+		"""
+		pkt_eth_ip_tcp_bts = b'\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\x08\x00E\x00\x00S\x00\x00\x00\x00@\x06z\xa6' \
+			b'\x00\x00\x00\x00\x00\x00\x00\x00\xde\xad\x00P\xde\xad\xbe\xef\x00\x00\x00\x00P\x02\xff\xff\x1a' \
+			b'\xfa\x00\x00GET / HTTP/1.1header1: value1\r\n\r\nContent123'
 
-		print("time diff: %ss" % (time.time() - start))
-		print("nr = %d p/s" % (cnt / (time.time() - start)))
-		print("orC = 15337 p/s")
-		print("orP = 40100 p/s")
+		LOOP_CNT = 10000
 
-		print(">>> Scapy and dpkt comparison: see dedicated performance scripts (Scapy needs Python 2)")
+		print("Comparing pypacker, dpkt and scapy performance (parsing Ethernet + IP + TCP + HTTP)")
+		print("nr = new results on this machine")
+		print("rounds per test: %d" % LOOP_CNT)
+
+		try:
+			from pypacker.layer12.ethernet import Ethernet
+			from pypacker.layer3 import ip
+			from pypacker.layer4 import tcp
+			from pypacker.layer567 import http
+
+			print(">>> testing pypacker parsing speed")
+
+			t_start = time.time()
+
+			for cnt in range(LOOP_CNT):
+				pkt1 = Ethernet(pkt_eth_ip_tcp_bts)
+				# dpkt does not parse TCP content but pypacker does
+				# -> access layer ip to get comparable result
+				pkt2 = pkt1.higher_layer
+				bts = pkt2.body_bytes
+			t_end = time.time()
+
+			print("nr = %d p/s" % (LOOP_CNT / (t_end - t_start)))
+		except Exception as ex:
+			print("Could not execute pypacker tests: %r" % ex)
+
+		try:
+			import dpkt
+			print(">>> testing dpkt parsing speed")
+			EthernetDpkt = dpkt.ethernet.Ethernet
+
+			t_start = time.time()
+
+			for cnt in range(LOOP_CNT):
+				pkt1 = EthernetDpkt(pkt_eth_ip_tcp_bts)
+				pkt2 = pkt1.ip
+				bts = pkt2.data
+			t_end = time.time()
+
+			print("nr = %d p/s" % (LOOP_CNT / (t_end - t_start)))
+		except Exception as ex:
+			print("Could not execute dpkt tests: %r" % ex)
+
+		try:
+			print(">>> testing scapy parsing speed")
+			from scapy.all import Ether, IP
+
+
+			t_start = time.time()
+
+			for _ in range(LOOP_CNT):
+				pkt1 = Ether(pkt_eth_ip_tcp_bts)
+				pkt2 = pkt1[IP]
+				bts = "%s" % pkt1
+
+			t_end = time.time()
+
+			print("nr = %d p/s" % (LOOP_CNT / (t_end - t_start)))
+		except Exception as ex:
+			print("Could not execute scapy tests: %r" % ex)
+
 
 
 class IEEE80211TestCase(unittest.TestCase):
@@ -2439,7 +2495,6 @@ class TPKTTestCase(unittest.TestCase):
 		print_header("TPKT")
 		tpkt1 = tpkt.TPKT()
 		tpkt1.bin()
-
 
 # bts = get_pcap("tests/packets_tpkt.pcap", 1)[0]
 # ether = ethernet.Ethernet(bts)
@@ -2893,6 +2948,8 @@ class DERTestCase(unittest.TestCase):
 		result_dct = {}
 
 		def extract_cb(tlv_list):
+			#print(len(tlv_list))
+
 			if len(tlv_list) == 2:
 				# b'U\x04\x03' = 2.5.4.3 - id-at-commonName
 				# b'U\x04\x06' = 2.5.4.6 - id-at-countryName
@@ -2900,21 +2957,67 @@ class DERTestCase(unittest.TestCase):
 				# b'U\x04\x08' = 2.5.4.8 - id-at-stateOrProvinceName
 				# b'U\x04\n' = 2.5.4.10 - id-at-organizationName
 				# b'U\x04\x0b' = 2.5.4.11 - id-at-organizationalUnitName
-				# print(tlv_list)
-				v1, v2 = tlv_list[0][2], tlv_list[1][2]
-				result_dct[v1] = v2
+				#print(tlv_list)
+				try:
+					v1, v2 = tlv_list[0][2], tlv_list[1][2]
+					result_dct[v1] = v2
+				except:
+					pass
 			else:
 				pass
 
 		result = []
-		raw = open("tests/wiki_gentoo.der", "rb").read()
-		der.decode_der(raw, result, extract_cb=extract_cb)
+		fd = open("tests/wiki_gentoo.der", "rb")
+		der_raw = fd.read()
+		fd.close()
+		result = der.decode_der(der_raw, rw_cb=extract_cb)
+
 		pprint.pprint(result)
-		#pprint.pprint(result[0][2][0][2][5][2])
-		#result_dct[result[0][2][0][2][5][2][0][2][0][2]] = result[0][2][0][2][5][2][1][2]
-		#result_dct[result[0][2][1][2][0][2]] = result[0][2][2][2]
 		print("=" * 20)
-		pprint.pprint(result_dct)
+
+		"""
+		#print(result)
+		# Top = result[0][t, l, v]
+		# tbsCertificate, signatureAlgorithm, signatureValue
+		#print(result[0][2][0->2])
+		# tbsCertificate
+		#pprint.pprint(result[0][2][0])
+		# version
+		pprint.pprint(result[0][2][0][2][0])
+		# serialNumber
+		pprint.pprint(result[0][2][0][2][1])
+		# signature
+		pprint.pprint(result[0][2][0][2][2])
+		# issuer
+		pprint.pprint(result[0][2][0][2][3])
+		# validity
+		pprint.pprint(result[0][2][0][2][4])
+		# subject
+		pprint.pprint(result[0][2][0][2][5])
+		# subjectPublicKeyInfo
+		pprint.pprint(result[0][2][0][2][6])
+		# issuerUniqueID / subjectUniqueID / extensions
+		pprint.pprint(result[0][2][0][2][7])
+
+		# signatureAlgorithm
+		pprint.pprint(result[0][2][1])
+		# signatureValue
+		pprint.pprint(result[0][2][2])
+		"""
+		#print("=" * 20)
+		#pprint.pprint(result_dct)
+		print(result.bin())
+		der_reassembled = result.bin()
+		self.assertEqual(der_reassembled, der_raw)
+		print(result.get_value_raw())
+
+		"""
+		for lentoencode in [65535, 65536]:
+			len_encoded = der.encode_length_definitive(lentoencode)
+			lenlen, len_decoded = der.decode_length_definitive(len_encoded)
+			print("num=%d, encoded=%s, decoded=%d" % (lentoencode, len_encoded, len_decoded))
+			self.assertEqual(lentoencode, len_decoded)
+		"""
 
 suite = unittest.TestSuite()
 loader = unittest.defaultTestLoader
@@ -2995,5 +3098,6 @@ if len(sys.argv) == 1:
 	unittest.TextTestRunner().run(suite)
 else:
 	# python tests/test_pypacker.py TestClass
+	# python tests/test_pypacker.py TestClass.method
 	print("Running tests given as program argument")
 	unittest.main()

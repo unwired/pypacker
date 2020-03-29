@@ -195,6 +195,8 @@ def get_ssl_clientsocket(hostname, port, timeout=5, **sslparams):
 	return -- SSL wrapped TCP socket, not complaining about any server certificates
 	"""
 	context = ssl.create_default_context()
+	context.check_hostname = False
+	context.verify_mode = ssl.CERT_NONE
 	socket_simple = socket.create_connection((hostname, port))
 	socket_ssl = context.wrap_socket(socket_simple, server_hostname=hostname, **sslparams)
 	socket_ssl.settimeout(timeout)
