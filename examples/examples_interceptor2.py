@@ -5,8 +5,11 @@ Interceptor example via nftables
 nft add table inet queuetable
 # Add chain to table
 nft add chain inet queuetable input { type filter hook input priority 0\; }
+nft add chain inet queuetable output { type filter hook output priority 0\; }
 # Add rule to chain
-nft insert rule inet queuetable input counter queue num 0-3 bypass
+nft insert rule inet queuetable input counter queue num 0-1 bypass
+nft insert rule inet queuetable output counter queue num 2-3 bypass
+
 # Delete table
 nft delete table inet queuetable
 
@@ -19,6 +22,7 @@ https://wiki.nftables.org/wiki-nftables/index.php/Queueing_to_userspace
 ip -6 neigh
 """
 import time
+import socket
 
 from pypacker import interceptor
 from pypacker.layer12 import ethernet
@@ -30,12 +34,22 @@ id_class = {
 }
 
 
-def verdict_cb(ll_data, ll_proto_id, data, ctx):
+
+def verdict_cb(ll_data, ll_proto_id, data, ctx, if_idx_in, if_idx_out):
 	clz = id_class.get(ll_proto_id, None)
+	if_in, if_out = "", ""
+
+	try:
+		if if_idx_in != 0:
+			if_in = socket.if_indextoname(if_idx_in)
+		if if_idx_out != 0:
+			if_out = socket.if_indextoname(if_idx_out)
+	except:
+		pass
 
 	if clz is not None:
 		pkt = clz(data)
-		print("Got a packet: %s" % pkt.__class__)
+		print("Got a packet: %s (in: %s, out: %s)" % (pkt.__class__, if_in, if_out))
 	else:
 		print("Unknown NW layer proto: %X" % ll_proto_id)
 

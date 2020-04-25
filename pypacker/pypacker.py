@@ -1075,14 +1075,9 @@ class Packet(object, metaclass=MetaPacket):
 		clz_add -- class for which handler has to be added
 		handler -- dict of handlers to be set like { id | (id1, id2, ...) : class }, id can be a tuple of values
 		"""
-		if clz_add in Packet._id_handlerclass_dct:
-			#logger.debug("handler already loaded: %s", clz_name)
-			return
-
-		#logger.debug("adding classes as handler: [%s] = %s", clz_add, handler)
-
-		Packet._id_handlerclass_dct[clz_add] = {}
-		Packet._handlerclass_id_dct[clz_add] = {}
+		if clz_add not in Packet._id_handlerclass_dct:
+			Packet._id_handlerclass_dct[clz_add] = {}
+			Packet._handlerclass_id_dct[clz_add] = {}
 
 		for handler_id, packetclass in handler.items():
 			# pypacker.Packet.load_handler(IP, { ID : class } )

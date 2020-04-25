@@ -197,6 +197,32 @@ get_msg_packet_hdr.restype = ctypes.POINTER(NfqnlMsgPacketHdr)
 get_msg_packet_hdr.argtypes = ctypes.POINTER(NfqData),
 
 
+# TODO
+# cat /proc/net/dev
+# cat /sys/class/net/lo/ifindex
+# socket.if_indextoname(1)
+# uint32_t nfq_get_physindev ( struct nfq_data *  nfad )
+get_physindev = netfilter.nfq_get_physindev
+get_physindev.restype = ctypes.c_uint32
+get_physindev.argtypes = ctypes.POINTER(NfqData),
+
+# uint32_t nfq_get_physoutdev ( struct nfq_data *  nfad )
+get_physoutdev = netfilter.nfq_get_physoutdev
+get_physoutdev.restype = ctypes.c_uint32
+get_physoutdev.argtypes = ctypes.POINTER(NfqData),
+
+
+# uint32_t  nfq_get_indev (struct nfq_data *nfad)
+get_indev = netfilter.nfq_get_indev
+get_indev.restype = ctypes.c_uint32
+get_indev.argtypes = ctypes.POINTER(NfqData),
+
+# uint32_t nfq_get_outdev ( struct nfq_data *  nfad )
+get_outdev = netfilter.nfq_get_outdev
+get_outdev.restype = ctypes.c_uint32
+get_outdev.argtypes = ctypes.POINTER(NfqData),
+
+
 # Retrieves the hardware address associated with the given queued packet.
 # struct nfqnl_msg_packet_hw* nfq_get_packet_hw	(	struct nfq_data * 	nfad	 ) 	[read]
 # Can be used to retrieve the source MAC address.
@@ -295,10 +321,15 @@ class Interceptor(object):
 				# hw address not always present, eg DHCP discover -> offer...
 				hw_addr = None
 
+			#if_idx_in = get_physindev(nfa)
+			if_idx_in = get_indev(nfa)
+			#if_idx_out = get_physoutdev(nfa)
+			if_idx_out = get_outdev(nfa)
+
 			data_ret, verdict = data, NF_DROP
 
 			try:
-				data_ret, verdict = verdict_callback(hw_addr, linklayer_protoid, data, ctx)
+				data_ret, verdict = verdict_callback(hw_addr, linklayer_protoid, data, ctx, if_idx_in, if_idx_out)
 			except Exception as ex:
 				logger.warning("Verdict callback problem, packet will be dropped: %r", ex)
 
