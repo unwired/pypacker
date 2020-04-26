@@ -25,6 +25,7 @@ import time
 import socket
 
 from pypacker import interceptor
+from pypacker.pypacker import mac_bytes_to_str
 from pypacker.layer12 import ethernet
 from pypacker.layer3 import ip, ip6
 
@@ -35,7 +36,7 @@ id_class = {
 
 
 
-def verdict_cb(ll_data, ll_proto_id, data, ctx, if_idx_in, if_idx_out):
+def verdict_cb(hwaddr, ll_proto_id, data, ctx, if_idx_in, if_idx_out, *args):
 	clz = id_class.get(ll_proto_id, None)
 	if_in, if_out = "", ""
 
@@ -49,7 +50,10 @@ def verdict_cb(ll_data, ll_proto_id, data, ctx, if_idx_in, if_idx_out):
 
 	if clz is not None:
 		pkt = clz(data)
-		print("Got a packet: %s (in: %s, out: %s)" % (pkt.__class__, if_in, if_out))
+		if hwaddr is not None:
+			hwaddr = mac_bytes_to_str(hwaddr)
+		print("Got a packet: %s (hwaddr: %s, in: %s, out: %s)" % (
+			pkt.__class__.__name__, hwaddr, if_in, if_out))
 	else:
 		print("Unknown NW layer proto: %X" % ll_proto_id)
 
