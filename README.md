@@ -140,7 +140,7 @@ def verdict_cb(ll_data, ll_proto_id, data, ctx, *args):
 	ip1 = ip.IP(data)
 	icmp1 = ip1[icmp.ICMP]
 
-	if icmp1 is None or icmp1.type != icmp.ICMP_TYPE_ECHO_REQ:
+	if icmp1 is None or icmp1.type != icmp.ICMP_ECHO:
 		return data, interceptor.NF_ACCEPT
 
 	echo1 = icmp1[icmp.ICMP.Echo]
