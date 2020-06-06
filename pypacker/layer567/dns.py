@@ -263,7 +263,7 @@ class DNS(pypacker.Packet):
 
 		while off < len(bts):
 			# check for pointer
-			if bts[off] == 0xC0:
+			if bts[off] & 0xC0:
 				#logger.debug("Found pointer at %d", off)
 				return off + 2
 			# found terminating 0
@@ -392,7 +392,7 @@ class DNS(pypacker.Packet):
 
 		for answer in self.answers:
 			# Assume answer for first query
-			if answer.name == b"\xc0\x0c" and answer.type in [DNS_A, DNS_AAAA]:
+			if answer.type in [DNS_A, DNS_AAAA]:
 				ret[answer.address_s] = question_dns[:-1]
 
 		return ret
