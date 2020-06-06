@@ -1617,6 +1617,17 @@ class DNSTestCase(unittest.TestCase):
 		self.assertEqual(ip_to_dns["64.4.25.82"], "teredo.ipv6.microsoft.com")
 		self.assertEqual(ip_to_dns["64.4.25.84"], "teredo.ipv6.microsoft.com")
 
+		print()
+		print(">>> DNS 6")
+		# this test file contains a long packet, where pointer addresses exceed 0xff
+		# and thus checks for pointers need to be made using the bitmask 0xc0
+		packet_bytes = get_pcap("tests/packets_dns4.pcap")
+
+		dns2 = linuxcc.LinuxCC(packet_bytes[0])[dns.DNS]
+		ip_to_dns = dns2.get_resolved_addresses()
+		self.assertEqual(len(ip_to_dns), 1)
+		self.assertEqual(ip_to_dns["13.107.246.10"], "collection.wifi4eu.ec.europa.eu")
+
 
 class NTPTestCase(unittest.TestCase):
 	def test_ntp(self):
