@@ -15,8 +15,8 @@ from pypacker.structcbs import pack_mac, unpack_mac, pack_ipv4, unpack_ipv4
 from pypacker.lazydict import LazyDict
 
 logger = logging.getLogger("pypacker")
-# logger.setLevel(logging.DEBUG)
-logger.setLevel(logging.WARNING)
+logger.setLevel(logging.DEBUG)
+#logger.setLevel(logging.WARNING)
 
 logger_streamhandler = logging.StreamHandler()
 logger_formatter = logging.Formatter("%(levelname)s (%(funcName)s): %(message)s")
@@ -40,7 +40,7 @@ ERROR_NOT_UNPACKED	= 4
 VARFILTER_TYPES = {bytes, int}
 
 
-class InvalidValuetypeException(Exception):
+class NotEnoughBytesException(Exception):
 	pass
 
 
@@ -181,7 +181,7 @@ class Packet(object, metaclass=MetaPacket):
 			# Not enough bytes means packet can't be unpacked.
 			# Check this here and not in _dissect() as its always the same for all dissects.
 			if len(args[0]) < header_len:
-				raise Exception("Not enough bytes for packet class %s: given=%d < expected=%d" %
+				raise NotEnoughBytesException("Not enough bytes for packet class %s: given=%d < expected=%d" %
 					(self.__class__, len(args[0]), header_len))
 
 			self._header_len = header_len

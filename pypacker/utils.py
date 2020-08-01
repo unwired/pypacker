@@ -1,5 +1,5 @@
 """
-Utility functions.
+Utility functions, primarily written for Linux based OS.
 """
 import subprocess
 import re
@@ -344,27 +344,20 @@ def get_mac_for_iface(iface_name):
 	except:
 		return None
 
-
-def get_ipv4_for_iface(iface_name, idx=0):
-	"""
-	return -- IPv4 address found for interface iface_name at index idx
-	"""
-	try:
-		return netifaces.ifaddresses(iface_name)[netifaces.AF_INET][idx]["addr"]
-	except:
-		return None
-
-
-def get_ipv4_addressinfo(iface_name, idx=0):
+def get_ip_addressinfo(iface_name, version=4, idx=0):
 	"""
 	iface_name -- Name of the interface to get the information from
+	version -- 4 for IPv4, 6 for IPv6
 	idx -- Index to the n'th element in the address-info list (useful if multiple IP addresses are assigned)
 	return -- Adressinfo (IP address, mask, broadcast address) for the given interface name
 		like ("1.2.3.4", "255.255.255.0", "192.168.0.255") or None on error
 	"""
+	version_id = netifaces.AF_INET if version == 4 else netifaces.AF_INET6
+
 	try:
-		addressinfo = netifaces.ifaddresses(iface_name)[netifaces.AF_INET][idx]
-		return addressinfo["addr"], addressinfo["netmask"], addressinfo["broadcast"]
+		addressinfo = netifaces.ifaddresses(iface_name)[version_id][idx]
+		# Honor no broadcast for IPv6
+		return addressinfo["addr"], addressinfo["netmask"], addressinfo.get("broadcast", None)
 	except:
 		return None
 
@@ -378,32 +371,24 @@ def nwmask_to_cidr(nmask):
 	return ipaddress.IPv4Network("1.2.3.4/%s" % nmask, strict=False).prefixlen
 
 
-def get_ipv6_for_iface(iface_name, idx=0):
+def get_gwip_for_iface(iface_name, version=4):
 	"""
-	return -- IPv6 address found for interface iface_name at index idx
+	iface_name -- Name of the interface to get the information from
+	version -- 4 for IPv4, 6 for IPv6
+	return -- IP address of the default gateway like "1.2.3.4" for interface iface_name or None
 	"""
-	try:
-		return netifaces.ifaddresses(iface_name)[netifaces.AF_INET6][idx]["addr"]
-	except:
+	version_id = netifaces.AF_INET if version == 4 else netifaces.AF_INET6
+	gws_ip = netifaces.gateways().get(version_id, None)
+
+	if gws_ip is None:
 		return None
+	gw_result = None
 
-
-def get_gwip_for_iface(iface_name):
-	"""
-	return -- IPv4 address of the default gateway like "1.2.3.4" for interface iface_name or None
-	"""
-	gws = netifaces.gateways()
-	gws_ipv4 = gws.get(netifaces.AF_INET, None)
-
-	if gws_ipv4 is None:
-		return None
-	gw_ipv4 = None
-
-	for gw_info in gws_ipv4:
+	for gw_info in gws_ip:
 		if iface_name in gw_info:
-			gw_ipv4 = gw_info[0]
+			gw_result = gw_info[0]
 			break
-	return gw_ipv4
+	return gw_result
 
 
 def get_arp_cache_entry(ipaddr):

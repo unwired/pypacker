@@ -31,7 +31,7 @@ try:
 
 	netfilter = ctypes.cdll.LoadLibrary(nflib)
 except:
-	logger.warning(MSG_NO_NFQUEUE)
+	logger.exception(MSG_NO_NFQUEUE)
 
 
 class NfqQHandler(ctypes.Structure):

@@ -87,14 +87,15 @@ class TuntapInterface(object):
 		ifacetype=TYPE_TUN,
 		ip_src="12.34.56.1",
 		ip_dst="12.34.56.2",
-		is_local_tunnel=False):
+		is_local_tunnel=False,
+		mtu=1500):
 		"""
 		iface_name -- name of the local interface to be used. See devnode.
 		devnode -- Path to the devnoce used for this interface. /dev/net/tunA will result in iface_name tunA0, tunA1 etc.
 		ifacetype -- TYPE_TUN or TYPE_TAP
 		ip_src -- Local IP address of the interface iface_name (/32 address will be used)
 		ip_dst -- Remote connection point of the local interface iface_name (/32 address will be used)
-		is_local_tunnel -- True is endpoint is also local, otherwise False
+		is_local_tunnel -- True if endpoint is also local, otherwise False
 		"""
 
 		self._closed = False
@@ -118,7 +119,7 @@ class TuntapInterface(object):
 		# ioctl(self._iface_fd, TUNSETOWNER, 1000)
 
 		if ip_src is not None and ip_dst is not None:
-			TuntapInterface.configure_interface(iface_name, ip_src, ip_dst, is_local_tunnel=is_local_tunnel)
+			TuntapInterface.configure_interface(iface_name, ip_src, ip_dst, mtu=mtu, is_local_tunnel=is_local_tunnel)
 		utils.set_interface_state(iface_name, state_active=True)
 
 	is_newly_created = property(lambda self: self._is_newly_created)
@@ -138,17 +139,17 @@ class TuntapInterface(object):
 		exec_syscmd("mknod %s c 10 200" % devnode)
 
 	@staticmethod
-	def configure_interface(iface_name, ip_src, ip_dst, is_local_tunnel=False):
+	def configure_interface(iface_name, ip_src, ip_dst, mtu=1500, is_local_tunnel=False):
 		"""
 		is_local_tunnel -- Adjust routing rules so that this interface can be used locally (eg tun0 <-> tun1
 			where tun0 and tun1 are both local interfaces)
 		"""
 		# Wait for interface to be created
 		#time.sleep(1)
-		#output = exec_syscmd("ifconfig %s %s/24" % (iface_name, ip_src))
-		#output = exec_syscmd("ifconfig %s %s/24 pointopoint %s" % (iface_name, ip_src, ip_dst))
-		#output = exec_syscmd("ifconfig %s %s pointopoint %s" % (iface_name, ip_src, ip_dst))
-		exec_syscmd("ifconfig %s %s/24" % (iface_name, ip_src))
+		#exec_syscmd("ifconfig %s %s/24" % (iface_name, ip_src))
+		exec_syscmd("ifconfig %s %s/24 pointopoint %s mtu %d" % (iface_name, ip_src, ip_dst, mtu))
+		#exec_syscmd("ifconfig %s %s pointopoint %s" % (iface_name, ip_src, ip_dst))
+		#exec_syscmd("ifconfig %s %s/24" % (iface_name, ip_src))
 
 		if is_local_tunnel:
 			# Packet with target ip_dst goes through "lo" if ip_dst is on the same host.

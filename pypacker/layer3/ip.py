@@ -181,7 +181,7 @@ class IP(pypacker.Packet):
 			self._init_triggerlist("opts", buf[20: 20 + options_length], self._parse_opts)
 		elif options_length < 0:
 			# invalid header length: assume no options at all
-			raise Exception()
+			raise Exception("Invalid options length: %d" % options_length)
 		# TODO: extract real data length:
 		# There are some cases where padding can not be identified on ethernet -> do it here (eg VSS shit trailer)
 		self._init_handler(buf[9], buf[total_header_length:])
