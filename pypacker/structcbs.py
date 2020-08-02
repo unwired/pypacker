@@ -19,6 +19,7 @@ unpack_I_n = Struct("=I").unpack
 unpack_IIII = Struct(">IIII").unpack
 pack_IIII = Struct(">IIII").pack
 unpack_IIII_le = Struct("<IIII").unpack
+pack_IIII_le = Struct("<IIII").pack
 
 pack_L_le = Struct("<L")
 

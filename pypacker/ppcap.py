@@ -6,9 +6,9 @@ import logging
 import types
 
 from pypacker import pypacker
-from pypacker.structcbs import pack_I, unpack_I_le
-from pypacker.structcbs import pack_IIII, unpack_IIII, unpack_IIII_le
-from pypacker.layer12 import ethernet, linuxcc, radiotap, btle, can
+from pypacker.structcbs import pack_H, unpack_H_le, pack_I, unpack_I_le
+from pypacker.structcbs import pack_IIII, unpack_IIII, pack_IIII_le, unpack_IIII_le
+from pypacker.layer12 import ethernet, linuxcc, ieee80211, radiotap, btle, can
 
 logger = logging.getLogger("pypacker")
 
@@ -51,6 +51,7 @@ PCAPTYPE_CLASS = {
 	DLT_LINUX_SLL: linuxcc.LinuxCC,
 	DLT_EN10MB: ethernet.Ethernet,
 	DLT_CAN_SOCKETCAN: can.CAN,
+	DLT_IEEE802_11: ieee80211.IEEE80211,
 	DLT_IEEE802_11_RADIO: radiotap.Radiotap,
 	LINKTYPE_BLUETOOTH_LE_LL_WITH_PHDR: btle.BTLEHdr
 }
@@ -82,82 +83,100 @@ class PcapPktHdr(pypacker.Packet):
 	)
 
 
+# Pcap magic to config:
+# magic : (ts_resolution, unpack_ts, pack_ts)
+MAGIC__PCAPFILECONFIG = {
+	TCPDUMP_MAGIC_MICRO: (1000, unpack_IIII, pack_IIII),
+	TCPDUMP_MAGIC_NANO: (1, unpack_IIII, pack_IIII),
+	TCPDUMP_MAGIC_MICRO_SWAPPED: (1000, unpack_IIII_le, pack_IIII_le),
+	TCPDUMP_MAGIC_NANO_SWAPPED: (1, unpack_IIII_le, pack_IIII_le)
+}
+
 # PCAP callbacks
 
-
-def pcap_cb_init_write_us(self, snaplen=1500, linktype=DLT_EN10MB, **initdata):
+def pcap_cb_init_write(self, snaplen=1500, linktype=DLT_EN10MB, magic=TCPDUMP_MAGIC_NANO, **initdata):
+	# Nanoseconds
 	self._timestamp = 0
-	header = PcapFileHdr(magic=TCPDUMP_MAGIC_MICRO, snaplen=snaplen, linktype=linktype)
-	self._fh.write(header.bin())
 
-def pcap_cb_init_write_ns(self, snaplen=1500, linktype=DLT_EN10MB, **initdata):
-	self._timestamp = 0
-	header = PcapFileHdr(magic=TCPDUMP_MAGIC_NANO, snaplen=snaplen, linktype=linktype)
-	self._fh.write(header.bin())
+	# A new pcap file is created
+	if self._fh.tell() == 0:
+		logger.debug("Creating new pcap")
+		self._resolution_factor, _, self._callback_pack_meta = MAGIC__PCAPFILECONFIG[magic]
+		header = PcapFileHdr(magic=magic, snaplen=snaplen, linktype=linktype)
 
-def pcap_cb_write_us(self, bts, **metadata):
+		# BE -> LE
+		if magic in [TCPDUMP_MAGIC_MICRO_SWAPPED, TCPDUMP_MAGIC_NANO_SWAPPED]:
+			header.v_major = unpack_H_le(pack_H(header.v_major))[0]
+			header.v_minor = unpack_H_le(pack_H(header.v_minor))[0]
+			header.snaplen = unpack_I_le(pack_I(snaplen))[0]
+			header.linktype = unpack_I_le(pack_I(linktype))[0]
+
+		self._fh.write(header.bin())
+	# File already present, read config
+	else:
+		logger.debug("File already present, reading config and appending to end")
+		self._fh.seek(0)
+		buf = self._fh.read(24)
+		magic = PcapFileHdr(buf).magic
+
+		if magic not in [TCPDUMP_MAGIC_MICRO, TCPDUMP_MAGIC_NANO, TCPDUMP_MAGIC_MICRO_SWAPPED, TCPDUMP_MAGIC_NANO_SWAPPED]:
+			raise Exception("Invalid magic: %X" % magic)
+
+		self._resolution_factor, callback_unpack_meta, self._callback_pack_meta = MAGIC__PCAPFILECONFIG[magic]
+		# Get last ts in pcap -> read until end
+		fhpos = 24
+		self._fh.seek(fhpos)
+		d = [0, 0, 0, 0]
+
+		while True:
+			buf = self._fh.read(16)
+			fhpos += 16
+
+			if not buf:
+				break
+
+			d = callback_unpack_meta(buf)
+			#logger.debug("s=%d, subsec=%d" % (d[0], d[1]))
+			fhpos += d[2]
+			self._fh.seek(fhpos)
+
+		self._timestamp = d[0] * 1000000000 + (d[1] * self._resolution_factor)
+		logger.debug("Last ts: s=%d, subsec=%d, final=%d" % (d[0], d[1], self._timestamp))
+
+
+def pcap_cb_write(self, bts, **metadata):
+	# Check if "ts" was given when calling write(), otherwise assume 1 us has passed
+	# ts = given as ns
 	ts = metadata.get("ts", self._timestamp + 1000)
 	self._timestamp = ts
-	sec = int(ts / 1000000)
-	usec = ts - (sec * 1000000)
-
-	# logger.debug("packet time sec/nsec: %d/%d", sec, nsec)
-	n = len(bts)
-	self._fh.write(pack_IIII(sec, usec, n, n))
-	self._fh.write(bts)
-
-def pcap_cb_write_ns(self, bts, **metadata):
-	ts = metadata.get("ts", self._timestamp + 1000000)
-	self._timestamp = ts
 	sec = int(ts / 1000000000)
-	nsec = ts - (sec * 1000000000)
+	# ns -> [ns | us]
+	subsec = int((ts - (sec * 1000000000)) / self._resolution_factor)
 
-	# logger.debug("packet time sec/nsec: %d/%d", sec, nsec)
+	# logger.debug("packet time sec/subsec: %d/%d", sec, subsec)
 	n = len(bts)
-	self._fh.write(pack_IIII(sec, nsec, n, n))
+	self._fh.write(self._callback_pack_meta(sec, subsec, n, n))
 	self._fh.write(bts)
 
 
 def pcap_cb_init_read(self, **initdata):
 	buf = self._fh.read(24)
-	# file header is skipped per default (needed for __next__)
+	# File header is skipped per default (needed for __next__)
 	self._fh.seek(24)
-	# this is not needed anymore later on but we set it anyway
 	fhdr = PcapFileHdr(buf)
-	self._closed = False
 
 	if fhdr.magic not in [TCPDUMP_MAGIC_MICRO, TCPDUMP_MAGIC_NANO, TCPDUMP_MAGIC_MICRO_SWAPPED, TCPDUMP_MAGIC_NANO_SWAPPED]:
 		return False
-	is_le = False
 
-	# handle file types
-	if fhdr.magic == TCPDUMP_MAGIC_MICRO:
-		self._resolution_factor = 1000
-		# Note: we could use PcapPktHdr/PcapLEPktHdr to parse pre-packetdata but calling unpack directly
-		# greatly improves performance
-		self._callback_unpack_meta = unpack_IIII
-	elif fhdr.magic == TCPDUMP_MAGIC_NANO:
-		self._resolution_factor = 1
-		self._callback_unpack_meta = unpack_IIII
-	elif fhdr.magic == TCPDUMP_MAGIC_MICRO_SWAPPED:
-		is_le = True
-		self._resolution_factor = 1000
-		self._callback_unpack_meta = unpack_IIII_le
-	elif fhdr.magic == TCPDUMP_MAGIC_NANO_SWAPPED:
-		is_le = True
-		self._resolution_factor = 1
-		self._callback_unpack_meta = unpack_IIII_le
-	else:
-		raise ValueError("invalid tcpdump header, magic value: %s" % fhdr.magic)
+	is_le = False if fhdr.magic in [TCPDUMP_MAGIC_MICRO, TCPDUMP_MAGIC_NANO] else True
 
+	logger.debug("Pcap magic: %X, le: %s" % (fhdr.magic, is_le))
+	# Handle file types
+	# Note: we could use PcapPktHdr/PcapLEPktHdr to parse pre-packetdata but calling unpack directly
+	# greatly improves performance
+	self._resolution_factor, self._callback_unpack_meta, _ = MAGIC__PCAPFILECONFIG[fhdr.magic]
 	linktype = fhdr.linktype if not is_le else unpack_I_le(pack_I(fhdr.linktype))[0]
 	self._lowest_layer_new = PCAPTYPE_CLASS.get(linktype, None)
-
-	def is_resolution_nano(obj):
-		"""return -- True if resolution is in Nanoseconds, False if milliseconds."""
-		return obj._resolution_factor == 1000
-
-	self.is_resolution_nano = types.MethodType(is_resolution_nano, self)
 	return True
 
 
@@ -170,7 +189,7 @@ def pcap_cb_read(self):
 	d = self._callback_unpack_meta(buf)
 	buf = self._fh.read(d[2])
 
-	# sec->ns + [us*1000 | ns]
+	# return as ns: sec->ns + [us*1000 | ns]
 	return d[0] * 1000000000 + (d[1] * self._resolution_factor), buf
 
 
@@ -178,14 +197,8 @@ def pcap_cb_btstopkt(self, meta, bts):
 	return self._lowest_layer_new(bts)
 
 
-# PCAPNG related_btstopkt
-# Generic/filetype invariant related
-
-# Time resolution microseconds
-FILETYPE_PCAP_RES_US	= 0
-# Time resolution nanoseconds
-FILETYPE_PCAP_RES_NS	= 1
-FILETYPE_PCAPNG	= 2
+FILETYPE_PCAP	= 0
+#FILETYPE_PCAPNG	= 1
 
 # type_id : [
 #	cb_init_write(obj, **initdata),
@@ -195,15 +208,9 @@ FILETYPE_PCAPNG	= 2
 #	cb_btstopkt(self, metadata, bytes): pkt
 # ]
 FILEHANDLER = {
-	FILETYPE_PCAP_RES_US: [
-		pcap_cb_init_write_us, pcap_cb_write_us, pcap_cb_init_read, pcap_cb_read, pcap_cb_btstopkt
+	FILETYPE_PCAP: [
+		pcap_cb_init_write, pcap_cb_write, pcap_cb_init_read, pcap_cb_read, pcap_cb_btstopkt
 	],
-	FILETYPE_PCAP_RES_NS: [
-		pcap_cb_init_write_ns, pcap_cb_write_ns, pcap_cb_init_read, pcap_cb_read, pcap_cb_btstopkt
-	]
-	#FILETYPE_PCAPNG : [
-	#	None, None, None
-	#]
 }
 
 
@@ -226,41 +233,47 @@ class FileHandler(object):
 		self._fh.close()
 
 
-class PcapHandler(FileHandler):
-	MODE_READ = 1
-	MODE_WRITE = 2
 
-	def __init__(self, filename, mode, filetype=FILETYPE_PCAP_RES_NS, **initdata):
-		# TODO: differentiate callbacks by mode -> filetype -> [read | write]
-		try:
-			callbacks = FILEHANDLER[filetype]
-		except IndexError:
-			raise Exception("unknown filehandler type for mode %d: %d" % (mode, filetype))
-
-		if mode == PcapHandler.MODE_WRITE:
-			super().__init__(filename, "wb")
-			callbacks[0](self, **initdata)
-			self.write = types.MethodType(callbacks[1], self)
-		elif mode == PcapHandler.MODE_READ:
-			super().__init__(filename, "rb")
-			ismatch = False
-
-			for pcaptype, callbacks in FILEHANDLER.items():
-				self._fh.seek(0)
-				# init callback
-				ismatch = callbacks[2](self, **initdata)
-
-				if ismatch:
-					#logger.debug("found handler for file: %x", pcaptype)
-					# read callback
-					self.__next__ = types.MethodType(callbacks[3], self)
-					# bytes-to-packet callback
-					self._btstopkt = types.MethodType(callbacks[4], self)
-					break
-			if not ismatch:
-				raise Exception("no matching handler found")
+class Writer(FileHandler):
+	"""
+	Simple pcap writer supporting pcap format.
+	"""
+	def __init__(self, filename, filetype=FILETYPE_PCAP, append=False, **initdata):
+		if append:
+			super().__init__(filename, "a+b")
 		else:
-			raise Exception("wrong mode: %d" % mode)
+			super().__init__(filename, "wb")
+
+		callbacks = FILEHANDLER[filetype]
+		callbacks[0](self, **initdata)
+		self.write = types.MethodType(callbacks[1], self)
+
+
+class Reader(FileHandler):
+	"""
+	Simple pcap file reader supporting pcap format.
+	"""
+	def __init__(self, filename, filetype=FILETYPE_PCAP, **initdata):
+		super().__init__(filename, "rb")
+
+		callbacks = FILEHANDLER[filetype]
+		ismatch = False
+
+		for pcaptype, callbacks in FILEHANDLER.items():
+			self._fh.seek(0)
+			# init callback
+			ismatch = callbacks[2](self, **initdata)
+
+			if ismatch:
+				#logger.debug("found handler for file: %x", pcaptype)
+				# Read callback
+				self.__next__ = types.MethodType(callbacks[3], self)
+				# Bytes-to-packet callback
+				self._btstopkt = types.MethodType(callbacks[4], self)
+				break
+		if not ismatch:
+			raise Exception("No matching handler found")
+
 
 	def read_packet(self, pktfilter=lambda pkt: True):
 		"""
@@ -317,22 +330,6 @@ class PcapHandler(FileHandler):
 		return -- [(ts, bts), ...]
 		"""
 		return [(ts, bts) for ts, bts in self]
-
-
-class Writer(PcapHandler):
-	"""
-	Simple pcap writer supporting pcap format.
-	"""
-	def __init__(self, filename, filetype=FILETYPE_PCAP_RES_NS, **initdata):
-		super().__init__(filename, PcapHandler.MODE_WRITE, filetype=filetype, **initdata)
-
-
-class Reader(PcapHandler):
-	"""
-	Simple pcap file reader supporting pcap format.
-	"""
-	def __init__(self, filename, filetype=FILETYPE_PCAP_RES_NS, **initdata):
-		super().__init__(filename, PcapHandler.MODE_READ, filetype=filetype, **initdata)
 
 
 def merge_pcaps(pcap_filenames_in, pcap_filename_out, filter_accept=lambda bts: True, linktype=DLT_EN10MB):

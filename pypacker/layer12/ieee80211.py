@@ -85,7 +85,7 @@ _subheader_properties = []
 
 IEEE_FIELDS_SRC_DST_BSSID = ["src", "dst", "bssid"]
 
-# set properties to access flags
+# Set properties to access flags
 for subfield_name, mask_off in _FRAMECTRL_SUBHEADERDATA.items():
 	# logger.debug("setting prop: %r, %X, %X" % (subfield_name, mask_off[0], mask_off[1]))
 	subheader = [

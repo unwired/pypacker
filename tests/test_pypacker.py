@@ -1884,7 +1884,7 @@ class ReadWriteReadTestCase(unittest.TestCase):
 		filename_write = "tests/packets_ether.pcapng_tmp"
 
 		reader = ppcap.Reader(filename=filename_read, lowest_layer=ethernet.Ethernet)
-		writer = ppcap.Writer(filename=filename_write)
+		writer = ppcap.Writer(filename=filename_write, append=False)
 		pkts_read = []
 
 		for ts, pkt in reader.read_packet_iter():
@@ -1905,6 +1905,66 @@ class ReadWriteReadTestCase(unittest.TestCase):
 			self.assertEqual(ts, pkts_read[pos][0])
 			self.assertEqual(bts, pkts_read[pos][1])
 		reader.close()
+
+	def test_write_and_append(self):
+		print_header("pcap WRITE -> Append")
+		filename_read = "tests/packets_ether.pcap"
+		filename_write = "tests/packets_ether.pcap_tmp"
+
+		reader = ppcap.Reader(filename=filename_read, lowest_layer=ethernet.Ethernet)
+		print("Writing initial (new file)")
+		writer1 = ppcap.Writer(filename=filename_write, append=False)
+		pkts_read = []
+
+		# 1) read from original (us format) -> write to target (ns format)
+		for ts, pkt in reader.read_packet_iter():
+			# should allready be fully dissected but we want to be sure..
+			pkts_read.append(tuple([ts, pkt.bin()]))
+			writer1.write(pkt.bin(), ts=ts)
+
+		writer1.close()
+		reader.close()
+
+		print("Appending to file, %d packets" % len(pkts_read))
+		writer2 = ppcap.Writer(filename=filename_write, append=True)
+
+		# 2) Appending to target: same content, ts is auto incremented (1us-steps)
+		for _, bts in pkts_read:
+			writer2.write(bts)
+		writer2.close()
+
+		# 3) Compare content: [source] = [target (1st half)], [source] = [target bytes (2nd half)] and ts is in 1us-steps
+		reader = ppcap.Reader(filename=filename_write, lowest_layer=ethernet.Ethernet)
+
+		pkts_read_rewritten = reader.read()
+
+		#for idx, ts_bts in enumerate(pkts_read_rewritten):
+		#	print("%d: %d" % (idx, ts_bts[0]))
+
+		pos_half = int(len(pkts_read_rewritten)/2)
+		pkts_read_rewritten_first = pkts_read_rewritten[0: pos_half]
+		pkts_read_rewritten_second = pkts_read_rewritten[pos_half:]
+		pkts_read_rewritten_pos = 0
+
+		for ts, bts in pkts_read_rewritten_first:
+			# Timestamp and bytes should not have been changed: input = output
+			self.assertEqual(ts, pkts_read[pkts_read_rewritten_pos][0])
+			self.assertEqual(bts, pkts_read[pkts_read_rewritten_pos][1])
+			pkts_read_rewritten_pos += 1
+
+		pkts_read_rewritten_pos = 0
+		ts_calc = pkts_read_rewritten_first[-1][0]
+		print("Last ts from read rewritten: %d" % ts_calc)
+
+		for ts, bts in pkts_read_rewritten_second:
+			# Timestamp and bytes should not have been changed: input = output
+			# Add 1us
+			ts_calc += 1000
+			#print("ts/pkts_read_rewritten_second=%d, ts/calculated=%d" % (ts, ts_calc))
+			self.assertEqual(ts, ts_calc)
+			self.assertEqual(bts, pkts_read[pkts_read_rewritten_pos][1])
+			pkts_read_rewritten_pos += 1
+
 
 
 class RadiotapTestCase(unittest.TestCase):
