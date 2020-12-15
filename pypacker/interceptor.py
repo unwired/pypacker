@@ -23,7 +23,7 @@ MSG_NO_NFQUEUE = "Could not load netfilter_queue library. See README.md for inte
 netfilter = None
 
 try:
-	# load library
+	# Load library
 	nflib = utils.find_library("netfilter_queue")
 
 	if nflib is None:
@@ -277,6 +277,7 @@ class Interceptor(object):
 	def verdict_trigger_cycler(recv, nfq_handle, obj):
 		try:
 			while obj._is_running:
+				# TODO: exception in outer loop?
 				try:
 					# max IP packet size = 65535 bytes
 					bts = recv(65535)
@@ -313,6 +314,7 @@ class Interceptor(object):
 			len_recv, data = get_full_payload(nfa, packet_ptr)
 
 			try:
+				# TODO: avoid exception, check for hw_addrlen?
 				hw_info = get_packet_hw(nfa).contents
 				hw_addrlen = ntohs(hw_info.hw_addrlen)
 				hw_addr = ctypes.string_at(hw_info.hw_addr, size=hw_addrlen)
@@ -360,6 +362,7 @@ class Interceptor(object):
 		# TODO: better solution to check for running state? close socket and raise exception does not work in stop()
 		nfq_socket.settimeout(1)
 
+		# TODO: faster w/ asyncio?
 		thread = threading.Thread(
 			target=Interceptor.verdict_trigger_cycler,
 			args=[nfq_socket.recv, nfq_handle, self]
@@ -389,7 +392,7 @@ class Interceptor(object):
 		self._is_running = True
 
 		for queue_id in queue_ids:
-			# setup queue and start produces threads
+			# Setup queue and start producer threads
 			self._setup_queue(queue_id, ctx, verdict_callback)
 
 	def stop(self):

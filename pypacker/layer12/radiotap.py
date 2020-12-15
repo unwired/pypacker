@@ -2,9 +2,9 @@
 import logging
 
 from pypacker import pypacker, triggerlist
-# handler
+# Handler
 from pypacker.layer12 import ieee80211
-from pypacker.structcbs import pack_H_le, unpack_H_le, unpack_I
+from pypacker.structcbs import pack_H_le, unpack_H_le, pack_I, pack_I_le, unpack_I, unpack_I_le
 
 logger = logging.getLogger("pypacker")
 
@@ -14,7 +14,7 @@ RTAP_TYPE_80211 = 0
 # Ref: http://www.radiotap.org
 # Fields Ref: http://www.radiotap.org/defined-fields/all
 
-# defined flags ordered by appearance (big endian)
+# Defined flags ordered by appearance (little endian)
 TSFT_MASK		= 0x01000000
 FLAGS_MASK		= 0x02000000
 RATE_MASK		= 0x04000000
@@ -185,6 +185,28 @@ class Radiotap(pypacker.Packet):
 
 	# get/set channel, set frequency under the hood
 	channel = property(_get_channel, _set_channel)
+
+	"""
+	def _get_present_flags_be(self):
+		return unpack_I(pack_I_le(self.present_flags))[0]
+
+	def _set_present_flags_be(self, present_flags_be):
+		self.present_flags = unpack_I_le(pack_I(present_flags_be))[0]
+
+	present_flags_be = property(_get_present_flags_be, _set_present_flags_be)
+	"""
+
+
+	def _get_signal_strength(self):
+		"""return -- Signal strength in dB or None"""
+		sig = self.flags.find_value(search_cb=lambda v: v[0] == DB_ANT_SIG_MASK)
+
+		if sig is not None:
+			return int.from_bytes(sig[1], byteorder="big", signed=True)
+
+		return sig
+
+	signal_strength = property(_get_signal_strength)
 
 	def _dissect(self, buf):
 		# Needed by _parse_flags()

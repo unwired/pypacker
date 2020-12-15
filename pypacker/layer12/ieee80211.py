@@ -174,11 +174,15 @@ class IEEE80211(pypacker.Packet):
 		def _set_ts(self, val):
 			self._ts = unpack_Q_le(pack_Q(val))[0]
 
+		def _get_essid(self):
+			return self.params.find_value(search_cb=lambda v: v.id == IEEE80211.IE_SSID).body_bytes
+
 		seq = property(_get_seq, _set_seq)
 		ts = property(_get_ts, _set_ts)
 		dst_s = pypacker.get_property_mac("dst")
 		bssid_s = pypacker.get_property_mac("bssid")
 		src_s = pypacker.get_property_mac("src")
+		essid = property(_get_essid)
 
 		def _dissect(self, buf):
 			self._init_triggerlist("params", buf[32:], IEEE80211._unpack_ies)

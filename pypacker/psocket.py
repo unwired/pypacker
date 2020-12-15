@@ -190,15 +190,22 @@ class SocketHndl(object):
 			pass
 
 
-def get_ssl_clientsocket(hostname, port, timeout=5, check_hostname=False, verify_mode=ssl.CERT_NONE, **sslparams):
+def get_ssl_clientsocket(hostname, port, server_cert=None, ssl_server_hostname_to_check=None, verify_mode=ssl.CERT_NONE, timeout=5):
 	"""
-	return -- SSL wrapped TCP socket, not complaining about any server certificates
+	server_cert -- PEM file containing server certificate
+	ssl_server_hostname_to_check -- Check hostname in context of TLS
+	verify_mode -- Verify server certificate, ssl.CERT_REQUIRED needs server_cert
+	return -- SSL wrapped TCP client socket
 	"""
 	context = ssl.create_default_context()
-	context.check_hostname = check_hostname
+
+	if server_cert is not None:
+		context.load_verify_locations(server_cert)
+
+	context.check_hostname = False if ssl_server_hostname_to_check is None else True
 	context.verify_mode = verify_mode
 	socket_simple = socket.create_connection((hostname, port))
-	socket_ssl = context.wrap_socket(socket_simple, server_hostname=hostname, **sslparams)
+	socket_ssl = context.wrap_socket(socket_simple, server_hostname=ssl_server_hostname_to_check)
 	socket_ssl.settimeout(timeout)
 	return socket_ssl
 

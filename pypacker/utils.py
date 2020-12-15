@@ -344,6 +344,7 @@ def get_mac_for_iface(iface_name):
 	except:
 		return None
 
+
 def get_ip_addressinfo(iface_name, version=4, idx=0):
 	"""
 	iface_name -- Name of the interface to get the information from

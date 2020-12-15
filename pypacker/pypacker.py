@@ -15,8 +15,8 @@ from pypacker.structcbs import pack_mac, unpack_mac, pack_ipv4, unpack_ipv4
 from pypacker.lazydict import LazyDict
 
 logger = logging.getLogger("pypacker")
-logger.setLevel(logging.DEBUG)
-#logger.setLevel(logging.WARNING)
+# logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.WARNING)
 
 logger_streamhandler = logging.StreamHandler()
 logger_formatter = logging.Formatter("%(levelname)s (%(funcName)s): %(message)s")
@@ -119,7 +119,7 @@ class Packet(object, metaclass=MetaPacket):
 	- Ability to check direction to other Packets via "[is_]direction()"
 	- Access to next lower/upper layer
 	- No correction of given raw packet-bytes e.g. checksums when creating a packet from it
-		If the packet can't be parsed without correct data -> raise exception.
+		If the packet can't be parsed w/ correct data -> raise exception.
 		The internal state will only be updated on changes to headers or data later on
 	- General rule: less changes to headers/body-data = more performance
 
@@ -486,7 +486,7 @@ class Packet(object, metaclass=MetaPacket):
 
 	def __iter__(self):
 		"""
-		Iterate over every layer starting from first layer.
+		Iterate over every layer starting from this layer.
 		To start from the lowest layer use "for l in pkt.lowest_layer".
 		"""
 		p_instance = self
