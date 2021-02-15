@@ -196,7 +196,6 @@ class Radiotap(pypacker.Packet):
 	present_flags_be = property(_get_present_flags_be, _set_present_flags_be)
 	"""
 
-
 	def _get_signal_strength(self):
 		"""return -- Signal strength in dB or None"""
 		sig = self.flags.find_value(search_cb=lambda v: v[0] == DB_ANT_SIG_MASK)

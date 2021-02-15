@@ -6,6 +6,9 @@ should be used.
 import socket
 import ssl
 import logging
+import threading
+from multiprocessing import Queue
+from queue import Full, Empty
 
 from pypacker import pypacker
 from pypacker.layer12 import ethernet
@@ -25,6 +28,7 @@ class SocketHndl(object):
 		timeout=3,
 		buffersize_recv=None,
 		buffersize_send=None,
+		buffer_packets_max=50000,
 		**params):
 		"""
 		iface_name -- Bind to the given interface
@@ -53,12 +57,36 @@ class SocketHndl(object):
 		if iface_name is not None:
 			self._socket.bind((iface_name, SocketHndl.ETH_P_ALL))
 
+		self._timeout = timeout
 		self._socket.settimeout(timeout)
 
 		if buffersize_recv is not None:
 			self._socket.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, buffersize_recv)
 		if buffersize_send is not None:
 			self._socket.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, buffersize_send)
+
+		# Buffer packets to reduce risk of packet drops
+		self._is_running = True
+		self._queue = Queue(maxsize=buffer_packets_max)
+		self._thread_recv = threading.Thread(target=SocketHndl._recv_cycler, args=[self])
+		self._thread_recv.start()
+
+	@staticmethod
+	def _recv_cycler(obj):
+		queue_put = obj._queue.put
+		sock_recv = obj._socket.recv
+
+		while obj._is_running:
+			try:
+				while obj._is_running:
+					queue_put(sock_recv(65535), block=False)
+			except socket.timeout:
+				logger.debug("Queue handler: receive timeout")
+				continue
+			except Full:
+				logger.warning("Receive queue is full: %d, dropping packet!" % obj._queue.qsize())
+			except OSError:
+				break
 
 	def send(self, bts):
 		"""
@@ -70,9 +98,13 @@ class SocketHndl(object):
 
 	def recv(self, size=65536):
 		"""
+		TODO: size is obsolete: always set to 65535
 		return -- bytes received from network
 		"""
-		return self._socket.recv(size)
+		try:
+			return self._queue.get(timeout=self._timeout)
+		except Empty:
+			raise socket.timeout("timed out")
 
 	def __enter__(self):
 		return self
@@ -184,13 +216,24 @@ class SocketHndl(object):
 		return received
 
 	def close(self):
+		self._is_running = False
+
 		try:
 			self._socket.close()
 		except:
 			pass
 
+		self._queue.close()
+		logger.debug("Joining receive thread")
+		self._thread_recv.join()
 
-def get_ssl_clientsocket(hostname, port, server_cert=None, ssl_server_hostname_to_check=None, verify_mode=ssl.CERT_NONE, timeout=5):
+
+def get_ssl_clientsocket(
+	hostname, port,
+	server_cert=None,
+	ssl_server_hostname_to_check=None,
+	verify_mode=ssl.CERT_NONE,
+	timeout=5):
 	"""
 	server_cert -- PEM file containing server certificate
 	ssl_server_hostname_to_check -- Check hostname in context of TLS

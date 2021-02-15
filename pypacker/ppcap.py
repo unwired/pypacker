@@ -94,6 +94,7 @@ MAGIC__PCAPFILECONFIG = {
 
 # PCAP callbacks
 
+
 def pcap_cb_init_write(self, snaplen=1500, linktype=DLT_EN10MB, magic=TCPDUMP_MAGIC_NANO, **initdata):
 	# Nanoseconds
 	self._timestamp = 0
@@ -233,7 +234,6 @@ class FileHandler(object):
 		self._fh.close()
 
 
-
 class Writer(FileHandler):
 	"""
 	Simple pcap writer supporting pcap format.
@@ -273,7 +273,6 @@ class Reader(FileHandler):
 				break
 		if not ismatch:
 			raise Exception("No matching handler found")
-
 
 	def read_packet(self, pktfilter=lambda pkt: True):
 		"""
