@@ -6,11 +6,12 @@ RFC 2460
 import logging
 
 from pypacker import pypacker, triggerlist
-from pypacker.layer3.ip_shared import IP_PROTO_HOPOPTS, IP_PROTO_ROUTING, IP_PROTO_FRAGMENT,\
+from pypacker.layer3.ip_shared import IP_PROTO_HOPOPTS, IP_PROTO_IP6, IP_PROTO_ROUTING, IP_PROTO_FRAGMENT,\
 	IP_PROTO_AH, IP_PROTO_ESP, IP_PROTO_DSTOPTS, IP_PROTO_ICMP6, IP_PROTO_IGMP, IP_PROTO_TCP,\
 	IP_PROTO_UDP, IP_PROTO_PIM, IP_PROTO_IPXIP, IP_PROTO_SCTP, IP_PROTO_OSPF
 from pypacker.pypacker import FIELD_FLAG_AUTOUPDATE, FIELD_FLAG_IS_TYPEFIELD
-# handler
+from pypacker.structcbs import unpack_H
+# Handler
 from pypacker.layer3 import esp, icmp6, igmp, ipx, ospf, pim
 from pypacker.layer4 import tcp, udp, sctp
 
@@ -19,6 +20,7 @@ logger = logging.getLogger("pypacker")
 
 ext_hdrs = {
 	IP_PROTO_HOPOPTS,
+	IP_PROTO_IP6,
 	IP_PROTO_ROUTING,
 	IP_PROTO_FRAGMENT,
 	IP_PROTO_AH,
@@ -33,8 +35,8 @@ ext_hdrs = {
 class IP6(pypacker.Packet):
 	__hdr__ = (
 		("v_fc_flow", "I", 0x60000000),
-		("dlen", "H", 0, FIELD_FLAG_AUTOUPDATE),  # length of extension header (opts header) + body
-		# body handler type OR type of first extension hedader (opts header)
+		("dlen", "H", 0, FIELD_FLAG_AUTOUPDATE),  # Length of extension header (opts header) + upwards
+		# Body handler type OR type of first extension hedader (opts header)
 		("nxt", "B", 0),
 		("hlim", "B", 0),  # hop limit
 		("src", "16s", b"\x00" * 16),
@@ -83,6 +85,8 @@ class IP6(pypacker.Packet):
 	update_dependants = {tcp.TCP, udp.UDP}
 
 	def _dissect(self, buf):
+		# IP6 header and upwards
+		len_total = 40 + unpack_H(buf[4: 6])[0]
 		type_nxt = buf[6]
 		off = 40
 		opts = []
@@ -91,12 +95,15 @@ class IP6(pypacker.Packet):
 		# logger.debug("parsing opts from bytes (dst: %s): (len: %d) %s" %
 		#	 (buf[24:40], self.hdr_len, buf[off:]))
 		# parse options until type is an upper layer one
-		while type_nxt in ext_hdrs:
-			length = 8 + buf[off + 1] * 8
-			# logger.debug("next type is: %s, len: %d, %r" % (type_nxt, length, buf[off:off + length]))
+		while type_nxt in ext_hdrs and off < len_total:
+			# Different header structure for IP6 and sub-header
+			# IP6: Total length = 8 + Payload length
+			length = 8 + buf[off + 1] * 8 if type_nxt != IP_PROTO_IP6 else 8 + unpack_H(buf[off + 4: off + 6])[0]
+			#logger.debug("next type is: %s, len: %d, %r" % (type_nxt, length, buf[off:off + length]))
 			opt = ext_hdrs_cls[type_nxt](buf[off:off + length])
 			opts.append(opt)
-			type_nxt = buf[off]
+			# Different header structure for IP6 and sub-header
+			type_nxt = buf[off] if type_nxt != IP_PROTO_IP6 else buf[off + 6]
 			off += length
 
 		# TODO: lazy dissect possible?
@@ -200,7 +207,9 @@ class IP6RoutingHeader(pypacker.Packet):
 		("len", "B", 0),  # extension data length in 8 octect units (ignoring first 8 octets) (<= 46 for type 0)
 		("type", "B", 0),  # routing type (currently, only 0 is used)
 		("segs_left", "B", 0),  # remaining segments in route, until destination (<= 23)
-		("rsvd_sl_bits", "I", 0),  # reserved (1 byte), strict/loose bitmap for addresses
+		("lastentry", "B", 0),
+		("flags", "B", 0),
+		("tag", "H", 0),
 		("addresses", None, triggerlist.TriggerList)
 	)
 
@@ -215,18 +224,17 @@ class IP6RoutingHeader(pypacker.Packet):
 		hdr_size = 8
 		addr_size = 16
 		addresses = []
-		num_addresses = self.buf[1] / 2
+		num_addresses = int(buf[1] / 2)
 
 		buf = buf[hdr_size:hdr_size + num_addresses * addr_size]
 
-		# logger.debug("IP6RoutingHeader: parsing addresses")
 		for i in range(num_addresses):
 			addresses.append(buf[i * addr_size: i * addr_size + addr_size])
 
 		self.addresses.extend(addresses)
-		return len(num_addresses) * addr_size + addr_size
-		# setattr(self, "addresses", addresses)
-		# setattr(self, "length", self.len * 8 + 8)
+		#logger.debug(addresses)
+		#print("num_addresses=%d, addr_size=%d" % (num_addresses, addr_size))
+		return 8 + num_addresses * addr_size
 
 
 class IP6FragmentHeader(pypacker.Packet):
@@ -273,6 +281,7 @@ class IP6DstOptsHeader(IP6OptsHeader):
 		IP6OptsHeader._dissect(self, buf)
 
 ext_hdrs_cls = {
+	IP_PROTO_IP6: IP6,
 	IP_PROTO_HOPOPTS: IP6HopOptsHeader,
 	IP_PROTO_ROUTING: IP6RoutingHeader,
 	IP_PROTO_FRAGMENT: IP6FragmentHeader,

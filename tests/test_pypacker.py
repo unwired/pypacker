@@ -1071,6 +1071,33 @@ class IP6TestCase(unittest.TestCase):
 				pkt_eth_ip_tcp[tcp.TCP].__class__))
 
 
+	def test_ruotingheader(self):
+		print_header("IPv6 routing header")
+		packet_bytes = get_pcap("tests/packets_ip6_sr-header.pcap")
+
+		for idx, bts in enumerate(packet_bytes):
+			print("%d" % (idx + 1) + "-" * 4)
+			pkt_eth = ethernet.Ethernet(bts)
+			# Routing header should be present
+			pkt_ip6 = pkt_eth[ip6.IP6]
+			self.assertIsNotNone(pkt_ip6)
+
+			if len(pkt_ip6.opts) == 0:
+				self.assertEqual(pkt_ip6.src_s, "fc00:2:0:2::1")
+				self.assertEqual(pkt_ip6.dst_s, "fc00:2:0:1::1")
+			else:
+				self.assertEqual(pkt_ip6.src_s, "fc00:42:0:1::2")
+				self.assertEqual(pkt_ip6.dst_s, "fc00:2:0:5::1")
+				self.assertEqual(len(pkt_ip6.opts), 2)
+
+				pkt_ip6opt = pkt_ip6.opts[0]
+				ip6_routingaddr = pkt_ip6opt.addresses
+				self.assertEqual(len(ip6_routingaddr), 3)
+				self.assertEqual(ip6_routingaddr[0], b"\xfc\x00\x00\x02\x00\x00\x00\x06\x00\x00\x00\x00\x00\x00\x00\x01")
+				self.assertEqual(ip6_routingaddr[1], b"\xfc\x00\x00\x02\x00\x00\x00\x07\x00\x00\x00\x00\x00\x00\x00\x01")
+				self.assertEqual(ip6_routingaddr[2], b"\xfc\x00\x00\x02\x00\x00\x00\x05\x00\x00\x00\x00\x00\x00\x00\x01")
+
+
 class ChecksumTestCase(unittest.TestCase):
 	def test_in_checksum(self):
 		print_header("Internet checksum")

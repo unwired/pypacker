@@ -190,7 +190,6 @@ class Packet(object, metaclass=MetaPacket):
 			if not self._body_changed:
 				# _dissect(...) didn't call _init_handler(): set raw bytes
 				self._body_bytes = args[0][header_len:]
-			#logger.warning("could not dissect in %s: %r" % (self.__class__.__name__, e))
 			# Reset the changed-flags: original unpacked value = no changes
 			self._reset_changed()
 			self._unpacked = False
@@ -431,12 +430,13 @@ class Packet(object, metaclass=MetaPacket):
 			self.upper_layer = handler_obj
 			# This was a lazy init: same as direct dissecting -> no body change
 			self._body_changed = False
-		except:
+		except Exception as ex:
 			# Error on lazy dissecting: set raw bytes
 			self._errors |= ERROR_DISSECT
 			self._body_bytes = handler_data[1]
-			#logger.warning("Can't set handler data (malformed packet?): base=%s handler_type/handlerclass=%r, reason: %s",
-			#	self.__class__, handler_data[0], ex)
+			# TODO: deactivate if too inperformant
+			logger.warning("Can't set handler data (malformed packet?): base=%s handler_type/handlerclass=%r, reason: %s",
+				self.__class__, handler_data[0], ex)
 		self._lazy_handler_data = None
 
 	def __getitem__(self, packet_type):
