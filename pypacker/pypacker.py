@@ -435,8 +435,8 @@ class Packet(object, metaclass=MetaPacket):
 			self._errors |= ERROR_DISSECT
 			self._body_bytes = handler_data[1]
 			# TODO: deactivate if too inperformant
-			logger.warning("Can't set handler data (malformed packet?): base=%s handler_type/handlerclass=%r, reason: %s",
-				self.__class__, handler_data[0], ex)
+			#logger.warning("Can't set handler data (malformed packet?): base=%s handler_type/handlerclass=%r, reason: %s",
+			#	self.__class__, handler_data[0], ex)
 		self._lazy_handler_data = None
 
 	def __getitem__(self, packet_type):
