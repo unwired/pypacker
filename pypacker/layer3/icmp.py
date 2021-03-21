@@ -70,18 +70,8 @@ class ICMP(pypacker.Packet):
 	class Echo(pypacker.Packet):
 		__hdr__ = (
 			("id", "H", 0),
-			("seq", "H", 1),
-			("ts", "Q", 0)
+			("seq", "H", 1)
 		)
-
-		def _dissect(self, buf):
-			hlen = 12
-
-			if len(buf) < 12:
-				# not enough bytes for ts
-				self.ts = None
-				hlen = 4
-			return hlen
 
 	class Unreach(pypacker.Packet):
 		__hdr__ = (
