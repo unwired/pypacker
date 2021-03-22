@@ -313,6 +313,7 @@ class Packet(object, metaclass=MetaPacket):
 			id will be ETH_TYPE_IP
 		"""
 		try:
+			# Likely to succeed
 			return Packet._handlerclass_id_dct[origin_class][handler_class]
 		except:
 			# logger.debug("Could not find body handler id for %s in current class %s",
@@ -425,12 +426,12 @@ class Packet(object, metaclass=MetaPacket):
 
 		try:
 			# Instantiate handler class using lazy data buffer
-			# logger.debug("lazy parsing using: %s", handler_data)
+			# Likely to succeed
 			handler_obj = handler_data[0](handler_data[1], self)
 			self.upper_layer = handler_obj
 			# This was a lazy init: same as direct dissecting -> no body change
 			self._body_changed = False
-		except Exception as ex:
+		except Exception:
 			# Error on lazy dissecting: set raw bytes
 			self._errors |= ERROR_DISSECT
 			self._body_bytes = handler_data[1]
@@ -521,7 +522,7 @@ class Packet(object, metaclass=MetaPacket):
 		try:
 			self.higher_layer.dissect_full()
 		except:
-			# no handler present
+			# No handler present
 			pass
 
 	def __add__(self, packet_or_bytes_to_add):
@@ -666,23 +667,9 @@ class Packet(object, metaclass=MetaPacket):
 		#	self._header_format.size,
 		#	len(self._header_cached)))
 
-		#logger.debug([self_getattr(name) for name in self._header_field_names])
-		try:
-			header_unpacked = self._header_format.unpack(self._header_cached)
-		except:
-			self._errors |= ERROR_NOT_UNPACKED
-			# Just warn user about incomplete data
-			errormsg = "could not unpack in: %s, format: %s, names: %s, value to unpack: %s (%d bytes)," \
-				" invalid value for format?" % (
-					self.__class__.__name__,
-					self._header_format.format,
-					self._header_field_names,
-					self._header_cached,
-					len(self._header_cached)
-				)
+		# Header length was checked in __init__ so no exception should happen here
+		header_unpacked = self._header_format.unpack(self._header_cached)
 
-			logger.warning(errormsg)
-			return
 		# logger.debug("unpacking via format: %s -> %s", self._header_format.format, header_unpacked)
 		cnt = 0
 		self_setattr = self.__setattr__
@@ -739,20 +726,9 @@ class Packet(object, metaclass=MetaPacket):
 		try:
 			# Likely to succeed
 			clz = Packet._id_handlerclass_dct[self.__class__][hndl_type]
-		except:
-			self.body_bytes = buffer
-			self._errors |= ERROR_UNKNOWN_PROTO
-			#errormsg = "Unknown upper layer type for %s: %d, feel free to implement" % (
-			#	self.__class__, hndl_type)
-			#logger.warning(errormsg)
-			return
-
-		try:
-			# Set lazy handler data, __getattr__() will be called on access
-			# to handler (field not yet initiated)
+			# __getattr__() will be called on access handler -> field gets initiated
 			# logger.debug("setting handler name: %s -> %s", self.__class__.__name__, clz_name)
 			self._lazy_handler_data = [clz, buffer]
-			# Set name although we don't set a handler (needed for direction() et al)
 			self._body_bytes = None
 			# Avoid setting body_bytes by _unpack()
 			self._body_changed = True
@@ -761,7 +737,6 @@ class Packet(object, metaclass=MetaPacket):
 			#	self.__class__, Packet._id_handlerclass_dct[self.__class__][hndl_type], ex)
 			# Set raw bytes as data (eg handler class not found)
 			self.body_bytes = buffer
-			self._errors |= ERROR_DISSECT
 
 	def _init_triggerlist(self, name, bts, dissect_callback):
 		"""
@@ -855,6 +830,7 @@ class Packet(object, metaclass=MetaPacket):
 			handler_clz = self._higher_layer.__class__
 			#logger.debug("handler class is: %s", handler_clz)
 
+			# Likely to succeed
 			self.__setattr__(self._id_fieldname,
 				Packet._handlerclass_id_dct[self.__class__][handler_clz])
 		except:
@@ -1040,6 +1016,7 @@ class Packet(object, metaclass=MetaPacket):
 		listener_cb -- the change listener to be added as callback-function
 		"""
 		try:
+			# Likely to succeed
 			self._changelistener.add(listener_cb)
 		except:
 			# Change listener not yet initiated
@@ -1319,6 +1296,7 @@ def get_property_translator(
 	"""
 	Get a descriptor allowing to make a "value -> variable name representation" translation.
 	The variable name representation can actually be used to assign values to the field in question.
+	Example: ip.py -> IP_PROTO_UDP=17 -> "17" gets translated to "IP_PROTO_UDP"
 
 	varname_regex -- The regex to find variables.
 	cb_get_description -- lambda value, value_name_dct: Description
@@ -1357,6 +1335,7 @@ def get_ondemand_property(varname, initval_cb):
 
 	def get_var(self):
 		try:
+			# Likely to succeed
 			return self.__getattribute__(varname_shadowed)
 		except:
 			val = initval_cb()

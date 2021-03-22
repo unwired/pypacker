@@ -1646,8 +1646,8 @@ class DNSTestCase(unittest.TestCase):
 
 		print()
 		print(">>> DNS 6")
-		# this test file contains a long packet, where pointer addresses exceed 0xff
-		# and thus checks for pointers need to be made using the bitmask 0xc0
+		# this test file contains a long packet, where pointer addresses exceed 0xFF
+		# and thus checks for pointers need to be made using the bitmask 0xC0
 		packet_bytes = get_pcap("tests/packets_dns4.pcap")
 
 		dns2 = linuxcc.LinuxCC(packet_bytes[0])[dns.DNS]
