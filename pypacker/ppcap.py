@@ -12,8 +12,9 @@ from pypacker.layer12 import ethernet, linuxcc, ieee80211, radiotap, btle, can
 
 logger = logging.getLogger("pypacker")
 
-
-# PCAP/TCPDump related
+"""
+PCAP/TCPDump related
+"""
 # PCAP file header
 
 # File magic numbers
@@ -199,6 +200,8 @@ def pcap_cb_btstopkt(self, meta, bts):
 
 
 FILETYPE_PCAP	= 0
+# TODO: add pcapng support:
+# - Interface name can be stored. Handy if capturing on >1 interfaces
 #FILETYPE_PCAPNG	= 1
 
 # type_id : [

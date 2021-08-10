@@ -237,46 +237,74 @@ def get_ssl_serversocket(file_certchain, file_privatekey, bindoptions, password_
 	return context.wrap_socket(socket_simple, server_side=True)
 
 
-# TCP/UDP server and client example code
-# Server
+# Server (TCP)
 """
 # ncat 127.0.0.1 80
-serversocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM) # IPv6: AF_INET6
-serversocket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-serversocket.bind(("127.0.0.1", 80))
-serversocket.listen(5)
-(ssock, address) = serversocket.accept()
-data = ssock.recv(1024)
+sock_server = socket.socket(socket.AF_INET, socket.SOCK_STREAM) # IPv6: AF_INET6
+sock_server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+sock_server.setsockopt(socket.SOL_SOCKET, socket.SO_BINDTODEVICE, b"lo\0")
+#sock_server.bind(("", 80))
+sock_server.bind(("127.0.0.1", 80))
+sock_server.listen(5)
+(sock_client, address) = sock_server.accept()
+
+data = sock_client.recv(1024)
 print(data)
-ssock.send(data)
+sock_client.send(data)
+
+for _sock in [sock_server, sock_client]:
+	_sock.shutdown(socket.SHUT_RDWR)
+	_sock.close()
 """
 
+# Server (UDP)
 """
 # ncat 127.0.0.1 80 -u
-serversocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # IPv6: AF_INET6
-serversocket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-serversocket.bind(("127.0.0.1", 80))
-data, address = serversocket.recvfrom(1024)
-print(data)
-serversocket.sendto(data, address)
+# Needs to be re-recreated for every new client
+def get_udpsock():
+	udpsock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # IPv6: AF_INET6
+	udpsock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+	udpsock.setsockopt(socket.SOL_SOCKET, socket.SO_BINDTODEVICE, b"lo\0")
+	#udpsock.bind(("", 80))
+	udpsock.bind(("127.0.0.1", 80))
+	# Multicast
+	#iface_index = socket.if_nametoindex(INTERFACE)
+	#mcopt = ipaddress.ip_address(MCAST_GRP).packed + struct.pack("i", intf_index)
+	#sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_JOIN_GROUP, mcopt)
+	# IPv4
+	##sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
+	return udpsock
+
+sock_server = get_udpsock()
+data1, addr = sock_server.recvfrom(1024)
+sock_client = get_udpsock()
+sock_client.connect(addr)
+
+sock_client.send(data1)
+data2 = sock_client.recv(1024)
+sock_client.send(data2)
+
+for _sock in [sock_server, sock_client]:
+	_sock.shutdown(socket.SHUT_RDWR)
+	_sock.close()
 """
 
-# Client
+# Client (TCP, UDP)
 """
 # ncat -l 80
-s = socket.socket(socket.AF_INET, socket.SOCK_STREAM) # IPv6: AF_INET6
-s.connect(("127.0.0.1", 80))
-data = s.recv(1024)
-print(data)
-s.send(data)
-"""
+sock_client = socket.socket(socket.AF_INET, socket.SOCK_STREAM) # IPv6: AF_INET6
+# UDP
+#sock_client = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # IPv6: AF_INET6
+#sock_client.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_MULTICAST_LOOP, True)
+sock_client.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+sock_client.setsockopt(socket.SOL_SOCKET, socket.SO_BINDTODEVICE, b"lo\0")
+sock_client.bind("127.0.0.1", 0)
+sock_client.connect(("127.0.0.1", 80))
 
-"""
-# ncat -l 80 -u
-s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # IPv6: AF_INET6
-s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-#s.bind(("127.0.0.1", 1234))
-s.sendto(b"testtest", ("127.0.0.1", 80))
-data, address = s.recvfrom(1024)
+data = sock_client.recv(1024)
 print(data)
+sock_client.send(data)
+
+sock_client.shutdown(socket.SHUT_RDWR)
+sock_client.close()
 """

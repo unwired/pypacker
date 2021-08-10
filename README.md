@@ -59,7 +59,7 @@ layer3.icmp.Echo
         bodybytes   : b'foobar2'
 ```
 
-Read/write packets from/to file (pcap/tcpdump format):
+Read/write packets from/to file (Support only for Wireshark/tcpdump pcap format):
 
 ```python
 from pypacker import ppcap

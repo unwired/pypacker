@@ -12,6 +12,11 @@ pypacker
 	tests			# tests for pypacker logic and protocols
 
 
+Development process
+===================
+Add new code -> add Tests -> QA via "./switch_setup.sh stable" -> PR
+
+
 Styleguide
 ==========
 

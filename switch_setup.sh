@@ -87,7 +87,11 @@ case "$1" in
 		git tag "v$VERSION"
 	fi
 
-	msg "If everything is OK call: git push -u origin master --tags; python setup.py sdist upload"
+	msg "If everything is OK call: git push -u origin master --tags"
+	# PyPi
+	# Source: https://packaging.python.org/tutorials/packaging-projects/#uploading-your-project-to-pypi
+	# python3 -m build
+	# python3 -m twine upload --repository-url  https://upload.pypi.org/legacy/ dist/*
 ;;
 "dev")
 	msg "changing debug level to DEBUG"
