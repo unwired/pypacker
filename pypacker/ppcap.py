@@ -151,7 +151,7 @@ def pcap_cb_write(self, bts, **metadata):
 	# ts = given as ns
 	ts = metadata.get("ts", self._timestamp + 1000)
 	self._timestamp = ts
-	sec = int(ts / 1000000000)
+	sec = int(ts // 1000000000)
 	# ns -> [ns | us]
 	subsec = int((ts - (sec * 1000000000)) / self._resolution_factor)
 
