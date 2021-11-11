@@ -20,6 +20,7 @@ class SocketHndl(object):
 	ETH_P_ALL	= 0x0003
 	ETH_P_IPV4	= 0x0800
 
+	# TODO: remove **params
 	def __init__(self,
 		iface_name="lo",
 		timeout=3,
@@ -276,6 +277,8 @@ def get_udpsock():
 	return udpsock
 
 sock_server = get_udpsock()
+# On multicast this will keep on receiving bytes from client sockets although we will call connect() in the next steps
+# -> Explicit mapping of "server-packet/addr <-> client socket" needed
 data1, addr = sock_server.recvfrom(1024)
 sock_client = get_udpsock()
 sock_client.connect(addr)

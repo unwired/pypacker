@@ -116,7 +116,7 @@ for raw_bytes in psock:
 	# Receive raw bytes
 	bts = psock.recv()
 	# Send/receive based on source/destination data in packet
-	pkts = psock.sr(packet_ip)
+	pkts = psock.sr(eth)
 	# Use filter to get specific packets
 	pkts = psock.recvp(filter_match_recv=filter_pkt)
 	# stop on first packet
@@ -247,6 +247,9 @@ orC = 2213 p/s
 ```
 
 # FAQ
+
+If you have any questions: please first read the following point "Is there any documentation?".
+For any questions left please file a bug (will be tagged as "questions").
 
 **Q**:	Where should I start learn to use Pypacker?
 
