@@ -376,3 +376,8 @@ sysctl -w net.ipv4.tcp_sack=1
 ## Misc related
 - Assemblation of TCP/UDP streams can be done by tshark using pipes
 	with "-i -" and "-z follow,prot,mode,filter[,range]"
+- Chosing the right "lowest layer" when reading capture files: Open the file eg w/ wireshark
+  and look at the packet details for the data link layer. Most times this will probably
+  be Ethernet II which can be parsed w/ layer12.ethernet.Ethernet.
+  When capturing eg via wiresharks/tsharks "-i any" option, this will lead to Linux cooked capture
+  represented by layer12.linuxcc.LinuxCC.

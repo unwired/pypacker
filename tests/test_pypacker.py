@@ -2839,7 +2839,7 @@ class LLDPTestCase(unittest.TestCase):
 
 class MQTTTestCase(unittest.TestCase):
 	def test_mqttbase(self):
-		print_header("MQTT")
+		print_header("MQTT 1")
 		raw_pkt = get_pcap("tests/packets_mqtt.pcap")
 		pkts = [ethernet.Ethernet(bts) for bts in raw_pkt]
 
@@ -2859,6 +2859,25 @@ class MQTTTestCase(unittest.TestCase):
 		hflen, val_decoded = mqtt.MQTTBase._decode_length(val_encoded)
 		self.assertEqual(hflen, 2)
 		self.assertEqual(val_decoded, val)
+
+
+	def test_mqtt_over_linuxcc(self):
+		print_header("MQTT 2")
+		raw_pkt = get_pcap("tests/packets_mqtt_over_linuxcc.pcap")
+		pkts = [linuxcc.LinuxCC(bts) for bts in raw_pkt]
+
+		for pkt in pkts:
+			pkt_ip = pkt[ip.IP]
+			self.assertIsNotNone(pkt_ip)
+			pkt_tcp = pkt[tcp.TCP]
+			self.assertIsNotNone(pkt_tcp)
+			pkt_mqtt_base = pkt_tcp[mqtt.MQTTBase]
+			self.assertIsNotNone(pkt_mqtt_base)
+			pkt_mqtt_upper = pkt_mqtt_base.higher_layer
+
+			if pkt_mqtt_upper is not None:
+				descr = f"{pkt_mqtt_upper}"
+			print(descr)
 
 
 class SlacTestCase(unittest.TestCase):
