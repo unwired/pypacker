@@ -318,15 +318,16 @@ copyreg.pickle(struct.Struct, pickle_struct)
 
 # Usage hints
 ## Performance related
-- For maxmimum performance start accessing attributes at lowest level e.g. for filtering:
+- For maxmimum performance start accessing attributes at lowest level via the following index notation.
+  This will lazy parse only needed layers behind the scenes:
 ```
-# This will lazy parse only needed layers behind the scenes
-if ether.src == "...":
-    ...
-elif ip.src == "...":
-    ...
-elif tcp.sport == "...":
-    ...
+pkt_eth, pkt_ip, pkt_tcp, pkt_http = pkt[
+  (ethernet.Ethernet, lambda a: a.dst_s=="00:11:22:33:44:55"),
+  (None, lambda b: b.__class__ in [ip.IP, ip6.IP6]),
+  (tcp.TCP, lambda c: c.dport==80),
+  http.HTTP
+]
+...
 ```
 
 - Avoid to convert packets using the "%s" or "%r" format as it triggers parsing behind the scene:

@@ -439,18 +439,23 @@ class GeneralTestCase(unittest.TestCase):
 
 	def test_multivalue_getitem(self):
 		print_header("Multi type __getitem__")
-		pkt1 = ethernet.Ethernet() + ip.IP() + tcp.TCP() + http.HTTP()
-		# match on end
-		pkt1_http = pkt1[ethernet.Ethernet, ip.IP, tcp.TCP, http.HTTP]
+		pkt1 = ethernet.Ethernet(dst_s="00:11:22:33:44:55") + ip.IP(src_s="12.34.56.78") + tcp.TCP(dport=80) + http.HTTP()
+		# Match on end
+		_, _, _, pkt1_http = pkt1[
+			(ethernet.Ethernet, lambda a: a.dst_s=="00:11:22:33:44:55"),
+			(None, lambda b: b.__class__ in [ip.IP, ip6.IP6]),
+			(tcp.TCP, lambda c: c.dport==80),
+			http.HTTP
+		]
 		self.assertEqual(pkt1_http.__class__, http.HTTP)
-		# match before end
-		pkt1_tcp = pkt1[ethernet.Ethernet, ip.IP, tcp.TCP]
+		# Match before end
+		_, _, pkt1_tcp = pkt1[ethernet.Ethernet, ip.IP, tcp.TCP]
 		self.assertEqual(pkt1_tcp.__class__, tcp.TCP)
-		# no match on start
-		pkt1_none = pkt1[ethernet.Ethernet, ethernet.Ethernet]
+		# No match on start
+		_, pkt1_none = pkt1[ethernet.Ethernet, ethernet.Ethernet]
 		self.assertEqual(pkt1_none, None)
-		# no match on end
-		pkt1_none = pkt1[ethernet.Ethernet, ip.IP, tcp.TCP, telnet.Telnet]
+		# No match on end
+		_, _, _, pkt1_none = pkt1[ethernet.Ethernet, ip.IP, tcp.TCP, telnet.Telnet]
 		self.assertEqual(pkt1_none, None)
 
 	def test_output(self):
