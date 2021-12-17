@@ -440,43 +440,65 @@ class Packet(object, metaclass=MetaPacket):
 			#	self.__class__, handler_data[0], ex)
 		self._lazy_handler_data = None
 
-	def __getitem__(self, packet_type):
+	def __getitem__(self, pkt_clzs):
 		"""
 		Check every layer upwards (inclusive this layer) for the given Packet class
-		and return the first matched instance or None if nothing was found.
+		and return the matched layers or None if nothing was found.
 
-		packet_type -- Packet class to search for like TCP or combined
-			multi-value like Ethernet, IP, TCP. For multi-value the last
-			given Type in sequence will be returned (pkt[A, B, C] -> gets C).
-		return -- First finding of packet_type or None if nothing was found
+		pkt_clzs -- Packet classes to search for. Optional lambdas can
+		be used for filtering each layer:
+		# WARNING: this parses ALL layers until end of layer or layer found -> performance penalty
+		pkt[TCP] # Search FIRST appearence of this class.
+		pkt[
+			(A, lambda a: a.src="123"), # Type A and filter must match
+			(None, lambda b: b.__class__ == B), # No type given but filter must match
+			(C, lambda b: b.dst="123")
+		]
+		# Alternative style bad for performance: A,B,C need to get unpacked even nothing matches
+		pkt[A, B, C, lambda a,b,c: a.src="123" and b.dst="321")]
+		return -- All given layers like [a,b,c] or None if at least one pkt_clzs did not match
+			in type or via filter.
+
 		"""
 		p_instance = self
 
 		# Multi-value index search
-		if type(packet_type) is tuple:
-			# Keep unpacking until packet_type is found (no intermediate storing)
-			type_cnt = 0
-			packet_type_len = len(packet_type)
+		if type(pkt_clzs) is tuple:
+			# Keep unpacking until pkt_clzs is found (no intermediate storing)
+			pkt_clzs_len = len(pkt_clzs)
+			layers = []
 
-			for pkt_clz in packet_type:
-				if pkt_clz != p_instance.__class__:
-					# Mismatch
-					return None
+			for pkt_clz in pkt_clzs:
+				filter = lambda a: True
 
-				type_cnt += 1
+				# (A, lambda a: a.src="123")
+				if type(pkt_clz) is tuple:
+					pkt_clz, filter = pkt_clz
+
+					if not filter(p_instance):
+						# Mismatch in filter
+						return (None,) * pkt_clzs_len
+
+				# Type match is optional, maybe only filter
+				if pkt_clz is not None and pkt_clz != p_instance.__class__:
+					# Mismatch in type
+					return (None,) * pkt_clzs_len
+
+				layers.append(p_instance)
+
 				# Highest layer reached (no more layers or end of needle reached)
-				if p_instance.higher_layer is None or type_cnt == packet_type_len:
+				if p_instance.higher_layer is None or len(layers) == pkt_clzs_len:
 					break
-				# End of match sequence in packet_type not reached, go higher
+				# End of match sequence in pkt_clzs not reached, go higher
 				p_instance = p_instance.higher_layer
 
-			# Return last matching layer
-			return p_instance if type_cnt == packet_type_len else None
+			# Return matching layer
+			return layers if len(layers) == pkt_clzs_len else (None,) * pkt_clzs_len
 		# Single-value index search
 		else:
-			# Keep unpacking until packet_type is found (no intermediate storing)
-			while not type(p_instance) is packet_type:
-				# this will auto-parse lazy handler data via _get_higherlayer()
+			# Keep unpacking until pkt_clz is found (no intermediate storing)
+			while not type(p_instance) is pkt_clzs:
+				# This will auto-parse lazy handler data via _get_higherlayer()
 				p_instance = p_instance.higher_layer
 
 				if p_instance is None:
