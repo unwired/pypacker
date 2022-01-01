@@ -33,7 +33,7 @@ DIR_UNKNOWN		= 4
 DIR_NOT_IMPLEMENTED	= 255
 
 ERROR_NONE		= 0
-ERROR_DISSECT		= 1
+ERROR_DISSECT		= 1	# This layer had an error when parsing/creating an upper layer
 ERROR_UNKNOWN_PROTO	= 2
 ERROR_NOT_UNPACKED	= 4
 
@@ -78,6 +78,10 @@ class Packet(object, metaclass=MetaPacket):
 	having the name "name", format "12s" and default value b"defaultvalue" as bytestring. Fields will
 	be added in order of definition. Extending classes should overwrite the "_dissect"-method in order to dissect
 	given data.
+
+	Body can be in 3 states:
+	- Lazy handler not yet parsed (higher layer is stored as bytes
+	- Higher layer is parsed (present as packet) or present as bytes
 
 	Requirements
 	============
@@ -179,7 +183,7 @@ class Packet(object, metaclass=MetaPacket):
 			#logger.debug("Dissecting %s using this bytes: %s" % (self.__class__.__name__, args[0]))
 			header_len = self._dissect(args[0])
 			# Not enough bytes means packet can't be unpacked.
-			# Check this here and not in _dissect() as its always the same for all dissects.
+			# Check this here and not in _dissect() as it's always the same for all dissects.
 			if len(args[0]) < header_len:
 				raise NotEnoughBytesException("Not enough bytes for packet class %s: given=%d < expected=%d" %
 					(self.__class__, len(args[0]), header_len))
@@ -230,7 +234,7 @@ class Packet(object, metaclass=MetaPacket):
 			# % (self.__class__.__name__, self._higher_layer))
 			return self.header_len + len(self._higher_layer)
 		else:
-			# Assume bodybytes are set
+			# Assume body bytes are set
 			# logger.debug("returning length from raw bytes in %s", self.__class__.__name__)
 			return self.header_len + len(self._body_bytes)
 
@@ -266,14 +270,14 @@ class Packet(object, metaclass=MetaPacket):
 		This is the same as calling bin() but excluding this header and without resetting changed-status.
 		"""
 		if self._lazy_handler_data is not None:
-			# no need to parse: raw bytes for all upper layers
+			# No need to parse: raw bytes for all upper layers
 			return self._lazy_handler_data[1]
 		elif self._higher_layer is not None:
-			# some handler was set
+			# Some handler was set
 			hndl = self._higher_layer
 			return hndl._pack_header() + hndl._get_bodybytes()
 		else:
-			# return raw bytes (no handler)
+			# Return raw bytes (no handler)
 			return self._body_bytes
 
 	def _set_bodybytes(self, value):
@@ -283,7 +287,7 @@ class Packet(object, metaclass=MetaPacket):
 		value -- a byte string (do NOT set to None)
 		"""
 		if self._higher_layer is not None:
-			# reset all handler data
+			# Reset all handler data
 			self._set_higherlayer(None)
 		# logger.debug("setting new raw data: %s", value)
 		self._body_bytes = value
@@ -330,17 +334,17 @@ class Packet(object, metaclass=MetaPacket):
 			will clear any handler and set body_bytes to b"".
 		"""
 		if self._higher_layer is not None:
-			# clear old linked data of upper layer if body handler is already parsed
+			# Clear old linked data of upper layer if body handler is already parsed
 			# A.B -> A.higher_layer = x -> B.lower_layer = None
 			# logger.debug("removing old data handler connections")
 			self._higher_layer._lower_layer = None
 
 		if hndl is None:
-			# avoid (body_bytes=None, handler=None)
+			# Avoid (body_bytes=None, handler=None)
 			self._body_bytes = b""
 		else:
-			# set a new body handler
-			# associate ip, arp etc with handler-instance to call "ether.ip", "ip.tcp" etc
+			# Set a new body handler
+			# Associate ip, arp etc with handler-instance to call "ether.ip", "ip.tcp" etc
 			self._body_bytes = None
 			hndl._lower_layer = self
 
@@ -424,9 +428,9 @@ class Packet(object, metaclass=MetaPacket):
 		"""
 		handler_data = self._lazy_handler_data
 
+		# Likely to succeed
 		try:
 			# Instantiate handler class using lazy data buffer
-			# Likely to succeed
 			handler_obj = handler_data[0](handler_data[1], self)
 			self.upper_layer = handler_obj
 			# This was a lazy init: same as direct dissecting -> no body change
@@ -745,8 +749,8 @@ class Packet(object, metaclass=MetaPacket):
 			return
 
 		# self.__class__ MUST be contained, otherwise calling _init_handler() would be illegal
+		# Likely to succeed
 		try:
-			# Likely to succeed
 			clz = Packet._id_handlerclass_dct[self.__class__][hndl_type]
 			# __getattr__() will be called on access handler -> field gets initiated
 			# logger.debug("setting handler name: %s -> %s", self.__class__.__name__, clz_name)
@@ -831,16 +835,16 @@ class Packet(object, metaclass=MetaPacket):
 		If updating the type id is more complex than a simple assignmet this method has to
 		be overwritten.
 		"""
-		# Do nothing if:
-		# type id field not known or this is a parsed packet (non self-made) or we got no body handler
-		# or nothing has changed
+		# Do nothing if one of:
+		# - type id field not known
+		# - body was not changed (bytes or handler must have been changed)
+		# - there is a higher layer (there must be a higher layer, not bytes)
+		# - type id field is active
 		# logger.debug("%s -> _id_fieldname: %s", self.__class__, self._id_fieldname)
 		if self._id_fieldname is None\
 			or not self._body_changed\
 			or self._higher_layer is None\
-			or not self.__getattribute__("%s_au_active" % self._id_fieldname)\
-			or self._lazy_handler_data is not None:
-			# logger.debug("Will NOT update!")
+			or not self.__getattribute__("%s_au_active" % self._id_fieldname):
 			return
 
 		# logger.debug("will update handler id, %s / %s / %s / %s",
@@ -848,11 +852,12 @@ class Packet(object, metaclass=MetaPacket):
 		#	self.__getattribute__("%s_au_active" % self._id_fieldname),
 		#	self._lazy_handler_data,
 		#	self._body_changed)
+		# Likely to succeed
 		try:
 			handler_clz = self._higher_layer.__class__
 			#logger.debug("handler class is: %s", handler_clz)
 
-			# Likely to succeed
+			# Only set id if the upper layer class can be assoicated to this layer (eg Ethernet -> IP, not Ethernet -> TCP)
 			self.__setattr__(self._id_fieldname,
 				Packet._handlerclass_id_dct[self.__class__][handler_clz])
 		except:
