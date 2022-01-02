@@ -273,46 +273,48 @@ class TCP(pypacker.Packet):
 	def reverse_address(self):
 		self.sport, self.dport = self.dport, self.sport
 
+	# Segments collected by ra_collect
 	ra_segments = pypacker.get_ondemand_property("ra_segments", lambda: {})
+	# Amount of bytes collected by ra_collect
+	ra_bts_cnt = pypacker.get_ondemand_property("ra_bts_cnt", lambda: 0)
 
 	def ra_collect(self, pkt_list):
 		"""
-		Collect TCP segments which have the same direction as this packet.
+		Collect TCP segments which have the same direction as this packet for later reassemblation.
 		Concatenated segments can be retrieved via ra_bin(). Does not check for missing
 		segments.
-		return -- bytes_cnt, [True|False]: amount of bytes added (sum of body bytes),
+		return -- ra_bytes_cnt, [True|False]: amount of bytes added (sum of body bytes),
 			final packet found (RST or FIN). True indicates that ra_bin() can be called.
 		"""
 		if type(pkt_list) is not list:
 			pkt_list = [pkt_list]
-
-		bts_cnt = 0
 
 		for segment in pkt_list:
 			if self.direction(segment) != pypacker.Packet.DIR_SAME or len(segment.body_bytes) == 0:
 				continue
 
 			seq_store = segment.seq
-			# final packet found: connection is going to be terminated
+			# Final packet found: connection is going to be terminated
 			if (segment.flags & TH_FIN) != 0 or (segment.flags & TH_RST) != 0:
 				return 0, True
 
 			if seq_store < self.seq:
-				logger.warning("seq of new segment is lower than start")
+				logger.warning("Seq of new segment is lower than start, assuming overflow")
 				seq_store += 0xFFFF
 
 			self.ra_segments[seq_store] = segment.body_bytes
-			bts_cnt += len(segment.body_bytes)
+			self.ra_bts_cnt += len(segment.body_bytes)
 
-		return bts_cnt, False
+		return self.ra_bts_cnt, False
 
 	def ra_bin(self):
 		"""
-		Assemble retrieved TCP segments in sorted order (body bytes of TCP segments) and
-		flushes the internal buffer.
+		Re-assemble retrieved TCP segments in sorted order (body bytes of TCP segments) and
+		flush the internal buffer.
 		"""
 		self.ra_segments[self.seq] = self.body_bytes
 		sorted_list = sorted(self.ra_segments.items(), key=lambda t: t[0])
-		bts_lst = [value for key, value in sorted_list]
+		bts_lst = [bts for _, bts in sorted_list]
 		self.ra_segments.clear()
+		self.ra_bts_cnt = 0
 		return b"".join(bts_lst)

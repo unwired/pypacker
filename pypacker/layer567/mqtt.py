@@ -59,14 +59,15 @@ class ConnAck(Packet):
 class Publish(Packet):
 	__hdr__ = (
 		("topiclen", "H", 0),
-		("topic", None, b"")
+		("topic", None, b""),
+		("msgid", "H", 0)
 	)
 
 	def _dissect(self, buf):
 		topiclen = unpack_H(buf[:2])[0]
 		self.topic = buf[2: 2 + topiclen]
 
-		return 2 + topiclen
+		return 2 + topiclen + 2
 
 
 class PubAck(Packet):
@@ -164,7 +165,7 @@ class MQTTBase(Packet):
 
 	def _dissect(self, buf):
 		# Length MUST be decoded, flexible format but more imperformant bc parsing needed
-		mlen_len, _ = MQTTBase._decode_length(buf[1:])
+		mlen_len, _ = MQTTBase.decode_length(buf[1:])
 		self.mlen = buf[1: 1 + mlen_len]
 		hlen = 1 + mlen_len
 		#logger.debug("Init handler..., mlen: %s, id: %d, buf: %s" % (mlen_len, (buf[0] & 0xF0) >> 4, buf[hlen:]))
@@ -177,8 +178,8 @@ class MQTTBase(Packet):
 		return hlen
 
 	@staticmethod
-	def _decode_length(buf):
-		"""return -- mlen length, mlen value"""
+	def decode_length(buf):
+		"""return -- mlen length in bytes, mlen value"""
 		if buf[0] == 0x00:
 			return 1, 0
 		buf_idx = 0
@@ -192,7 +193,7 @@ class MQTTBase(Packet):
 		return 1 + buf_idx, retval
 
 	@staticmethod
-	def _encode_length(num):
+	def encode_length(num):
 		"""
 		num -- Positive integer like 256
 		return -- Encoded number as bytes like b"\x81\xff"
@@ -207,10 +208,10 @@ class MQTTBase(Packet):
 		return b"".join(bts)
 
 	def _get_mlen(self):
-		return MQTTBase._decode_length(self.mlen)
+		return MQTTBase.decode_length(self.mlen)[1]
 
 	def _set_mlen(self, val):
-		self.mlen = MQTTBase._encode_length(val)
+		self.mlen = MQTTBase.encode_length(val)
 
 	mlen_d = property(_get_mlen, _set_mlen)
 

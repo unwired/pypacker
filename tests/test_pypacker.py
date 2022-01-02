@@ -2859,9 +2859,9 @@ class MQTTTestCase(unittest.TestCase):
 
 	def test_mqttvarlen(self):
 		val = 129
-		val_encoded = mqtt.MQTTBase._encode_length(val)
+		val_encoded = mqtt.MQTTBase.encode_length(val)
 		self.assertEqual(val_encoded, b"\x81\x01")  # 127 + 1
-		hflen, val_decoded = mqtt.MQTTBase._decode_length(val_encoded)
+		hflen, val_decoded = mqtt.MQTTBase.decode_length(val_encoded)
 		self.assertEqual(hflen, 2)
 		self.assertEqual(val_decoded, val)
 
@@ -2884,6 +2884,21 @@ class MQTTTestCase(unittest.TestCase):
 				descr = f"{pkt_mqtt_upper}"
 			print(descr)
 
+	def test_mqtt_publish(self):
+		raw_pkt = get_pcap("tests/packets_mqtt_single_pub_msg.pcap")
+
+		pkt_linuxcc = linuxcc.LinuxCC(raw_pkt[0])
+		_, _, _, pkt_mqttbase, pkt_mqttpublish = pkt_linuxcc[
+				linuxcc.LinuxCC,
+				ip.IP,
+				tcp.TCP,
+				(mqtt.MQTTBase, lambda pkt: pkt.mlen==b"\x99\x01" and pkt.mlen_d==153 and pkt.flags==0x32),
+				mqtt.Publish
+			]
+		#print(f"{pkt_mqttbase.mlen} {pkt_mqttbase.mlen_d} {pkt_mqttbase.flags}")
+		self.assertIsNotNone(pkt_mqttpublish)
+		self.assertEqual(pkt_mqttpublish.topiclen, 41)
+		self.assertEqual(pkt_mqttpublish.msgid, 9)
 
 class SlacTestCase(unittest.TestCase):
 	def test_smb(self):

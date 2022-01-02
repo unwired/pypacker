@@ -79,9 +79,12 @@ class Packet(object, metaclass=MetaPacket):
 	be added in order of definition. Extending classes should overwrite the "_dissect"-method in order to dissect
 	given data.
 
-	Body can be in 3 states:
-	- Lazy handler not yet parsed (higher layer is stored as bytes
-	- Higher layer is parsed (present as packet) or present as bytes
+	Body can have these states:
+	- Lazy handler not yet dissected (body bytes are internally stored as raw bytes)
+		-> Higher layer gets dissected
+		-> Higher layer is packet OR raw bytes (if not dissectable)
+	- Body is raw bytes
+
 
 	Requirements
 	============
@@ -126,6 +129,7 @@ class Packet(object, metaclass=MetaPacket):
 		If the packet can't be parsed w/ correct data -> raise exception.
 		The internal state will only be updated on changes to headers or data later on
 	- General rule: less changes to headers/body-data = more performance
+
 
 	Call-flows
 	==========
@@ -473,19 +477,26 @@ class Packet(object, metaclass=MetaPacket):
 			layers = []
 
 			for pkt_clz in pkt_clzs:
-				filter = lambda a: True
+				filter = lambda pkt: True
 
 				# (A, lambda a: a.src="123")
 				if type(pkt_clz) is tuple:
 					pkt_clz, filter = pkt_clz
 
-					if not filter(p_instance):
-						# Mismatch in filter
-						return (None,) * pkt_clzs_len
-
 				# Type match is optional, maybe only filter
 				if pkt_clz is not None and pkt_clz != p_instance.__class__:
 					# Mismatch in type
+					#logger.debug(f"Class did not match: {pkt_clz} != {p_instance.__class__}")
+					return (None,) * pkt_clzs_len
+
+				try:
+					if not filter(p_instance):
+						# Mismatch in filter
+						#logger.debug(f"Filter did not match")
+						return (None,) * pkt_clzs_len
+				except:
+					# This can go wrong if filter is (None, lambda pkt: ...)
+					# Eg: checking attributes on wrong packet type
 					return (None,) * pkt_clzs_len
 
 				layers.append(p_instance)
