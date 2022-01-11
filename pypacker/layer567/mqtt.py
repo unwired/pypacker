@@ -1,6 +1,9 @@
 """
 Message Queuing Telemetry Transport (MQTT)
 https://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html
+
+Note: Most lengths are *not* en/decoded via special MQTT format (see MQTTBase.en/decode_length())
+but via standard pack/unpack. Change to more complex/inperformant en/decoding if needed.
 """
 import logging
 
@@ -51,7 +54,7 @@ class Connect(Packet):
 
 class ConnAck(Packet):
 	__hdr__ = (
-		("reserved", "B", 0),
+		("flags", "B", 0),
 		("retcode", "B", 0)
 	)
 
@@ -72,6 +75,7 @@ class Publish(Packet):
 
 class PubAck(Packet):
 	__hdr__ = (
+		("msgid", "H", 0),
 	)
 
 
@@ -111,17 +115,19 @@ class SubRequest(Packet):
 class SubAck(Packet):
 	__hdr__ = (
 		("msgid", "H", 0),
-		("qos", "B", 0)
+		("retcode", "B", 0)
 	)
 
 
 class Unsubscribe(Packet):
 	__hdr__ = (
+		("msgid", "H", 0),
 	)
 
 
 class UnsubAck(Packet):
 	__hdr__ = (
+		("msgid", "H", 0),
 	)
 
 

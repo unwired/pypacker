@@ -2900,6 +2900,21 @@ class MQTTTestCase(unittest.TestCase):
 		self.assertEqual(pkt_mqttpublish.topiclen, 41)
 		self.assertEqual(pkt_mqttpublish.msgid, 9)
 
+	def test_mqtt_puback(self):
+		raw_pkt = get_pcap("tests/packets_mqtt_puback.pcap")
+
+		pkt_linuxcc = linuxcc.LinuxCC(raw_pkt[0])
+		_, _, _, pkt_mqttbase, pkt_mqttpublish = pkt_linuxcc[
+				linuxcc.LinuxCC,
+				ip.IP,
+				tcp.TCP,
+				(mqtt.MQTTBase, lambda pkt: pkt.mlen_d==2 and pkt.flags==0x40),
+				mqtt.PubAck
+			]
+		#print(f"{pkt_mqttbase.mlen} {pkt_mqttbase.mlen_d} {pkt_mqttbase.flags}")
+		self.assertIsNotNone(pkt_mqttpublish)
+		self.assertEqual(pkt_mqttpublish.msgid, 9)
+
 class SlacTestCase(unittest.TestCase):
 	def test_smb(self):
 		print_header("SLAC")
