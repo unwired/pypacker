@@ -35,5 +35,5 @@ setup(name="pypacker",
 	#install_requires=[
 	#	"netifaces",
 	#],
-	python_requires=">=3.3.*"
+	python_requires=">=3.3"
 )
