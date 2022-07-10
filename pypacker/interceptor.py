@@ -248,6 +248,9 @@ def get_full_payload(nfa, ptr_packet):
 	data = ctypes.string_at(ptr_packet, len_recv)
 	return len_recv, data
 
+class UnableToBindException(Exception):
+	def __init__(self, queue_id):
+		self.queue_id = queue_id
 
 class Interceptor(object):
 	"""
@@ -342,6 +345,8 @@ class Interceptor(object):
 
 		c_handler = HANDLER(verdict_callback_ind)
 		queue = create_queue(nfq_handle, queue_id, c_handler, None)  # 1
+		if not queue:
+			raise UnableToBindException(queue_id)
 
 		set_mode(queue, NFQNL_COPY_PACKET, 0xFFFF)
 
@@ -390,10 +395,14 @@ class Interceptor(object):
 			queue_ids = []
 
 		self._is_running = True
-
-		for queue_id in queue_ids:
-			# Setup queue and start producer threads
-			self._setup_queue(queue_id, ctx, verdict_callback)
+		
+		try:
+			for queue_id in queue_ids:
+				# Setup queue and start producer threads
+				self._setup_queue(queue_id, ctx, verdict_callback)
+		except UnableToBindException as e:
+			self.stop()
+			raise e
 
 	def stop(self):
 		if not self._is_running:
