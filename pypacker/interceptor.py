@@ -395,7 +395,7 @@ class Interceptor(object):
 			queue_ids = []
 
 		self._is_running = True
-		
+
 		try:
 			for queue_id in queue_ids:
 				# Setup queue and start producer threads

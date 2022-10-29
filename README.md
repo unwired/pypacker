@@ -30,9 +30,9 @@ ip0 = IP(src_s="127.0.0.1", dst_s="192.168.0.1", p=1) +\
 ip1_bts = b"E\x00\x00*\x00\x00\x00\x00@\x01;)\x7f\x00\x00\x01\xc0\xa8\x00\x01\x08\x00\xc0?\x00{\x00\x01\x00\x00\x00\x00\x00\x00\x00\x00foobar"
 ip1 = IP(ip1_bts) 
 # Change source IPv4 address
-ip0.src_s = "1.2.3.4"
+ip1.src_s = "1.2.3.4"
 # Change ICMP payload
-ip0[IP,ICMP,ICMP.Echo].body_bytes = b"foobar2"
+ip1.highest_layer.body_bytes = b"foobar2"
 
 # Output packet (similar result for ip1)
 print("%s" % ip0)
@@ -64,18 +64,26 @@ Read/write packets from/to file (Support only for Wireshark/tcpdump pcap format)
 ```python
 from pypacker import ppcap
 from pypacker.layer12 import ethernet
-from pypacker.layer3 import ip
+from pypacker.layer3 import ip, ip6
 from pypacker.layer4 import tcp
+from pypacker.layer567 import http
 
 preader = ppcap.Reader(filename="packets_ether.pcap")
 pwriter = ppcap.Writer(filename="packets_ether_new.pcap", linktype=ppcap.DLT_EN10MB)
 
 for ts, buf in preader:
-	eth = ethernet.Ethernet(buf)
+	pkt = ethernet.Ethernet(buf)
 
-	if eth[ethernet.Ethernet, ip.IP, tcp.TCP] is not None:
-		print("%d: %s:%s -> %s:%s" % (ts, eth[ip.IP].src_s, eth[tcp.TCP].sport,
-			eth[ip.IP].dst_s, eth[tcp.TCP].dport))
+	# Filter specific packets
+	eth, ip, tcp, http = pkt[
+		None,
+		(None, lambda b: b.__class__ in [ip.IP, ip6.IP6]),
+		(tcp.TCP, lambda c: c.dport==80),
+		http.HTTP
+	]
+
+	if eth is not None:
+		print(f"{ts}: {ip.src_s}:{tcp.sport} -> {ip.dst_s}:{tcp.dport}")
 		pwriter.write(eth.bin())
 
 pwriter.close()
@@ -94,7 +102,7 @@ def filter_accept(bts):
 ppcap.merge_pcaps(["file_in1.pcap", "file_in2.pcap"], "file_out.pcap", filter_accept=filter_accept)
 ```
 
-Send/receive layer 2 packets:
+Send/receive layer 2 (and higher)  packets:
 
 ```python
 from pypacker import psocket
