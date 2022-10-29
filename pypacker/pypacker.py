@@ -39,6 +39,7 @@ ERROR_NOT_UNPACKED	= 4
 
 VARFILTER_TYPES = {bytes, int}
 
+LAMBDA_TRUE = lambda pkt: True
 
 class NotEnoughBytesException(Exception):
 	pass
@@ -454,17 +455,24 @@ class Packet(object, metaclass=MetaPacket):
 		and return the matched layers or None if nothing was found.
 
 		pkt_clzs -- Packet classes to search for. Optional lambdas can
-		be used for filtering each layer:
-		# WARNING: this parses ALL layers until end of layer or layer found -> performance penalty
-		pkt[TCP] # Search FIRST appearence of this class.
-		pkt[
+		be used for filtering each layer.
+
+		# All layers have to match starting from A (explicit is better than implicit).
+		# Comparing starts from "current layer == A" bc: otherwise ALL layers have to
+		# be parsed all the time until a matching layer (to A) appears (starting layer
+		# would not be known a priori).
+		a, b, c, d = pkt[
 			(A, lambda a: a.src="123"), # Type A and filter must match
-			(None, lambda b: b.__class__ == B), # No type given but filter must match
-			(C, lambda b: b.dst="123")
+			None, # This layer can be anything
+			C, # Only type must match
+			(None, lambda d: d.__class__ == d), # No type given but filter must match
 		]
-		# Alternative style bad for performance: A,B,C need to get unpacked even nothing matches
-		pkt[A, B, C, lambda a,b,c: a.src="123" and b.dst="321")]
-		return -- All given layers like [a,b,c] or None if at least one pkt_clzs did not match
+
+		# Search FIRST appearence of this class
+		# WARNING: Deprecated! This parses ALL layers until end of layer or layer found -> performance penalty
+		a = pkt[TCP]
+
+		return -- All given layers like [a, b, ...] or [None, None, ...] if at least one layer did not match
 			in type or via filter.
 
 		"""
@@ -477,13 +485,13 @@ class Packet(object, metaclass=MetaPacket):
 			layers = []
 
 			for pkt_clz in pkt_clzs:
-				filter = lambda pkt: True
+				filter = LAMBDA_TRUE
 
 				# (A, lambda a: a.src="123")
 				if type(pkt_clz) is tuple:
 					pkt_clz, filter = pkt_clz
+				# else: A
 
-				# Type match is optional, maybe only filter
 				if pkt_clz is not None and pkt_clz != p_instance.__class__:
 					# Mismatch in type
 					#logger.debug(f"Class did not match: {pkt_clz} != {p_instance.__class__}")
@@ -495,7 +503,7 @@ class Packet(object, metaclass=MetaPacket):
 						#logger.debug(f"Filter did not match")
 						return (None,) * pkt_clzs_len
 				except:
-					# This can go wrong if filter is (None, lambda pkt: ...)
+					# This can go wrong if filter is (?, lambda pkt: ...)
 					# Eg: checking attributes on wrong packet type
 					return (None,) * pkt_clzs_len
 
@@ -507,7 +515,7 @@ class Packet(object, metaclass=MetaPacket):
 				# End of match sequence in pkt_clzs not reached, go higher
 				p_instance = p_instance.higher_layer
 
-			# Return matching layer
+			# Return matching layers
 			return layers if len(layers) == pkt_clzs_len else (None,) * pkt_clzs_len
 		# Single-value index search
 		else:

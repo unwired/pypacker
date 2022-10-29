@@ -322,7 +322,7 @@ copyreg.pickle(struct.Struct, pickle_struct)
   This will lazy parse only needed layers behind the scenes:
 ```
 pkt_eth, pkt_ip, pkt_tcp, pkt_http = pkt[
-  (ethernet.Ethernet, lambda a: a.dst_s=="00:11:22:33:44:55"),
+  None,
   (None, lambda b: b.__class__ in [ip.IP, ip6.IP6]),
   (tcp.TCP, lambda c: c.dport==80),
   http.HTTP

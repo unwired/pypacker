@@ -90,8 +90,10 @@ case "$1" in
 	msg "If everything is OK call: git push -u origin master --tags"
 	# PyPi
 	# Source: https://packaging.python.org/tutorials/packaging-projects/#uploading-your-project-to-pypi
-	# python3 -m build
-	# python3 -m twine upload --repository-url  https://upload.pypi.org/legacy/ dist/*
+	# Create package in dist/
+	# python setup.py sdist
+	# # Upload. Chose correct version in dist/
+	# python3 -m twine upload --repository-url  https://upload.pypi.org/legacy/ dist/pypacker-...
 ;;
 "dev")
 	msg "changing debug level to DEBUG"
