@@ -167,7 +167,8 @@ def pcap_cb_init_read(self, **initdata):
 	self._fh.seek(24)
 	fhdr = PcapFileHdr(buf)
 
-	if fhdr.magic not in [TCPDUMP_MAGIC_MICRO, TCPDUMP_MAGIC_NANO, TCPDUMP_MAGIC_MICRO_SWAPPED, TCPDUMP_MAGIC_NANO_SWAPPED]:
+	if fhdr.magic not in [TCPDUMP_MAGIC_MICRO, TCPDUMP_MAGIC_NANO, TCPDUMP_MAGIC_MICRO_SWAPPED,
+		TCPDUMP_MAGIC_NANO_SWAPPED]:
 		return False
 
 	is_le = False if fhdr.magic in [TCPDUMP_MAGIC_MICRO, TCPDUMP_MAGIC_NANO] else True

@@ -48,32 +48,32 @@ EXT_MASK		= 0x00000080
 
 # mask -> (length, alignment)
 RADIO_FIELDS = {
-	TSFT_MASK		: (8, 8),
-	FLAGS_MASK		: (1, 1),
-	RATE_MASK		: (1, 1),
+	TSFT_MASK: (8, 8),
+	FLAGS_MASK: (1, 1),
+	RATE_MASK: (1, 1),
 	# channel + flags
-	CHANNEL_MASK		: (4, 2),
+	CHANNEL_MASK: (4, 2),
 
 	# fhss + pattern
-	FHSS_MASK		: (2, 1),
-	DB_ANT_SIG_MASK 	: (1, 1),
-	DB_ANT_NOISE_MASK	: (1, 1),
-	LOCK_QUAL_MASK 		: (2, 2),
+	FHSS_MASK: (2, 1),
+	DB_ANT_SIG_MASK: (1, 1),
+	DB_ANT_NOISE_MASK: (1, 1),
+	LOCK_QUAL_MASK: (2, 2),
 
-	TX_ATTN_MASK		: (2, 2),
-	DB_TX_ATTN_MASK 	: (2, 2),
-	DBM_TX_POWER_MASK 	: (1, 1),
-	ANTENNA_MASK		: (1, 1),
+	TX_ATTN_MASK: (2, 2),
+	DB_TX_ATTN_MASK: (2, 2),
+	DBM_TX_POWER_MASK: (1, 1),
+	ANTENNA_MASK: (1, 1),
 
-	ANT_SIG_MASK 		: (1, 1),
-	ANT_NOISE_MASK		: (1, 1),
-	RX_FLAGS_MASK 		: (2, 2),
+	ANT_SIG_MASK: (1, 1),
+	ANT_NOISE_MASK: (1, 1),
+	RX_FLAGS_MASK: (2, 2),
 
 	# CHANNELPLUS_MASK	:,
-	HT_MASK			: (3, 1),
+	HT_MASK: (3, 1),
 
-	AMPDU_MASK		: (8, 4),
-	VHT_MASK		: (12, 2)
+	AMPDU_MASK: (8, 4),
+	VHT_MASK: (12, 2)
 
 	# RT_NS_NEXT_MASK	:,
 	# VENDOR_NS_NEXT	:,
@@ -177,11 +177,11 @@ class Radiotap(pypacker.Packet):
 	fcs = property(_get_fcs, _set_fcs)
 
 	def _get_channel(self):
-		return self.flags.get_by_key(CHANNEL_MASK)
+		return self.flags[lambda v: v[0] == CHANNEL_MASK][0][1][1]
 
 	def _set_channel(self, channel):
 		freq = int(channel_to_freq(channel) / 1000000)
-		self.flags.set_by_key(CHANNEL_MASK, pack_H_le(freq))
+		self.flags[lambda v: v[0] == CHANNEL_MASK] = (CHANNEL_MASK, pack_H_le(freq))
 
 	# get/set channel, set frequency under the hood
 	channel = property(_get_channel, _set_channel)
@@ -198,7 +198,7 @@ class Radiotap(pypacker.Packet):
 
 	def _get_signal_strength(self):
 		"""return -- Signal strength in dB or None"""
-		sig = self.flags.find_value(search_cb=lambda v: v[0] == DB_ANT_SIG_MASK)
+		sig = self.flags[lambda v: v[0] == DB_ANT_SIG_MASK][0][1][1]
 
 		if sig is not None:
 			return int.from_bytes(sig[1], byteorder="big", signed=True)
@@ -208,17 +208,16 @@ class Radiotap(pypacker.Packet):
 	signal_strength = property(_get_signal_strength)
 
 	def _dissect(self, buf):
-		# Needed by _parse_flags()
-		self.present_flags = unpack_I(buf[4:8])[0]
+		present_flags = unpack_I(buf[4:8])[0]
 		#logger.debug("Flags: 0x%X" % flags)
 		pos_end = len(buf)
 
 		# Check for FSC, needs to be skipped for upper layers
-		if self.present_flags & FLAGS_MASK == FLAGS_MASK:
+		if present_flags & FLAGS_MASK == FLAGS_MASK:
 			#logger.debug("Flags mask matched")
 			flags_off = 8
 			# TSFT present -> Flags values are after TSFT value
-			if self.present_flags & TSFT_MASK == TSFT_MASK:
+			if present_flags & TSFT_MASK == TSFT_MASK:
 				flags_off = 8 + 8
 			if buf[flags_off] & 0x10 != 0:
 				#logger.debug("FCS found")

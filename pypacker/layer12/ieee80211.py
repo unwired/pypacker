@@ -175,7 +175,7 @@ class IEEE80211(pypacker.Packet):
 			self._ts = unpack_Q_le(pack_Q(val))[0]
 
 		def _get_essid(self):
-			return self.params.find_value(search_cb=lambda v: v.id == IEEE80211.IE_SSID).body_bytes
+			return self.params[lambda v: v.id == IEEE80211.IE_SSID][0][1].body_bytes
 
 		seq = property(_get_seq, _set_seq)
 		ts = property(_get_ts, _set_ts)
@@ -436,17 +436,17 @@ class IEEE80211(pypacker.Packet):
 			self.dst, self.src = self.src, self.dst
 
 	m_decoder = {
-		M_BEACON	: Beacon,
-		M_ACTION	: Action,
-		M_ASSOC_REQ	: AssocReq,
-		M_ASSOC_RESP	: AssocResp,
-		M_DISASSOC	: Disassoc,
-		M_REASSOC_REQ	: ReassocReq,
-		M_REASSOC_RESP	: AssocResp,
-		M_AUTH		: Auth,
-		M_PROBE_REQ	: ProbeReq,
-		M_PROBE_RESP	: ProbeResp,
-		M_DEAUTH	: Deauth
+		M_BEACON: Beacon,
+		M_ACTION: Action,
+		M_ASSOC_REQ: AssocReq,
+		M_ASSOC_RESP: AssocResp,
+		M_DISASSOC: Disassoc,
+		M_REASSOC_REQ: ReassocReq,
+		M_REASSOC_RESP: AssocResp,
+		M_AUTH: Auth,
+		M_PROBE_REQ: ProbeReq,
+		M_PROBE_RESP: ProbeResp,
+		M_DEAUTH: Deauth
 	}
 
 	#
@@ -521,12 +521,12 @@ class IEEE80211(pypacker.Packet):
 			self.dst, self.src = self.src, self.dst
 
 	c_decoder = {
-		C_RTS		: RTS,
-		C_CTS		: CTS,
-		C_ACK		: ACK,
-		C_BLOCK_ACK_REQ	: BlockAckReq,
-		C_BLOCK_ACK	: BlockAck,
-		C_CF_END	: CFEnd
+		C_RTS: RTS,
+		C_CTS: CTS,
+		C_ACK: ACK,
+		C_BLOCK_ACK_REQ: BlockAckReq,
+		C_BLOCK_ACK: BlockAck,
+		C_CF_END: CFEnd
 	}
 
 	#
@@ -667,20 +667,20 @@ class IEEE80211(pypacker.Packet):
 			return header_len
 
 	d_decoder = {
-		D_NORMAL		: Dataframe,
-		D_DATA_CF_ACK		: Dataframe,
-		D_DATA_CF_POLL 		: Dataframe,
-		D_DATA_CF_ACK_POLL 	: Dataframe,
-		D_NULL			: Dataframe,
-		D_CF_ACK		: Dataframe,
-		D_CF_POLL		: Dataframe,
-		D_CF_ACK_POLL		: Dataframe,
-		D_QOS_DATA		: Dataframe,
-		D_QOS_CF_ACK		: Dataframe,
-		D_QOS_CF_POLL		: Dataframe,
-		D_QOS_CF_ACK_POLL	: Dataframe,
-		D_QOS_NULL		: Dataframe,
-		D_QOS_CF_POLL_EMPTY	: Dataframe
+		D_NORMAL: Dataframe,
+		D_DATA_CF_ACK: Dataframe,
+		D_DATA_CF_POLL: Dataframe,
+		D_DATA_CF_ACK_POLL: Dataframe,
+		D_NULL: Dataframe,
+		D_CF_ACK: Dataframe,
+		D_CF_POLL: Dataframe,
+		D_CF_ACK_POLL: Dataframe,
+		D_QOS_DATA: Dataframe,
+		D_QOS_CF_ACK: Dataframe,
+		D_QOS_CF_POLL: Dataframe,
+		D_QOS_CF_ACK_POLL: Dataframe,
+		D_QOS_NULL: Dataframe,
+		D_QOS_CF_POLL_EMPTY: Dataframe
 	}
 
 	#
@@ -778,16 +778,16 @@ class IEEE80211(pypacker.Packet):
 	IE_HT_INFO		= 61
 
 	ie_decoder = {
-		IE_SSID		: IE,
-		IE_RATES	: IE,
-		IE_FH		: FH,
-		IE_DS		: DS,
-		IE_CF		: CF,
-		IE_TIM		: TIM,
-		IE_IBSS		: IBSS,
-		IE_HT_CAPA	: IE,
-		IE_ESR		: IE,
-		IE_HT_INFO	: IE
+		IE_SSID: IE,
+		IE_RATES: IE,
+		IE_FH: FH,
+		IE_DS: DS,
+		IE_CF: CF,
+		IE_TIM: TIM,
+		IE_IBSS: IBSS,
+		IE_HT_CAPA: IE,
+		IE_ESR: IE,
+		IE_HT_INFO: IE
 	}
 
 # Handler for IEEE80211

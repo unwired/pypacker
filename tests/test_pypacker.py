@@ -270,7 +270,7 @@ class GeneralTestCase(unittest.TestCase):
 		bts_list = get_pcap("tests/packets_rtap_sel.pcap")
 
 		beacon = radiotap.Radiotap(bts_list[0])[ieee80211.IEEE80211.Beacon]
-		essid = beacon.params.find_value(lambda v: v.id == 0).body_bytes
+		essid = beacon.params[lambda v: v.id == 0][0][1].body_bytes
 		print(essid)
 		self.assertEqual(essid, b"system1")
 
@@ -1366,18 +1366,19 @@ class TriggerListTestCase(unittest.TestCase):
 		del tcp1.opts[:]
 		tcp1.opts.extend([tcp.TCPOptMulti(type=0, len=3, body_bytes=b"\x00\x11\x22"), tcp.TCPOptSingle(type=1),
 			tcp.TCPOptSingle(type=2)])
-		self.assertEqual(tcp1.opts.find_pos(lambda v: v.type == 2), 2)
+		self.assertEqual(tcp1.opts[lambda v: v.type == 2][0][1].type, 2)
 
 		tcp1.opts.extend([(b"key1", b"value1"), (b"key2", b"value2")])
-		idx, res = tcp1.opts.get_by_key(b"key1")
+		idx, res = tcp1.opts[lambda v: v[0] == b"key1"][0][1]
 		self.assertEqual(res, b"value1")
-		idx, res = tcp1.opts.get_by_key(b"key2")
+		idx, res = tcp1.opts[lambda v: v[0] == b"key2"][0][1]
 		self.assertEqual(res, b"value2")
-		tcp1.opts.set_by_key(b"key1", b"value1b")
-		tcp1.opts.set_by_key(b"key2", b"value2b")
-		idx, res = tcp1.opts.get_by_key(b"key1")
+		tcp1.opts[lambda v: v[0] == b"key1"] = (b"key1", b"value1b")
+		tcp1.opts[lambda v: v[0] == b"key2"] = (b"key2", b"value2b")
+		print(tcp1)
+		idx, res = tcp1.opts[lambda v: v[0] == b"key1"][0][1]
 		self.assertEqual(res, b"value1b")
-		idx, res = tcp1.opts.get_by_key(b"key2")
+		idx, res = tcp1.opts[lambda v: v[0] == b"key2"][0][1]
 		self.assertEqual(res, b"value2b")
 
 
@@ -2013,7 +2014,9 @@ class RadiotapTestCase(unittest.TestCase):
 		self.assertEqual(rad.len, 4608)  # 0x1200 = 18
 		self.assertEqual(rad.present_flags, 0x2E480000)
 		# channel_bytes = rad.flags[bytes([radiotap.CHANNEL_MASK])][0][1]
-		channel_bytes = rad.flags.find_value(lambda v: v[0] == radiotap.CHANNEL_MASK)[1]
+		# [(idx, (id, flag)), ...]
+		channel_bytes = rad.flags[lambda v: v[0] == radiotap.CHANNEL_MASK][0][1][1]
+		print(channel_bytes)
 		channel = radiotap.get_channelinfo(channel_bytes)
 
 		print("channel: %d" % channel[0])

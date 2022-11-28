@@ -33,13 +33,12 @@ DIR_UNKNOWN		= 4
 DIR_NOT_IMPLEMENTED	= 255
 
 ERROR_NONE		= 0
-ERROR_DISSECT		= 1	# This layer had an error when parsing/creating an upper layer
-ERROR_UNKNOWN_PROTO	= 2
-ERROR_NOT_UNPACKED	= 4
+ERROR_DISSECT		= 1  # This layer had an error when parsing/creating an upper layer
 
 VARFILTER_TYPES = {bytes, int}
 
 LAMBDA_TRUE = lambda pkt: True
+
 
 class NotEnoughBytesException(Exception):
 	pass
@@ -72,13 +71,12 @@ class Packet(object, metaclass=MetaPacket):
 		[Body: -> Packet:
 			headerfields
 			...
-			[Body: b"some_bytes"]
+			[Body: -> b"some_bytes"]
 	]]]
 
 	A header definition like __hdr__ = (("name", "12s", b"defaultvalue"),) will define a header field
 	having the name "name", format "12s" and default value b"defaultvalue" as bytestring. Fields will
-	be added in order of definition. Extending classes should overwrite the "_dissect"-method in order to dissect
-	given data.
+	be added and concatinated in order of definition.
 
 	Body can have these states:
 	- Lazy handler not yet dissected (body bytes are internally stored as raw bytes)
@@ -87,8 +85,8 @@ class Packet(object, metaclass=MetaPacket):
 	- Body is raw bytes
 
 
-	Requirements
-	============
+	Minimum features
+	================
 
 	- Auto-decoding of headers via given format-patterns (defined via __hdr__)
 	- Auto-decoding of body-handlers (IP -> parse IP-data -> add TCP-handler to IP -> parse TCP-data..)
@@ -117,39 +115,37 @@ class Packet(object, metaclass=MetaPacket):
 		Implementation info:
 		Convenient access should be set via varname_s = pypacker.Packet.get_property_XXX("varname")
 		Get/set via is always done using strings (not byte strings).
-	- Concatination via "layer1 + layer2 + layerX"
+	- Concatination via "packet = layer1 + layer2 + layerX"
+	- Access to next lower/upper layer
 	- Header-values with length < 1 Byte should be set by using properties
-	- Activate/deactivate non-TriggerList header fields by setting values (None=deactive, value=active)
+	- Deactivate/activate non-TriggerList header fields, eg pkt.hdr=None (inactive), pkt.hdr=b"xxx" (active)
 	- Checksums (static auto fields in general) are auto-recalculated when calling
 		bin(update_auto_fields=True) (default: active)
 		The update-behaviour for every single field can be controlled via
 		"pkt.VARNAME_au_active = [True|False]
 	- Ability to check direction to other Packets via "[is_]direction()"
-	- Access to next lower/upper layer
 	- No correction of given raw packet-bytes e.g. checksums when creating a packet from it
-		If the packet can't be parsed w/ correct data -> raise exception.
 		The internal state will only be updated on changes to headers or data later on
 	- General rule: less changes to headers/body-data = more performance
 
 
 	Call-flows
 	==========
-
 		pypacker(bytes)
 			-> _dissect(): has to be overwritten, get to know/verify the real header-structure
 				-> (optional): call _init_handler() initiating a handler representing an upper-layer
 				-> (optional): call _init_triggerlist(name, b"bytes", dissect_callback)
 					to initiate a TriggerList field
 				Note: headers won't be updated to buffer values until dissect finishes
-			-> (optional) on access to simple headers: _unpack() sets all header values
+			-> (optional) on access to simple headers: _unpack() sets all header values of a layer
 			-> (optional) on access to TriggerList headers: lazy parsing gets triggered
-			-> (optional) on access to body handler next upper layer gets initiated
+			-> (optional) on access to body handler: next upper layer gets initiated
 
 		pypacker(keyword1=value, ...)
 			-> (optional) set headers
 
 		pypacker()
-			-> sets standard values for simple headers
+			-> Only sets standard values for simple headers
 
 	"""
 
@@ -173,7 +169,7 @@ class Packet(object, metaclass=MetaPacket):
 			Note: lower_layer_object only for internal usage
 		Packet(keyword1=val1, keyword2=val2, ...)
 
-		bytestring -- packet bytes to build packet from, nonempty values are NOT allowed
+		bytestring -- packet bytes to build packet from
 		lower_layer_object -- For internal usage only. Used by _dissect()
 			Ideally the current layer is agnostic to the lower layer. But sometimes...
 		keywords -- keyword arguments correspond to header fields to be set
@@ -247,9 +243,9 @@ class Packet(object, metaclass=MetaPacket):
 	# Public access to header length: keep it uptodate
 	#
 	def _get_header_len(self):
-		if self._header_changed and self._header_format_changed:
+		if self._header_format_changed:
 			# Header has NOT changed if __init__ just finished -> avoid unneeded re-formating
-			# update format to get the real length
+			# Update format to get the real length
 			self._update_header_format()
 		return self._header_len
 
@@ -294,11 +290,10 @@ class Packet(object, metaclass=MetaPacket):
 		if self._higher_layer is not None:
 			# Reset all handler data
 			self._set_higherlayer(None)
-		# logger.debug("setting new raw data: %s", value)
+
 		self._body_bytes = value
 		self._body_changed = True
 		self._lazy_handler_data = None
-		#logger.debug("notify after setting body bytes")
 		self._notify_changelistener()
 
 	# Get and set bytes for body. Note: this returns bytes even if higher_layer returns None.
@@ -359,7 +354,7 @@ class Packet(object, metaclass=MetaPacket):
 		#logger.debug("notify after setting handler")
 		self._notify_changelistener()
 
-	# deprecated, wording "higher_layer/highest_layer layer is more consistent
+	# Deprecated, wording "higher_layer/highest_layer layer is more consistent
 	upper_layer = property(_get_higherlayer, _set_higherlayer)
 	# Get/set body handler. Note: this will force lazy dissecting when reading
 	higher_layer = property(_get_higherlayer, _set_higherlayer)
@@ -373,7 +368,7 @@ class Packet(object, metaclass=MetaPacket):
 		if hndl is not None:
 			hndl.higher_layer = self
 
-	# Get/set next lower body handler
+	# Get/set body handler
 	lower_layer = property(lambda pkt: pkt._lower_layer, _set_lower_layer)
 
 	def _lowest_layer(self):
@@ -393,28 +388,15 @@ class Packet(object, metaclass=MetaPacket):
 
 		return current
 
-	def _set_highest_layer(self, layer):
-		"""
-		Replaces the current highest layer with a new one,
-		eg with new layer "D" A.B.C becomes A.B.D.
-		"""
-		layer_to_change = self.highest_layer.lower_layer
-
-		if layer_to_change is None:
-			return
-
-		layer_to_change.higher_layer = layer
-
-	# get lowest layer
 	lowest_layer = property(_lowest_layer)
-	# get top layer
 	highest_layer = property(_get_highest_layer)
 
 	def disconnect_layer(self):
 		"""
-		Disconnect and return this layer. Connects lower and upper layer
-		with each other. This is the same as 'pkt.lower_layer = pkt.higher_layer'
+		Disconnect layer B from ABC and return B. Connects AC with each other.
+		This is the same as 'pkt.lower_layer = pkt.higher_layer'
 		without returning the middle layer (pkt).
+
 		return -- This layer
 		"""
 		# Connect lower/upper layer of this layer
@@ -440,7 +422,7 @@ class Packet(object, metaclass=MetaPacket):
 			self.upper_layer = handler_obj
 			# This was a lazy init: same as direct dissecting -> no body change
 			self._body_changed = False
-		except Exception:
+		except:
 			# Error on lazy dissecting: set raw bytes
 			self._errors |= ERROR_DISSECT
 			self._body_bytes = handler_data[1]
@@ -451,16 +433,9 @@ class Packet(object, metaclass=MetaPacket):
 
 	def __getitem__(self, pkt_clzs):
 		"""
-		Check every layer upwards (inclusive this layer) for the given Packet class
-		and return the matched layers or None if nothing was found.
+		Check every layer upwards (inclusive this layer) for the given criteria
+		and return the matched layers. Example:
 
-		pkt_clzs -- Packet classes to search for. Optional lambdas can
-		be used for filtering each layer.
-
-		# All layers have to match starting from A (explicit is better than implicit).
-		# Comparing starts from "current layer == A" bc: otherwise ALL layers have to
-		# be parsed all the time until a matching layer (to A) appears (starting layer
-		# would not be known a priori).
 		a, b, c, d = pkt[
 			(A, lambda a: a.src="123"), # Type A and filter must match
 			None, # This layer can be anything
@@ -468,13 +443,14 @@ class Packet(object, metaclass=MetaPacket):
 			(None, lambda d: d.__class__ == d), # No type given but filter must match
 		]
 
-		# Search FIRST appearence of this class
-		# WARNING: Deprecated! This parses ALL layers until end of layer or layer found -> performance penalty
-		a = pkt[TCP]
+		All layers have to match starting from A (explicit is better than implicit).
+		Comparing starts from first layer otherwise ALL layers have to
+		be parsed all the time until a matching layer (to A) appears (starting layer
+		is not be known a priori).
 
-		return -- All given layers like [a, b, ...] or [None, None, ...] if at least one layer did not match
-			in type or via filter.
-
+		pkt_clzs -- Packet classes to search for. Optional lambdas can be used for filtering each layer.
+		return -- All given layers like [a, b, ...] or [None, None, ...] if at least one
+			layer did not match in type or via filter.
 		"""
 		p_instance = self
 
@@ -573,7 +549,8 @@ class Packet(object, metaclass=MetaPacket):
 	def __add__(self, packet_or_bytes_to_add):
 		"""
 		Concatinate a packet with another packet or bytes.
-		Note: Beware of side effects as Packets remain connected until removed, eg via pkt.higher_layer = None.
+		Note: Beware of side effects as Packets remain connected until removed,
+		eg via pkt.higher_layer = None.
 
 		packet_or_bytes_to_add -- The packet or bytes to be added as highest layer
 		"""
@@ -598,12 +575,13 @@ class Packet(object, metaclass=MetaPacket):
 
 	def split_layers(self):
 		"""
-		Splits all layers to indepent ones starting from this one not connectedto each other
+		Splits all layers to independent ones starting from this one not connected to each other
 		e.g. A.B.C -> [A, B, C]
 		return -- [layer1, layer2, ...]
 		"""
 		layers = [layer for layer in self]
 
+		# Disconnect all layers
 		for layer in layers:
 			# Avoid overwriting bytes, only reset handler
 			if layer._body_bytes is None:
@@ -614,6 +592,7 @@ class Packet(object, metaclass=MetaPacket):
 	def summarize(self):
 		"""
 		Print a summary of this layer state. Shows all header, even deactivated ones.
+		Optional: Call bin() to update auto-update fields.
 		"""
 		# Values need to be unpacked to be shown
 		if not self._unpacked:
@@ -753,12 +732,9 @@ class Packet(object, metaclass=MetaPacket):
 
 	def _init_handler(self, hndl_type, buffer):
 		"""
-		Called by overwritten "_dissect()". 1) Store handler for later dissect or 2) directly dissect it.
-		Notes for 2): Initiate the handler-parser using the given buffer and set it using _set_higherlayer()
-		On any error this will set raw bytes given for body data.
+		Store handler for later dissect. Called by overwritten "_dissect()".
 
-		hndl_type -- A value to place the handler in the handler-dict like
-			dict[Class.__name__][hndl_type] (eg type-id, port-number)
+		hndl_type -- A value matching the class overwriting __dissect()
 		buffer -- The buffer to be used to create the handler
 		"""
 		# Empty buffer must lead to empty body. Initiating packets using empty buffer
@@ -887,7 +863,8 @@ class Packet(object, metaclass=MetaPacket):
 
 	def _update_fields(self):
 		"""
-		Overwrite this to update header fields. Only gets called if this or any other upper layer has changed.
+		Overwrite this to update header fields.
+		Only gets called if this or any other upper layer has changed.
 		Callflow on a packet "pkt = layer1 + layer2 + layer3 -> pkt.bin()":
 		layer3._update_fields() -> layer2._update_fields() -> layer1._update_fields() ...
 		"""
@@ -910,10 +887,10 @@ class Packet(object, metaclass=MetaPacket):
 
 			while layer_it is not None:
 				layers.append(layer_it)
-				# Upper layer is not yet dissected but could need update:
-				# ip:changed + tcp:notchanged/parsed -> tcp needs update
+				# Upper layer is not yet dissected but *could* need update.
+				# eg: IP:changed + TCP:notchanged/parsed -> TCP needs update
 				if layer_it._lazy_handler_data is not None:
-					# Next upper layer forces update in layet_it
+					# Next upper layer forces update in layer_it, eg IP->TCP (layer_it)
 					if layer_it._header_changed and\
 						layer_it._lazy_handler_data[0].__class__ in layer_it._update_dependants:
 						# Force dissecting
@@ -1006,15 +983,15 @@ class Packet(object, metaclass=MetaPacket):
 				continue
 			val = self_getattr(name)
 			# Two options:
-			# - simple type (int, bytes, ...)	-> add given value
+			# - Simple type (int, bytes, ...)	-> add given value
 			# - TriggerList	(found via format None) -> call bin()
-			if val.__class__ in HEADER_TYPES_SIMPLE:  # assume bytes/int
+			if val.__class__ in HEADER_TYPES_SIMPLE:
 				header_values_append(val)
-			else:  # Assume TriggerList
+			else:
+				# Assume TriggerList: not initiated or otherwise
 				if val.__class__ == list:
 					header_values_append(val[0])
 				else:
-					# Assume packet
 					header_values_append(val.bin())
 
 		# logger.debug("header bytes for %s: %s = %s",
@@ -1342,7 +1319,7 @@ def get_property_translator(
 	"""
 	Get a descriptor allowing to make a "value -> variable name representation" translation.
 	The variable name representation can actually be used to assign values to the field in question.
-	Example: ip.py -> IP_PROTO_UDP=17 -> "17" gets translated to "IP_PROTO_UDP"
+	Example: ip.py -> contains IP_PROTO_UDP=17 -> ip1.p=ip.IP_PROTO_UDP -> ip.p_t gives "IP_PROTO_UDP"
 
 	varname_regex -- The regex to find variables.
 	cb_get_description -- lambda value, value_name_dct: Description

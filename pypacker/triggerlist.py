@@ -1,5 +1,6 @@
 """TriggerList for handling dynamic headers."""
 import logging
+import types
 
 logger = logging.getLogger("pypacker")
 
@@ -61,9 +62,22 @@ class TriggerList(list):
 
 	# Python predefined overwritten methods
 
-	def __getitem__(self, pos):
+	def __getitem__(self, needle):
 		self._lazy_dissect()
-		return super().__getitem__(pos)
+		if type(needle) != types.FunctionType:
+			return super().__getitem__(needle)
+		else:
+			idx_value = []
+			idx = 0
+
+			for idx, value in enumerate(self):
+				try:
+					if needle(value):
+						idx_value.append((idx, value))
+				except:
+					# Don't care. Note: gets inperformant if too many exceptions
+					pass
+			return idx_value
 
 	def __iadd__(self, v):
 		"""Item can be added using '+=', use 'append()' instead."""
@@ -72,15 +86,34 @@ class TriggerList(list):
 		self.__refresh_listener([v])
 		return self
 
-	def __setitem__(self, k, v):
+	def __setitem__(self, needle, value):
 		self._lazy_dissect()
-		try:
-			# Remove listener from old packet which gets overwritten
-			self[k].remove_change_listener(None, remove_all=True)
-		except:
-			pass
-		super().__setitem__(k, v)
-		self.__refresh_listener([v])
+		idxs_to_set = []
+
+		if type(needle) != types.FunctionType:
+			idxs_to_set.append(needle)
+		else:
+			idx = 0
+
+			for idx, value_it in enumerate(self):
+				try:
+					if needle(value_it):
+						idxs_to_set.append(idx)
+						break
+				except:
+					# Don't care. Note: gets inperformant if too many exceptions
+					pass
+
+		for idx_to_set in idxs_to_set:
+			try:
+				# Remove listener from old packet which gets overwritten
+				self[idx_to_set].remove_change_listener(None, remove_all=True)
+			except:
+				pass
+			super().__setitem__(idx_to_set, value)
+
+		if len(idxs_to_set) > 0:
+			self.__refresh_listener([value])
 
 	def __delitem__(self, k):
 		# logger.debug("removing elements: %r" % k)
@@ -201,37 +234,6 @@ class TriggerList(list):
 
 		return self._cached_result
 
-	def find_pos(self, search_cb, offset=0):
-		"""
-		Find an item-position giving search callback as search criteria.
-
-		search_cb -- callback to compare values, signature: callback(value) [True|False]
-			Return True to return value found.
-		offset -- start at index "offset" to search
-		return -- index of first element found or None
-		"""
-		self._lazy_dissect()
-		while offset < len(self):
-			try:
-				if search_cb(self[offset]):
-					return offset
-			except:
-				# error on callback (unknown fields etc), ignore
-				pass
-			offset += 1
-		# logger.debug("position not found")
-		return None
-
-	def find_value(self, search_cb, offset=0):
-		"""
-		Same as find_pos() but directly returning found value or None.
-		"""
-		self._lazy_dissect()
-		try:
-			return self[self.find_pos(search_cb, offset=offset)]
-		except:
-			return None
-
 	def _pack(self, tuple_entry):
 		"""
 		This can  be overwritten to convert tuples in TriggerLists to bytes (see layer567/http.py)
@@ -271,49 +273,3 @@ class TriggerList(list):
 				final_descr.append("-> %s:\n%s\n" % (idx_descr, val))
 			final_descr.append("-" * 10)
 			return "".join(final_descr)
-
-	def get_by_key(self, key_needle, idx_startat=0):
-		"""
-		Allow retrieving the value of a tuple key/value-pair.
-		This isn't done via dictionaries as keys don't have to be unique.
-		This isn't done by __getitem__ either because it would be to ambiguous
-		in contrast to index access.
-
-		key -- The key to ssearch for a value like (key, value). The search
-			is case INsensitive!
-		return -- First matching value corresponding to key like idx, b"value"
-			or None, None if nothing was found
-
-		"""
-		try:
-			key_needle = key_needle.lower()
-		except:
-			# not a string
-			pass
-
-		idx = self.find_pos(
-			search_cb=lambda tpl: tpl[0] == key_needle or tpl[0].lower() == key_needle,
-			offset=idx_startat)
-
-		if idx is None:
-			return None, None
-		return idx, self[idx][1]
-
-	def set_by_key(self, key_needle, value, idx_startat=0):
-		"""
-		Do inverse of get_by_key()
-		"""
-		try:
-			key_needle = key_needle.lower()
-		except:
-			# not a string
-			pass
-
-		idx = self.find_pos(
-			search_cb=lambda tpl: tpl[0] == key_needle or tpl[0].lower() == key_needle,
-			offset=idx_startat)
-
-		if idx is None:
-			return
-		# Update using original key
-		self[idx] = (self[idx][0], value)

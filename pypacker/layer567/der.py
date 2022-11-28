@@ -1,10 +1,11 @@
 import logging
 import math
 
+from pypacker.structcbs import pack_B
+
 math_ceil = math.ceil
 math_log = math.log
 
-from pypacker.structcbs import pack_B
 
 logger = logging.getLogger("pypacker")
 from_bytes = int.from_bytes
@@ -23,13 +24,14 @@ def encode_length_definitive(num):
 	if num < 0x80:
 		return pack_B(num)
 	else:
-		len_len_inbytes = math_ceil( math_log(num + 1, 256) )
+		len_len_inbytes = math_ceil(math_log(num + 1, 256))
 
 		if len_len_inbytes > 0x7F:
 			logger.warning("Number too big for encoding")
 
 		len_bytesencoded = num.to_bytes(len_len_inbytes, "big")
 		return pack_B(0x80 + len_len_inbytes) + len_bytesencoded
+
 
 def decode_length_definitive(bts):
 	"""
@@ -56,6 +58,7 @@ def decode_length_definitive(bts):
 		len_len += len_octets
 	return len_len, vlen
 
+
 def _get_der_tlv(der_bts):
 	"""
 	return -- idlen, lenlen, vlen, is_primitive
@@ -79,6 +82,7 @@ def _get_der_tlv(der_bts):
 	valuestart = off
 
 	return lenstart - tagstart, valuestart - lenstart, vlen, is_primitive
+
 
 class LinkedTLVList(list):
 	def __init__(self, val):
@@ -148,6 +152,7 @@ class LinkedTLVList(list):
 		return LinkedTLVList(val_ret) if type(val_ret) == list else val_ret
 	"""
 
+
 def decode_der(der_bts, rw_cb=None):
 	off = 0
 	end = len(der_bts)
@@ -178,25 +183,25 @@ def decode_der(der_bts, rw_cb=None):
 >>> X.509
 
 Certificate  ::=  SEQUENCE  {
-    tbsCertificate       TBSCertificate,
-    signatureAlgorithm   AlgorithmIdentifier,
-    signatureValue       BIT STRING  }
+	tbsCertificate       TBSCertificate,
+	signatureAlgorithm   AlgorithmIdentifier,
+	signatureValue       BIT STRING  }
 3082 06eb - SEQUENCE with length 0x06eb
 
 TBSCertificate  ::=  SEQUENCE  {
-    version         [0]  EXPLICIT Version DEFAULT v1,
-    serialNumber         CertificateSerialNumber,
-    signature            AlgorithmIdentifier,
-    issuer               Name,
-    validity             Validity,
-    subject              Name,
-    subjectPublicKeyInfo SubjectPublicKeyInfo,
-    issuerUniqueID  [1]  IMPLICIT UniqueIdentifier OPTIONAL,
-    -- If present, version MUST be v2 or v3
-    subjectUniqueID [2]  IMPLICIT UniqueIdentifier OPTIONAL,
-    -- If present, version MUST be v2 or v3
-    extensions      [3]  EXPLICIT Extensions OPTIONAL
-    -- If present, version MUST be v3
+	version         [0]  EXPLICIT Version DEFAULT v1,
+	serialNumber         CertificateSerialNumber,
+	signature            AlgorithmIdentifier,
+	issuer               Name,
+	validity             Validity,
+	subject              Name,
+	subjectPublicKeyInfo SubjectPublicKeyInfo,
+	issuerUniqueID  [1]  IMPLICIT UniqueIdentifier OPTIONAL,
+	-- If present, version MUST be v2 or v3
+	subjectUniqueID [2]  IMPLICIT UniqueIdentifier OPTIONAL,
+	-- If present, version MUST be v2 or v3
+	extensions      [3]  EXPLICIT Extensions OPTIONAL
+	-- If present, version MUST be v3
 }
 """
 
@@ -295,6 +300,4 @@ http://www.oid-info.com/
 2.5.29.37 - Extended key usage
 2.5.29.46 - FreshestCRL
 2.5.29.54 - X.509 version 3 certificate extension Inhibit Any-policy
-
 """
-

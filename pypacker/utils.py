@@ -6,11 +6,11 @@ import re
 import os
 import logging
 import math
-from socket import inet_ntoa
 import ipaddress
+import collections
 
 from pypacker import pypacker as pypacker
-from pypacker.structcbs import pack_L_le
+
 
 logger = logging.getLogger("pypacker")
 
@@ -118,7 +118,7 @@ def is_interface_present(iface_name):
 		netifaces.ifaddresses(iface_name)
 		return True
 	except ValueError:
-		# raised if interface is not present
+		# Raised if interface is not present
 		return False
 
 
@@ -315,14 +315,12 @@ def calculate_entropy(elements, granularity_bytes=0, blocksize_bytes=64, log_bas
 			entropies.append(entropy_part)
 		return entropies
 
-	symbol_count = {}
+	symbol_count = collections.defaultdict(lambda: 0)
 
 	for element in elements:
 		# Faster than using exceptions
-		if element in symbol_count:
-			symbol_count[element] += 1
-		else:
-			symbol_count[element] = 1
+		symbol_count[element] += 1
+
 	#print(symbol_count)
 	entropy = 0
 	symbols_total = sum(val for _, val in symbol_count.items())

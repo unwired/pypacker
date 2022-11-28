@@ -248,9 +248,11 @@ def get_full_payload(nfa, ptr_packet):
 	data = ctypes.string_at(ptr_packet, len_recv)
 	return len_recv, data
 
+
 class UnableToBindException(Exception):
 	def __init__(self, queue_id):
 		self.queue_id = queue_id
+
 
 class Interceptor(object):
 	"""
@@ -282,7 +284,7 @@ class Interceptor(object):
 			while obj._is_running:
 				# TODO: exception in outer loop?
 				try:
-					# max IP packet size = 65535 bytes
+					# Max IP packet size = 65535 bytes
 					bts = recv(65535)
 				except socket_timeout:
 					continue
@@ -296,7 +298,7 @@ class Interceptor(object):
 
 				handle_packet(nfq_handle, bts, len(bts))
 		except OSError:
-			# eg "Bad file descriptor": started and nothing read yet
+			# Eg "Bad file descriptor": started and nothing read yet
 			#logger.error(ex)
 			pass
 		except Exception as ex:
@@ -412,10 +414,13 @@ class Interceptor(object):
 		self._is_running = False
 
 		for qconfig in self._netfilterqueue_configs:
-			destroy_queue(qconfig.queue)
-			close_queue(qconfig.nfq_handle)
-			qconfig.nfq_socket.close()
-			# logger.debug("joining verdict thread for queue %d", qconfig.queue_id)
-			qconfig.verdictthread.join()
-
+			try:
+				destroy_queue(qconfig.queue)
+				close_queue(qconfig.nfq_handle)
+				qconfig.nfq_socket.close()
+				# logger.debug("joining verdict thread for queue %d", qconfig.queue_id)
+				qconfig.verdictthread.join()
+			except:
+				# Don't mind, we can't do anything if something goes wrong here
+				pass
 		self._netfilterqueue_configs.clear()

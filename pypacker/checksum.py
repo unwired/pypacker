@@ -11,7 +11,7 @@ from pypacker.structcbs import unpack_H_le, unpack_H
 logger = logging.getLogger("pypacker")
 
 # avoid references for performance reasons
-array_call = array.array
+array_array = array.array
 ntohs = socket.ntohs
 ENDIANNES_IS_BIG = True if sys.byteorder == "big" else False
 
@@ -23,7 +23,8 @@ def in_cksum_add(s, buf):
 	buflen = len(buf)
 	# logger.debug("buflen for checksum: %d" % n)
 	#a = [unpack_H_le(buf[off: off+2])[0] for off in range(0, buflen & ~0x1, 2)] # seems to be slower
-	a = array_call("H", buf[:buflen & ~0x1])
+	#a = data = numpy_frombuffer(bts, dtype=numpy_int16) # seems to be slower
+	a = array_array("H", buf[:buflen & ~0x1])
 
 	if ENDIANNES_IS_BIG:
 		a.byteswap()

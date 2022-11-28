@@ -23,6 +23,10 @@ def get_setter(varname, is_field_type_simple=True, is_field_static=True):
 	return -- set-property for simple types or triggerlist
 	"""
 	varname_shadowed = "_%s" % varname
+	varname_shadowed_active = varname_shadowed + "_active"
+	varname_shadowed_format = varname_shadowed + "_format"
+	object__setattr__ = object.__setattr__
+	object__getattribute__ = object.__getattribute__
 
 	def setfield_simple(obj, value):
 		"""
@@ -33,27 +37,29 @@ def get_setter(varname, is_field_type_simple=True, is_field_static=True):
 		if obj._unpacked is not None and not obj._unpacked:
 			# obj._unpacked = None means: dissect not yet finished
 			obj._unpack()
-		if value is None and obj.__getattribute__(varname_shadowed + "_active"):
-			# deactivate active field
-			object.__setattr__(obj, varname_shadowed + "_active", False)
+
+		is_active = obj.__getattribute__(varname_shadowed_active)
+
+		# Toggle active/inactive
+		if (value is None and is_active) or (value is not None and not is_active):
+			object__setattr__(obj, varname_shadowed_active, not is_active)
 			obj._header_format_changed = True
 			# logger.debug("deactivating field: %s" % varname_shadowed)
-		elif value is not None and not obj.__getattribute__(varname_shadowed + "_active"):
-			# activate inactive field
-			object.__setattr__(obj, varname_shadowed + "_active", True)
-			obj._header_format_changed = True
-			# logger.debug("activating field: %s" % varname_shadowed)
 
-		if value is not None and not is_field_static:
-			# simple dynamic field: update format
+		if not is_field_static and value is not None:
+			# Simple dynamic field: update format
 			format_new = "%ds" % len(value)
-			# logger.debug(">>> changing format for dynamic field: %r / %s / %s" %
-			# (obj.__class__, varname_shadowed, format_new))
-			object.__setattr__(obj, varname_shadowed + "_format", format_new)
-			obj._header_format_changed = True
+			format_old = object__getattribute__(obj, varname_shadowed_format)
+
+			# Avoid unneeded updates
+			if format_new != format_old:
+				# logger.debug(">>> changing format for dynamic field: %r / %s / %s" %
+				# (obj.__class__, varname_shadowed, format_new))
+				object__setattr__(obj, varname_shadowed_format, format_new)
+				obj._header_format_changed = True
 
 		#logger.debug("setting simple field: %r=%r" % (varname_shadowed, value))
-		object.__setattr__(obj, varname_shadowed, value)
+		object__setattr__(obj, varname_shadowed, value)
 		obj._header_changed = True
 		obj._notify_changelistener()
 
@@ -77,8 +83,8 @@ def get_setter(varname, is_field_type_simple=True, is_field_static=True):
 				headerfield_name=varname_shadowed
 			)
 			object.__setattr__(obj, varname_shadowed, tl)
-		# This will trigger unpacking
 
+		# This will trigger unpacking
 		del tl[:]
 
 		# TriggerList: avoid overwriting dynamic fields eg when using keyword constructor Class(key=val)
@@ -173,13 +179,13 @@ def configure_packet_header(t, hdrs, header_fmt):
 		t._header_field_names.append(shadowed_name)
 		setattr(t, shadowed_name + "_active", True)
 
-		# remember header format
+		# Remember header format
 		# t._header_field_infos[shadowed_name] = [True, hdr[1]]
 		is_field_type_simple = False
 		is_field_static = True
 
 		if hdr[1] is not None or (hdr[2] is None or type(hdr[2]) == bytes):
-			# simple static or simple dynamic type
+			# Simple static or simple dynamic type
 			# we got one of: ("name", format, ???) = static or
 			# ("name", None, [None, b"xxx"]) = dynamic
 			# -> Format given = static, Format None = dynamic
@@ -192,7 +198,7 @@ def configure_packet_header(t, hdrs, header_fmt):
 		setattr(t, shadowed_name + "_format", hdr[1])
 
 		if is_field_type_simple:
-			# assume simple static or simple dynamic type
+			# Assume simple static or simple dynamic type
 			fmt = hdr[1]
 
 			if hdr[2] is not None:
@@ -207,10 +213,10 @@ def configure_packet_header(t, hdrs, header_fmt):
 			#else:
 			#	setattr(t, shadowed_name + "_active", False)
 
-			# only simple fields can get deactivated
+			# Only simple fields can get deactivated
 			setattr(t, shadowed_name + "_active", True if hdr[2] is not None else False)
 
-			# check for auto-update
+			# Check for auto-update
 			if len(hdr) >= 4:
 				field_flags = hdr[3]
 
@@ -235,17 +241,17 @@ def configure_packet_header(t, hdrs, header_fmt):
 				get_setter(hdr[0], is_field_type_simple=True, is_field_static=is_field_static)
 			))
 		else:
-			# assume TriggerList
+			# Assume TriggerList
 			# Triggerlists don't have initial default values (and can't get deactivated)
 			t._header_fields_dyn_dict[shadowed_name] = hdr[2]
-			# initial value of TiggerLists is: values to init empty list
+			# Initial value of TiggerLists is: values to init empty list
 			setattr(t, shadowed_name, [b"", None])
 			setattr(t, hdr[0], property(
 				get_getter(hdr[0], is_field_type_simple=False),
 				get_setter(hdr[0], is_field_type_simple=False, is_field_static=is_field_static)
 			))
-			# format and value needed for correct length in _unpack()
-			# default is empty TriggerList -> 0 bytes
+			# Format and value needed for correct length in _unpack()
+			# Default is empty TriggerList -> 0 bytes
 			header_fmt.append("0s")
 			t._header_cached.append(b"")
 
@@ -308,28 +314,28 @@ class MetaPacket(type):
 		# __slots__ = ("var", ...) -> t.var = None -> p = Clz() -> p.var = 123 won't work (var is readonly)
 		# See: https://stackoverflow.com/questions/820671/python-slots-and-attribute-is-read-only
 		t = type.__new__(cls, clsname, clsbases, clsdict)
-		# dictionary of TriggerLists: name -> TriggerListClass
+		# Dictionary of TriggerLists: name -> TriggerListClass
 		t._header_fields_dyn_dict = {}
-		# cache header for performance reasons, will be set to bytes later on
+		# Cache header for performance reasons, will be set to bytes later on
 		t._header_cached = []
-		# all header names
+		# All header names
 		t._header_field_names = []
-		# all header formats including byte order
+		# All header formats including byte order
 		header_fmt = [">"]
 
-		# varname holding the fieldname containing the id associated with body handler
+		# Varname holding the fieldname containing the id associated with body handler
 		# eg Ethernet -> "type" or IP -> "p"
 		t._id_fieldname = None
 
-		# get header-infos: [("name", "format", value), ...]
+		# Get header-infos: [("name", "format", value), ...]
 		hdrs = getattr(t, "__hdr__", None)
 		configure_packet_header(t, hdrs, header_fmt)
 
-		# get sub-header-infos: [("name", cb_get, cb_set), ...]
+		# Get sub-header-infos: [("name", cb_get, cb_set), ...]
 		hdrs_sub = getattr(t, "__hdr_sub__", None)
 		configure_packet_header_sub(t, hdrs_sub)
 
-		# get handler classes, assume Packet class has no member "__handler__"
+		# Get handler classes, assume Packet class has no member "__handler__"
 		handler = getattr(t, "__handler__", None)
 
 		if handler is not None and len(handler) > 0:
@@ -338,50 +344,44 @@ class MetaPacket(type):
 			else:
 				t.load_handler(t, handler)
 
-		# Set of higher_layer classes which force dissecting (update dependends):
-		# IP->TCP => IP changed, TCP needs checksum update and
-		# needs to be dissected for this => TCP is ud in ip
+		# Set of higher_layer classes which force dissecting (update dependants):
+		# IP->TCP => IP changed -> TCP needs checksum update and
+		# needs to be dissected for this -> TCP is update dependant of IP
 		update_deps = getattr(t, "UPDATE_DEPENDANTS", set())
 		t._update_dependants = set([ud.__class__ for ud in update_deps])
 
 		# logger.debug(">>> translated header names: %s/%r" % (clsname, t._header_name_translate))
-		# current format as string
+		# Current format as string
 		t._header_format = struct.Struct("".join(header_fmt))
-		# header size can be assigened by __init__() directly or given by _header_format.size
+		# Header size can be assigened by __init__() directly or given by _header_format.size
 		t._header_len = t._header_format.size
-		# track changes to header format (changes to simple dynamic fields or TriggerList)
+		# Track changes to header format (changes to simple dynamic fields or TriggerList)
 		t._header_format_changed = False
-		# cached header, return this if nothing changed
+		# Cached header, return this if nothing changed
 		t._header_cached = t._header_format.pack(*t._header_cached)
 		# logger.debug("formatstring is: %s" % header_fmt)
-		# body as raw byte string (None if handler is present)
+		# Body as raw byte string (None if handler is present)
 		t._body_bytes = b""
-		# next lower layer: a = b + c -> b will be lower layer for c
+		# Next lower layer: a = b + c -> b will be lower layer for c
 		t._lower_layer = None
 		t._higher_layer = None
-		# track changes to header values: This is needed for layers like TCP for
+		# Track changes to header values: This is needed for layers like TCP for
 		# checksum-recalculation. Set to "True" on changes to header/body values, set to False on "bin()"
-		# track changes to header values
+		# Track changes to header values
 		t._header_changed = False
-		# track changes to body value like [None | bytes | body-handler] -> [None | bytes | body-handler]
+		# Track changes to body value like [None | bytes | body-handler] -> [None | bytes | body-handler]
 		t._body_changed = False
-		# objects which get notified on changes on header or body (shared)
-		# needs to be None do identify none-initialized variable
+		# Objects which get notified on changes on header or body (shared)
+		# Needs to be None do identify none-initialized variable
 		t._changelistener = None
-		# parent of the packet which is contained in a triggerlist
+		# Parent of the packet which is contained in a triggerlist
 		# parent_packet.triggerlist[sub] -> sub._triggelistpacket_parent == parent_packet
 		t._triggelistpacket_parent = None
-		# lazy handler data: [name, class, bytes]
+		# Lazy handler data: [name, class, bytes]
 		t._lazy_handler_data = None
-		# Indicates the most top layer until which should be unpacked
-		# (vs. lazy dissecting = just next higher layer)
-		# Setting this to an unknown class will keep the next-layer-parsing going on
-		t._final_unpack_clz = None
 		# indicates if static header values got already unpacked
 		# [True|False] = Status after dissect, None = pre-dissect (not unpacked)
 		t._unpacked = None
-		# indicates if this packet contains fragmented data saved as body bytes
-		t._fragmented = False
-		# concatination of errors, see pypacker.py -> ERROR_...
+		# Concatination of errors, see pypacker.py -> ERROR_...
 		t._errors = 0
 		return t
