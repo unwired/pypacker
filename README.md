@@ -68,8 +68,8 @@ from pypacker.layer3 import ip, ip6
 from pypacker.layer4 import tcp
 from pypacker.layer567 import http
 
-preader = ppcap.Reader(filename="packets_ether.pcap")
-pwriter = ppcap.Writer(filename="packets_ether_new.pcap", linktype=ppcap.DLT_EN10MB)
+preader = ppcap.Reader(filename="ether.pcap")
+pwriter = ppcap.Writer(filename="ether_new.pcap", linktype=ppcap.DLT_EN10MB)
 
 for ts, buf in preader:
 	pkt = ethernet.Ethernet(buf)
@@ -138,6 +138,10 @@ Intercept (and modificate) Packets eg for MITM:
 ```python
 # Add iptables rule:
 # iptables -I INPUT 1 -p icmp -j NFQUEUE --queue-balance 0:2
+# Alternatively add nftables rule:
+# nft add table inet pptable
+# nft add chain inet pptable filter { type filter hook input priority 0 \; policy accept\; }
+# nft add rule inet pptable filter counter queue num 0-2
 import time
 
 from pypacker import interceptor
@@ -192,6 +196,10 @@ Some examples:
 ## Usage examples
 See examples/ and tests/test_pypacker.py.
 
+```
+python tests/test_pypacker.py
+python examples/python [example]
+```
 ## Testing
 Tests are executed as follows:
 
@@ -291,7 +299,7 @@ by their respective RFCs/official standards.
 **Q**:	How are protocols added?
 
 **A**:  Short answer: Extend Packet class and add the class variable `__hdr__` to define header fields.
-        Long answer: See examples/examples_new_protocol.py for a very complete example.
+        Long answer: See examples/new_protocol.py for a very complete example.
 
 **Q**: How can I contribute to this project?
 

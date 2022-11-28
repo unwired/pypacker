@@ -1,4 +1,5 @@
 import socket
+import os
 
 import pypacker.pypacker as pypacker
 from pypacker.pypacker import Packet
@@ -8,10 +9,12 @@ from pypacker.layer12 import arp, ethernet, ieee80211, prism
 from pypacker.layer3 import ip, icmp
 from pypacker.layer4 import udp, tcp
 
+DIR_CURRENT = os.path.dirname(os.path.realpath(__file__)) + "/"
+
 wlan_monitor_if		= "wlan1"
 
 #
-# create packets using raw bytes
+# Create packets using raw bytes
 #
 BYTES_ETH_IP_ICMPREQ = b"\x52\x54\x00\x12\x35\x02\x08\x00\x27\xa9\x93\x9e\x08\x00" +\
 	b"\x45\x00\x00\x54\x00\x00\x40\x00\x40\x01\x54\xc1\x0a\x00" +\
@@ -21,19 +24,19 @@ BYTES_ETH_IP_ICMPREQ = b"\x52\x54\x00\x12\x35\x02\x08\x00\x27\xa9\x93\x9e\x08\x0
 	b"\x1c\x1d\x1e\x1f\x20\x21\x22\x23\x24\x25\x26\x27\x28\x29" +\
 	b"\x2a\x2b\x2c\x2d\x2e\x2f\x30\x31\x32\x33\x34\x35\x36\x37"
 packet1 = ethernet.Ethernet(BYTES_ETH_IP_ICMPREQ)
-print("packet contents: %s" % packet1)
-print("packet as bytes: %s" % packet1.bin())
-# create custom packets and concat them
+print("Packet contents: %s" % packet1)
+print("Packet as bytes: %s" % packet1.bin())
+# Create custom packets and concat them
 packet1 = ethernet.Ethernet(dst_s="aa:bb:cc:dd:ee:ff", src_s="ff:ee:dd:cc:bb:aa") +\
 	ip.IP(src_s="192.168.0.1", dst_s="192.168.0.2") +\
 	icmp.ICMP(type=8) +\
 	icmp.ICMP.Echo(id=1, ts=123456789, body_bytes=b"12345678901234567890")
-print("custom packet: %s" % packet1)
+print("Custom packet: %s" % packet1)
 
-# change dynamic header
+# Change dynamic header
 packet1[ip.IP].opts.append(ip.IPOptMulti(type=ip.IP_OPT_TS, len=3, body_bytes=b"\x00\x11\x22"))
 
-# change dynamic header even more
+# Change dynamic header even more
 # opts = [(ip.IP_OPT_TR, b"\x33\x44\x55"), (ip.IP_OPT_NOP, b"")]
 opts = [ip.IPOptMulti(type=ip.IP_OPT_TR,
 	len=3,
@@ -41,37 +44,39 @@ opts = [ip.IPOptMulti(type=ip.IP_OPT_TR,
 	ip.IPOptSingle(type=ip.IP_OPT_NOP)]
 packet1[ip.IP].opts.extend(opts)
 
-# get specific layers
+# Get specific layers
 layers = [packet1[ethernet.Ethernet], packet1[ip.IP], packet1[icmp.ICMP]]
-# the same as above but without index notation
+# The same as above but without index notation
 layers = [packet1, packet1.higher_layer, packet1.higher_layer.higher_layer]
-# the same as above but without index notation and navigating downwards
+# The same as above but without index notation and navigating downwards
 pkt_icmp = layers[2]
 layers = [pkt_icmp.lowest_layer, pkt_icmp.lower_layer, pkt_icmp]
 
 for l in layers:
 	if l is not None:
-		print("found layer: %s" % l)
+		print("Found layer: %s" % l)
 
-# check direction
+# Check direction
 packet2 = ethernet.Ethernet(dst_s="ff:ee:dd:cc:bb:aa", src_s="aa:bb:cc:dd:ee:ff") +\
 	ip.IP(src_s="192.168.0.2", dst_s="192.168.0.1") +\
 	icmp.ICMP(type=8) +\
 	icmp.ICMP.Echo(id=1, ts=123456789, body_bytes=b"12345678901234567890")
+
 print(packet1)
 print(packet1.direction)
+
 if packet1.is_direction(packet2, Packet.DIR_SAME):
-	print("same direction for packet 1/2")
+	print("Same direction for packet 1/2")
 elif packet1.is_direction(packet2, Packet.DIR_REV):
-	print("reverse direction for packet 1/2")
+	print("Reverse direction for packet 1/2")
 else:
-	print("unknown direction for packet 1/2, type: %d" % dir)
+	print("Unknown direction for packet 1/2, type: %d" % dir)
 
 #
-# read packets from pcap-file using pypacker-reader
+# Read packets from pcap-file using pypacker-reader
 #
 
-pcap = ppcap.Reader(filename="packets_ether.pcap")
+pcap = ppcap.Reader(filename=DIR_CURRENT + "/ether.pcap")
 cnt = 0
 
 for ts, buf in pcap:
@@ -83,30 +88,30 @@ for ts, buf in pcap:
 			eth[ip.IP].dst_s, eth[tcp.TCP].dport))
 pcap.close()
 #
-# send/receive packets to/from network using raw sockets
+# Send/receive packets to/from network using raw sockets
 #
 try:
 	psock = psocket.SocketHndl(timeout=10)
-	print("please do a ping to localhost to receive bytes!")
+	print("Please do a ping to localhost to receive bytes!")
 	raw_bytes = psock.recv()
 	print(ethernet.Ethernet(raw_bytes))
 	psock.close()
 except socket.error as e:
-	print("you need to be root to execute the raw socket-examples!")
+	print("You need to be root to execute the raw socket-examples!")
 
-# read 802.11 packets from wlan monitor interface
-# command to create/remove interface (replace wlanX with your managed wlan-interface):
+# Read 802.11 packets from wlan monitor interface
+# Command to create/remove interface (replace wlanX with your managed wlan-interface):
 # iw dev [wlanX] interface add mon0 type monitor
 # iw dev [wlanX] interface del
 
 try:
 	wlan_reader = psocket.SocketHndl(wlan_monitor_if)
-	print("please wait for wlan traffic to show up")
+	print("Please wait for wlan traffic to show up")
 	raw_bytes = wlan_reader.recv()
 	# print(Radiotap(raw_bytes))
 	print(prism.Prism(raw_bytes))
 
-	# grab some beacons on the current channel
+	# Grab some beacons on the current channel
 	bc_cnt = 0
 
 	for i in range(10):
@@ -135,38 +140,38 @@ try:
 			print(e)
 
 	if bc_cnt == 0:
-		print("got no beacons, try to change channel or get closer to the AP")
+		print("Got no beacons, try to change channel or get closer to the AP")
 	wlan_reader.close()
 except socket.error as e:
 	print(e)
 
-# write packets to network interface (default lo) using raw sockets
+# Write packets to network interface (default lo) using raw sockets
 try:
 	#
-	# send packets on layer 2
+	# Send packets on layer 2
 	#
 	psock = psocket.SocketHndl(iface_name="lo", timeout=10)
 
-	# send ARP request
+	# Send ARP request
 	arpreq = ethernet.Ethernet(src_s="12:34:56:78:90:12", type=ethernet.ETH_TYPE_ARP) +\
 		arp.ARP(sha_s="12:34:56:78:90:12", spa_s="192.168.0.2",
 			tha_s="12:34:56:78:90:13", tpa_s="192.168.0.1")
 	psock.send(arpreq.bin())
 
-	# send ICMP request
+	# Send ICMP request
 	icmpreq = ethernet.Ethernet(src_s="12:34:56:78:90:12", dst_s="12:34:56:78:90:13", type=ethernet.ETH_TYPE_IP) +\
 		ip.IP(p=ip.IP_PROTO_ICMP, src_s="192.168.0.2", dst_s="192.168.0.1") +\
 		icmp.ICMP(type=8) +\
 		icmp.ICMP.Echo(id=1, ts=123456789, body_bytes=b"12345678901234567890")
 	psock.send(icmpreq.bin())
 
-	# send TCP SYN
+	# Send TCP SYN
 	tcpsyn = ethernet.Ethernet(src_s="12:34:56:78:90:12", dst_s="12:34:56:78:90:13", type=ethernet.ETH_TYPE_IP) +\
 		ip.IP(p=ip.IP_PROTO_TCP, src_s="192.168.0.2", dst_s="192.168.0.1") +\
 		tcp.TCP(sport=12345, dport=80)
 	psock.send(tcpsyn.bin())
 
-	# send UDP data
+	# Send UDP data
 	udpcon = ethernet.Ethernet(src_s="12:34:56:78:90:12", dst_s="12:34:56:78:90:13", type=ethernet.ETH_TYPE_IP) +\
 		ip.IP(p=ip.IP_PROTO_UDP, src_s="192.168.0.2", dst_s="192.168.0.1") +\
 		udp.UDP(sport=12345, dport=80)
@@ -174,9 +179,9 @@ try:
 	psock.send(udpcon.bin())
 	psock.close()
 except socket.timeout as e:
-	print("timeout!")
+	print("Timeout!")
 except socket.error as e:
-	print("you need to be root to execute the raw socket-examples!")
+	print("You need to be root to execute the raw socket-examples!")
 
 """
 >>> Code snippets

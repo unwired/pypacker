@@ -535,16 +535,14 @@ class Packet(object, metaclass=MetaPacket):
 
 	def dissect_full(self):
 		"""
-		Recursive unpack ALL data inlcuding lazy header etc up to highest layer inlcuding danymic fields.
+		Recursive unpack ALL data inlcuding lazy header etc up to highest layer
+		inlcuding danymic fields.
 		"""
 		for name in self._header_field_names:
 			self.__getattribute__(name)
 
-		try:
+		if self.higher_layer is not None:
 			self.higher_layer.dissect_full()
-		except:
-			# No handler present
-			pass
 
 	def __add__(self, packet_or_bytes_to_add):
 		"""

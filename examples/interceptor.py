@@ -2,16 +2,13 @@
 Interceptor example using ICMP
 
 Requirements:
+# Add iptables rule:
 iptables -I INPUT 1 -p icmp -j NFQUEUE --queue-balance 0:2
 """
 import time
 
 from pypacker import interceptor
 from pypacker.layer3 import ip, icmp
-
-# Add iptables rule:
-# iptables -I INPUT 1 -p icmp -j NFQUEUE --queue-balance 0:2
-
 
 # ICMP Echo request intercepting
 def verdict_cb(ll_data, ll_proto_id, data, ctx, *args):
