@@ -33,7 +33,7 @@ class NewProtocol(pypacker.Packet):
 	layer 'IP' which can be access via pkt[UpperLayerClass]"""
 
 	# The protocol header is basically defined by the static field
-	# "__hdr__" (see layer12/ethernet.Ethernet). See code documentation
+	# "__hdr__" (see layer12/ethernet.py). See code documentation
 	# for classes "MetaPacket" and "Packet" in pypacker/pypacker.py for
 	# deeper information.
 	__hdr__ = (
@@ -43,28 +43,29 @@ class NewProtocol(pypacker.Packet):
 		("src", "4s", b"\xff" * 4),
 		("dst", "4s", b"\xff" * 4),
 		# Simple constant field, marked for auto update, see _update_fields(...).
-		#  Stores the full header length inclusive options.
+		# Stores the full header length inclusive options.
 		("hlen", "H", 14, FIELD_FLAG_AUTOUPDATE),
-		# Simple constant field, deactivated (see Ethernet -> vlan)
+		# Simple constant field, deactivated (see layer567/http.py -> startline)
 		# Switching between active/inactive should be avoided because of performance penalty :/
 		("idk", "H", None),
 		# Again a simple constant field
 		("flags", "B", 0),
-		# Dynamic field: bytestring format, *can* change in length, see dns.DNS
+		# Dynamic field: bytestring format, *can* change in length, see layer567/dns.py
 		# Field type should be avoided because of performance penalty :/
 		("yolo", None, b"1234"),
-		# TriggerList field: variable length, can contain: raw bytes, key/value-tuples (see HTTP) and Packets (see IP)
-		# Here TriggerList will contain key/value Tuples like (b"\x00", b"1")
+		# TriggerList field: allows multiple (variable length) values in any order
+		# Can contain: raw bytes, key/value-tuples (see layer567/httpy.py) and Packets (see layer3/ip.py)
+		# For NewProtocol this TriggerList usually will contain key/value Tuples like (b"\x00", b"1")
 		("options", None, triggerlist.TriggerList)
 	)
 
-	# Conveniant access should be enabled using properties eg using pypacker.get_property_xxx(...)
+	# Convenient access should be enabled using properties eg using pypacker.get_property_xxx(...)
 	src_s = pypacker.get_property_ip4("src")
 	dst_s = pypacker.get_property_ip4("dst")
 	# xxx_s = pypacker.get_property_mac("xxx")
 	# xxx_s = pypacker.get_property_dnsname("xxx")
 
-	# Setting/getting values smaller then 1 Byte should be enabled using properties (see layer3/ip.IP -> v, hl)
+	# Setting/getting values smaller then 1 Byte should be enabled using properties (see layer3/ip.py -> v, hl)
 	def __get_flag_fluxcapacitor(self):
 		return (self.flags & 0x80) >> 15
 
@@ -93,9 +94,9 @@ class NewProtocol(pypacker.Packet):
 		"""
 		_dissect(...) must be overwritten if the header format can change
 		from its original format. This is generally the case when
-		- using TriggerLists (see ip.IP)
-		- a simple field could get deactivated (see ethernet.Ethernet -> vlan)
-		- using dynamic fields (see dns.DNS -> Query -> name)
+		- using TriggerLists (see layer3/ip.py)
+		- a simple field could get deactivated (see layer12/ethernet.py -> vlan)
+		- using dynamic fields (see layer567/dns.py -> Query -> name)
 
 		In NewProtocol idk can get deactivated, options is a TriggerList
 		and yolo is a dynamic field so _dissect(...) needs to be defined.
@@ -118,7 +119,7 @@ class NewProtocol(pypacker.Packet):
 		# self._init_handler(...) must be called to initiate the handler of the next
 		# upper layer and makes it accessible (eg via ethernet[ip.IP]).
 		# Which handler to be initialized generally depends on the type information (here higher_layer_type)
-		# found in the current layer (see layer12/ethernet.Ethernet -> type).
+		# found in the current layer (see layer12/ethernet.py -> type).
 		# Here higher_layer_type can become the value 0x66 (defined by __handler__ field) and
 		# as a result ip.IP will be created as upper layer using the bytes given by "buf[total_header_length:]".
 		self._init_handler(higher_layer_type, buf[total_header_length:])
@@ -134,10 +135,10 @@ class NewProtocol(pypacker.Packet):
 	def _update_fields(self):
 		"""
 		_update_fields(...) should be overwritten to update fields which depend on the state
-		of the packet like lengths, checksums etc (see layer3/ip.IP -> len, sum)
+		of the packet like lengths, checksums etc (see layer3/ip.py -> len, sum)
 		aka auto-update fields.	The variable XXX_au_active indicates
 		if the field XXX should be updated (True) or not
-		(see layer3/ip.IP.bin() -> len_au_active). XXX_au_active is
+		(see layer3/ip.py -> bin() -> len_au_active). XXX_au_active is
 		available if the field has the flag "FIELD_FLAG_AUTOUPDATE" in __hdr__,
 		default value is True. _update_fields(...) is implicitly called by bin(...).
 		"""
@@ -147,7 +148,7 @@ class NewProtocol(pypacker.Packet):
 	def bin(self, update_auto_fields=True):
 		"""
 		bin(...)  should only be overwritten to allow more complex assemblation eg adding padding
-		at the end of all layers instead of the current layer (see ethernet.Ethernet -> padding).
+		at the end of all layers instead of the current layer (see layer12/ethernet.py -> padding).
 		The variable update_auto_fields indicates if fields should be updated in general.
 		"""
 		return pypacker.Packet.bin(self, update_auto_fields=update_auto_fields) + b"somepadding"
@@ -155,7 +156,7 @@ class NewProtocol(pypacker.Packet):
 	def direction(self, other):
 		"""
 		direction(...) should be overwritten to be able to check directions to an other packet
-		(see layer12/ethernet.Ethernet)
+		(see layer12/ethernet.py)
 		"""
 		direction = 0
 
@@ -171,7 +172,7 @@ class NewProtocol(pypacker.Packet):
 	def reverse_address(self):
 		"""
 		reverse_address(...) should be overwritten to be able to reverse
-		source/destination addresses (see ethernet.Ethernet)
+		source/destination addresses (see layer12/ethernet.py)
 		"""
 		self.src, self.dst = self.dst, self.src
 

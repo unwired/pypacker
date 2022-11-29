@@ -560,6 +560,7 @@ class GeneralTestCase(unittest.TestCase):
 		ppcap.merge_pcaps(pcap_files_in, pcap_file_out, filter_accept)
 		merged_bts = ppcap.Reader(filename=pcap_file_out).read()
 		self.assertTrue(len(merged_bts), cnt[0])
+		os.remove(pcap_file_out)
 
 class LazydictTestCase(unittest.TestCase):
 	def test_dict(self):
@@ -3175,6 +3176,10 @@ class DERTestCase(unittest.TestCase):
 			self.assertEqual(lentoencode, len_decoded)
 		"""
 
+class ExampleTestcase(unittest.TestCase):
+	def test_examples(self):
+		from examples import general, new_protocol
+
 suite = unittest.TestSuite()
 loader = unittest.defaultTestLoader
 
@@ -3246,6 +3251,7 @@ suite.addTests(loader.loadTestsFromTestCase(ReassembleTestCase))
 # Broken
 # suite.addTests(loader.loadTestsFromTestCase(ReaderNgTestCase))
 # suite.addTests(loader.loadTestsFromTestCase(ReaderPcapNgTestCase))
+suite.addTests(loader.loadTestsFromTestCase(ExampleTestcase))
 
 # Run all or dedicated tests
 if len(sys.argv) == 1:

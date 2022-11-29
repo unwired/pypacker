@@ -7,7 +7,7 @@ function msg {
 }
 
 if [ -z "$1" ]; then
-	echo "usage: $0 [stable | dev]"
+	echo "Usage: $0 [stable | dev]"
 exit 1
 fi
 
@@ -19,13 +19,13 @@ case "$1" in
 		grep -H "TODO" $f
 	done
 
-	msg "changing debug level to WARNING"
+	msg "Changing debug level to WARNING"
 	sed -r -i "s/# (logger.setLevel\(logging.WARNING\))/\1/g;s/^(logger.setLevel\(logging.DEBUG\))/# \1/g" pypacker/pypacker.py
 
-	msg "replacing version numbers"
+	msg "Replacing version numbers"
 	sed -r -i "s/version=\".+\"/version=\"$VERSION\"/g" setup.py
 
-	msg "searching for not disabled debug output"
+	msg "Searching for not disabled debug output"
 	grep -ir -R "^[^#]*logger.debug" *
 
 	#msg "doing style checks"
@@ -49,7 +49,7 @@ case "$1" in
 		git add doc
 	fi
 
-	msg "searching untracked NOT ignored files... did you forget to add anything?"
+	msg "Searching untracked NOT ignored files... did you forget to add anything?"
 	# Show untracked files
 	#git ls-files --others --exclude-from=.git/.gitignore
 	# Show only ignored files
@@ -96,7 +96,7 @@ case "$1" in
 	# python3 -m twine upload --repository-url  https://upload.pypi.org/legacy/ dist/pypacker-...
 ;;
 "dev")
-	msg "changing debug level to DEBUG"
+	msg "Changing debug level to DEBUG"
 	sed -r -i "s/# (logger.setLevel\(logging.DEBUG\))/\1/;s/^(logger.setLevel\(logging.WARNING\))/# \1/g" pypacker/pypacker.py
 ;;
 esac

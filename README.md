@@ -178,7 +178,7 @@ ictor.stop()
 - Optional: netifaces >=0.10.6 (for utils)
 - Optional (for interceptor):
   - CPython
-  - Linux based system with kernel support for NFQUEUE target. The config option is at:
+  - Linux based system with kernel support for NFQUEUE target. The kernel config option is at:
 	- Networking Options -> Network packet filtering -> Core Netfilter -> NFQUEUE target
   - iptables (alternatively nftables)
     - NFQUEUE related rulez can be added eg "iptables -I INPUT 1 -j NFQUEUE --queue-num 0"
@@ -205,12 +205,12 @@ Tests are executed as follows:
 
 1) Add Pypacker directory to the PYTHONPATH.
 
-- cd pypacker
-- export PYTHONPATH=$(pwd):$PYTHONPATH
+- `cd pypacker`
+- `export PYTHONPATH=$(pwd):$PYTHONPATH`
 
-2) execute tests
+2) Execute tests
 
-- python tests/test_pypacker.py
+- `python tests/test_pypacker.py`
 
 **Performance test results: pypacker**
 ```
@@ -270,12 +270,13 @@ For any questions left please file a bug (will be tagged as "questions").
 **Q**:	Where should I start learn to use Pypacker?
 
 **A**:	If you allready know Scapy starting by reading the examples should be OK. Otherwise there
-	is a general introduction to pypacker included at the doc's which shows the usage and concepts
+	is a general introduction to pypacker included at the doc's/wiki which shows the usage and concepts
 	of pypacker.
 
 **Q**:	How fast is pypacker?
 
-**A**:	See results above. For detailed results on your machine execute tests.
+**A**:	See results above. For detailed results on your machine execute tests:
+	`python tests/test_pypacker.py PerfTestCase`
 
 **Q**:	Is there any documentation?
 
@@ -360,7 +361,7 @@ packet_found = pkt[Telnet]
 packet_found = pkt[Ethernet,IP,TCP,Telnet]
 ```
 
-- Use pypy instead of cpython (~3x faster related to full packet parsing)
+- Use pypy (~3x faster than CPython related to full packet parsing)
 
 - For even more performance disable auto fields (affects calling bin(...)):
 ```
