@@ -100,7 +100,7 @@ class IP6(pypacker.Packet):
 			# IP6: Total length = 8 + Payload length
 			length = 8 + buf[off + 1] * 8 if type_nxt != IP_PROTO_IP6 else 8 + unpack_H(buf[off + 4: off + 6])[0]
 			#logger.debug("next type is: %s, len: %d, %r" % (type_nxt, length, buf[off:off + length]))
-			opt = ext_hdrs_cls[type_nxt](buf[off:off + length])
+			opt = ext_hdrs_cls[type_nxt](buf[off:off + length].tobytes())
 			opts.append(opt)
 			# Different header structure for IP6 and sub-header
 			type_nxt = buf[off] if type_nxt != IP_PROTO_IP6 else buf[off + 6]
@@ -173,7 +173,7 @@ class IP6OptsHeader(pypacker.Packet):
 				off += 1
 			else:
 				opt_len = buf[off + 1]
-				opt = IP6Option(type=opt_type, len=opt_len, body_bytes=buf[off + 2: off + 2 + opt_len])
+				opt = IP6Option(type=opt_type, len=opt_len, body_bytes=buf[off + 2: off + 2 + opt_len].tobytes())
 				# logger.debug("next ip6 bytes 2: %r" % (buf[off + 2: off + 2 + opt_len]))
 				off += 2 + opt_len
 			options.append(opt)
@@ -226,10 +226,10 @@ class IP6RoutingHeader(pypacker.Packet):
 		addresses = []
 		num_addresses = int(buf[1] / 2)
 
-		buf = buf[hdr_size:hdr_size + num_addresses * addr_size]
+		buf = buf[hdr_size: hdr_size + num_addresses * addr_size]
 
 		for i in range(num_addresses):
-			addresses.append(buf[i * addr_size: i * addr_size + addr_size])
+			addresses.append(buf[i * addr_size: i * addr_size + addr_size].tobytes())
 
 		self.addresses.extend(addresses)
 		#logger.debug(addresses)

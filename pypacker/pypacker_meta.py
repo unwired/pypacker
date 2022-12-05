@@ -46,8 +46,8 @@ def get_setter(varname, is_field_type_simple=True, is_field_static=True):
 			obj._header_format_changed = True
 			# logger.debug("deactivating field: %s" % varname_shadowed)
 
+		# Simple dynamic field: update format
 		if not is_field_static and value is not None:
-			# Simple dynamic field: update format
 			format_new = "%ds" % len(value)
 			format_old = object__getattribute__(obj, varname_shadowed_format)
 
@@ -59,7 +59,10 @@ def get_setter(varname, is_field_type_simple=True, is_field_static=True):
 				obj._header_format_changed = True
 
 		#logger.debug("setting simple field: %r=%r" % (varname_shadowed, value))
-		object__setattr__(obj, varname_shadowed, value)
+		if type(value) != memoryview:
+			# Allow "self.xyz = some_memoryview" _dissect, avoids "xyz.tobytes()"
+			# Actual value is not needed -> will be set in _unpack()
+			object__setattr__(obj, varname_shadowed, value)
 		obj._header_value_changed = True
 		obj._notify_changelistener()
 
@@ -177,7 +180,7 @@ def configure_packet_header(t, hdrs, header_fmt):
 						(t.__module__ + "." + t.__name__, hdr[0], hdr[1], hdr[2]))
 
 		shadowed_name = "_%s" % hdr[0]
-		t._header_field_names.append(shadowed_name)
+		t._header_field_names_shadowed.append(shadowed_name)
 		setattr(t, shadowed_name + "_active", True)
 
 		# Remember header format
@@ -320,7 +323,7 @@ class MetaPacket(type):
 		# Cache header for performance reasons, will be set to bytes later on
 		t._header_cached = []
 		# All header names
-		t._header_field_names = []
+		t._header_field_names_shadowed = []
 		# All header formats including byte order
 		header_fmt = [">"]
 
@@ -354,8 +357,6 @@ class MetaPacket(type):
 		# logger.debug(">>> translated header names: %s/%r" % (clsname, t._header_name_translate))
 		# Current format as string
 		t._header_format = struct.Struct("".join(header_fmt))
-		# Header size can be assigened by __init__() directly or given by _header_format.size
-		t._header_len = t._header_format.size
 		# Track changes to header format (changes to simple dynamic fields or TriggerList)
 		t._header_format_changed = False
 		# Cached header, return this if nothing changed
@@ -371,6 +372,7 @@ class MetaPacket(type):
 		# Track changes to header values
 		t._header_value_changed = False
 		# Track changes to body value like [None | bytes | body-handler] -> [None | bytes | body-handler]
+		# Does not track achanges in body-handler itself
 		t._body_value_changed = False
 		# Objects which get notified on changes on header or body (shared),
 		# eg packet_parent -> TriggerList[packet_sub, ...]:

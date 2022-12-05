@@ -179,7 +179,9 @@ class DNS(pypacker.Packet):
 		def _dissect(self, buf):
 			# Needed set format
 			# Find server name by 0-termination
+			buf = buf.tobytes()
 			off_end = buf.find(b"\x00", 12)
+
 			if off_end == -1:
 				off_end = len(buf)
 			else:

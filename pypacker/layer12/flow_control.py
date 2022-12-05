@@ -52,7 +52,7 @@ class FlowControl(pypacker.Packet):
 
 		def _dissect(self, buf):
 			for i in range(2, 18, 2):
-				self.time.append(buf[i:i + 2])
+				self.time.append(buf[i:i + 2].tobytes())
 			# TODO: find more efficient way, always correct?
 			return 2 + len(self.time) * 2
 

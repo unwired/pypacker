@@ -810,6 +810,7 @@ class IPTestCase(unittest.TestCase):
 		# header field udpate
 		src = "1.2.3.4"
 		dst = "4.3.2.1"
+		# TODO: triggering _update_header_format?
 		print(ip1)
 		ip1.src_s = src
 		ip1.dst_s = dst
@@ -2171,32 +2172,32 @@ class PerfTestCase(unittest.TestCase):
 		ip1 = ip.IP(s)
 		time.sleep(999)
 		"""
-		print(">>> full packet parsing (Ethernet + IP + TCP + HTTP)")
+		def print_result(time_start, time_end, cnt):
+			time_diff = time_end - time_start
+			print("Time diff: %ss" % time_diff)
+			print("nr = %d p/s" % (cnt / time_diff))
+
+		print(">>> Packet parsing (Ethernet + IP + TCP + HTTP) + reading all header")
 
 		start = time.time()
 		for i in range(cnt):
 			p = ethernet.Ethernet(BYTES_ETH_IP_TCP_HTTP)
 			p.dissect_full()
+		print_result(start, time.time(), cnt)
 
-		print("time diff: %ss" % (time.time() - start))
-		print("nr = %d p/s" % (cnt / (time.time() - start)))
-
-		print(">>> parsing (IP + ICMP)")
+		print(">>> Parsing first layer (IP + ICMP)")
 		start = time.time()
 		for i in range(cnt):
 			ip1 = ip.IP(s)
-		print("time diff: %ss" % (time.time() - start))
-		print("nr = %d p/s" % (cnt / (time.time() - start)))
+		print_result(start, time.time(), cnt)
 
-		print(">>> creating/direct assigning (IP only header)")
+		print(">>> Creating/direct assigning (IP only header)")
 		start = time.time()
 		for i in range(cnt):
 			# ip = IP(src="1.2.3.4", dst="1.2.3.5").bin()
 			# ip.IP(src=b"\x01\x02\x03\x04", dst=b"\x05\x06\x07\x08", p=17, len=1234, body_bytes=b"abcd")
 			ip.IP(src=b"\x01\x02\x03\x04", dst=b"\x05\x06\x07\x08", p=17, len=1234)
-		# ip = IP(src=b"\x01\x02\x03\x04", dst=b"\x05\x06\x07\x08", p=17, len=1234, body_bytes=b"abcd")
-		print("time diff: %ss" % (time.time() - start))
-		print("nr = %d p/s" % (cnt / (time.time() - start)))
+		print_result(start, time.time(), cnt)
 
 		print(">>> bin() without change (IP)")
 		ip2 = ip.IP(src=b"\x01\x02\x03\x04", dst=b"\x05\x06\x07\x08", p=17, len=1234, body_bytes=b"abcd")
@@ -2205,56 +2206,51 @@ class PerfTestCase(unittest.TestCase):
 
 		for i in range(cnt):
 			ip2.bin()
-		print("time diff: %ss" % (time.time() - start))
-		print("nr = %d p/s" % (cnt / (time.time() - start)))
+		print_result(start, time.time(), cnt)
 
-		print(">>> output with change/checksum recalculation (IP)")
+		print(">>> Output with change/checksum recalculation (IP)")
 		ip3 = ip.IP(src=b"\x01\x02\x03\x04", dst=b"\x05\x06\x07\x08", p=17, len=1234, body_bytes=b"abcd")
 		start = time.time()
 
 		for i in range(cnt):
 			ip3.src = b"\x01\x02\x03\x04"
 			ip3.bin()
-		print("time diff: %ss" % (time.time() - start))
-		print("nr = %d p/s" % (cnt / (time.time() - start)))
+		print_result(start, time.time(), cnt)
 
-		print(">>> basic/first layer parsing (Ethernet + IP + TCP + HTTP)")
+		print(">>> Basic/first layer parsing (Ethernet + IP + TCP + HTTP)")
 		start = time.time()
 
 		for i in range(cnt):
 			eth = ethernet.Ethernet(BYTES_ETH_IP_TCP_HTTP)
-		print("time diff: %ss" % (time.time() - start))
-		print("nr = %d p/s" % (cnt / (time.time() - start)))
+		print_result(start, time.time(), cnt)
 
-		print(">>> changing Triggerlist element value (Ethernet + IP + TCP + HTTP)")
+		print(">>> Changing Triggerlist element value (Ethernet + IP + TCP + HTTP)")
 		start = time.time()
 		eth1 = ethernet.Ethernet(BYTES_ETH_IP_TCP_HTTP)
 		tcp1 = eth1[tcp.TCP]
-		# initiate TriggerList before performance test
+		# Initiate TriggerList before performance test
 		tmp = tcp1.opts[0].type
 
 		for i in range(cnt):
 			tcp1.opts[0].type = tcp.TCP_OPT_WSCALE
-		print("time diff: %ss" % (time.time() - start))
-		print("nr = %d p/s" % (cnt / (time.time() - start)))
+		print_result(start, time.time(), cnt)
 
-		print(">>> changing dynamic field (Ethernet + IP + TCP + HTTP)")
+		print(">>> Changing dynamic field (Ethernet + IP + TCP + HTTP)")
 		start = time.time()
 		eth1 = ethernet.Ethernet(BYTES_ETH_IP_TCP_HTTP)
 		http1 = eth1[http.HTTP]
 
 		for i in range(cnt):
 			http1.startline = b"GET / HTTP/1.1"
-		print("time diff: %ss" % (time.time() - start))
-		print("nr = %d p/s" % (cnt / (time.time() - start)))
+		print_result(start, time.time(), cnt)
 
-		print(">>> direct assigning and concatination (Ethernet + IP + TCP + HTTP)")
+		print(">>> Direct assigning and concatination (Ethernet + IP + TCP + HTTP)")
 		start = time.time()
 		for i in range(cnt):
 			concat = ethernet.Ethernet(dst_s="ff:ff:ff:ff:ff:ff", src_s="ff:ff:ff:ff:ff:ff") + ip.IP(
 				src_s="127.0.0.1", dst_s="192.168.0.1") + tcp.TCP(sport=1234, dport=123) + http.HTTP()
-		print("time diff: %ss" % (time.time() - start))
-		print("nr = %d p/s" % (cnt / (time.time() - start)))
+		print_result(start, time.time(), cnt)
+
 
 
 	def test_perf_pypacker_dpkt_scapy(self):

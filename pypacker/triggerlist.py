@@ -44,18 +44,16 @@ class TriggerList(list):
 			return
 
 		try:
-			initial_list_content = self._dissect_callback(self._cached_result)
+			# TODO: use memoryview?
+			initial_list_content = self._dissect_callback(self.bin())
 		except:
 			# If anything goes wrong: raw bytes will be accessible in any case
 			#logger.debug("Failed to dissect in TL")
-			initial_list_content = [self._cached_result]
+			initial_list_content = [self.bin()]
 
 		self._dissect_callback = None
-		# This is re-calling _lazy_dissect() but directly returning after second if
-		# extend() is clearing cache -> remember cache
-		cache_tmp = self._cached_result
-		self.extend(initial_list_content)
-		self._cached_result = cache_tmp
+		# This is re-calling _lazy_dissect(), avoid by calling parent version
+		super(TriggerList, self).extend(initial_list_content)
 
 	# Python predefined overwritten methods
 
@@ -213,6 +211,8 @@ class TriggerList(list):
 					result_arr.append(entry.bin())
 
 			self._cached_result = b"".join(result_arr)
+		elif type(self._cached_result) == memoryview:
+			self._cached_result = self._cached_result.tobytes()
 
 		return self._cached_result
 

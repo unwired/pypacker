@@ -32,11 +32,11 @@ class PPP(pypacker.Packet):
 		offset = 1
 		ppp_type = buf[0]
 
-		if buf[0] & PFC_BIT == 0:
+		if ppp_type & PFC_BIT == 0:
 			ppp_type = unpack_H(buf[:2])[0]
 			offset = 2
-			self.p.append(buf[0:2])
+			self._init_triggerlist("p", buf[0:2], lambda tval: tval)
 		else:
-			self.p.append(buf[0:1])
+			self._init_triggerlist("p", buf[0:1], lambda tval: tval)
 		self._init_handler(ppp_type, buf[offset:])
 		return offset

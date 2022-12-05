@@ -171,10 +171,9 @@ class MQTTBase(Packet):
 
 	def _dissect(self, buf):
 		# Length MUST be decoded, flexible format but more imperformant bc parsing needed
-		mlen_len, _ = MQTTBase.decode_length(buf[1:])
+		mlen_len, _ = MQTTBase.decode_length(buf[1:].tobytes())
 		self.mlen = buf[1: 1 + mlen_len]
 		hlen = 1 + mlen_len
-		#logger.debug("Init handler..., mlen: %s, id: %d, buf: %s" % (mlen_len, (buf[0] & 0xF0) >> 4, buf[hlen:]))
 
 		try:
 			self._init_handler((buf[0] & 0xF0) >> 4, buf[hlen:])

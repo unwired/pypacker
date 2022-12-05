@@ -316,7 +316,7 @@ class LLDPManagementAddress(pypacker.Packet):
 		addrval_position = TLV_HEADER_LEN + 2
 		self.addrval = buf[addrval_position: addrval_position + addrlen - 1]
 		oidlen_postion = addrval_position + addrlen + 4
-		oidlen = unpack_B(buf[oidlen_postion: oidlen_postion + 1])[0]
+		oidlen = unpack_B(buf[oidlen_postion: oidlen_postion + 1].tobytes())[0]
 		if oidlen:
 			self.oid = buf[oidlen_postion + 1: oidlen_postion + 1 + oidlen]
 		return len(buf)
@@ -422,9 +422,9 @@ class DCBXConfiguration(pypacker.Packet):
 
 	def _dissect(self, buf):
 		for i in range(11, 19):
-			self.tcbandwith.append(buf[i:i + 1])
+			self.tcbandwith.append(buf[i:i + 1].tobytes())
 		for i in range(19, 27):
-			self.tsaassigment.append(buf[i:i + 1])
+			self.tsaassigment.append(buf[i:i + 1].tobytes())
 		return len(self)
 
 
@@ -450,9 +450,9 @@ class DCBXRecommendation(pypacker.Packet):
 		# start from TLV_HEADER_LEN + ORG_SPEC_HEADER_LEN +
 		# 1 byte(reserved) + 4 bytes(priority)
 		for i in range(11, 19):
-			self.tcbandwith.append(buf[i:i + 1])
+			self.tcbandwith.append(buf[i:i + 1].tobytes())
 		for i in range(19, 27):
-			self.tsaassigment.append(buf[i:i + 1])
+			self.tsaassigment.append(buf[i:i + 1].tobytes())
 		return len(self)
 
 
@@ -508,7 +508,7 @@ class DCBXApplicationPriority(pypacker.Packet):
 	def _dissect(self, buf):
 		# start from TLV_HEADER_LEN + ORG_SPEC_HEADER_LEN + 1 byte(reserved)
 		for i in range(7, len(buf), 3):
-			self.apppriotable.append(DCBXApplicationPriorityTable(buf[i:i + 3]))
+			self.apppriotable.append(DCBXApplicationPriorityTable(buf[i:i + 3].tobytes()))
 		return len(self)
 
 	def _update_fields(self):
@@ -559,7 +559,7 @@ LLDP_ORG_SPEC_TLV_CLS = {
 }
 
 
-def count_and_dissect_tlvs(buf):
+def count_and_dissect_tlvs(buf, onlylen=False):
 	"""
 	Count and dissect TLVs. Return length of LLDP layer
 
@@ -576,17 +576,26 @@ def count_and_dissect_tlvs(buf):
 		tlv_type = (type_and_len & TYPE_MASK) >> LENGTH_FIELD_BITS
 		tlv_len = type_and_len & LENGTH_MASK
 
-		if tlv_type != ORG_SPEC_TYPE:
-			clz = LLDP_TLV_CLS.get(tlv_type, LLDPGeneric)
-		else:
-			oui_subtype = unpack_I(buf[shift + TLV_HEADER_LEN:shift + ORG_SPEC_HEADER_LEN + TLV_HEADER_LEN])[0]
-			oui = (oui_subtype & OUI_MASK) >> SUBTYPE_LEN_BITS
-			subtype = oui_subtype & SUBTYPE_MASK
-			clz = LLDP_ORG_SPEC_TLV_CLS.get((oui, subtype), LLDPOrgSpecGeneric)
-		# get body bytes
-		tlv_body = buf[shift: tlv_len + shift + TLV_HEADER_LEN]
-		# update shift to begin of next TLV (TLV_HEADER_LEN:2 + content:x)
+		if not onlylen:
+			if tlv_type != ORG_SPEC_TYPE:
+				clz = LLDP_TLV_CLS.get(tlv_type, LLDPGeneric)
+			else:
+				oui_subtype = unpack_I(
+					buf[shift + TLV_HEADER_LEN: shift + ORG_SPEC_HEADER_LEN + TLV_HEADER_LEN])[0]
+				oui = (oui_subtype & OUI_MASK) >> SUBTYPE_LEN_BITS
+				subtype = oui_subtype & SUBTYPE_MASK
+				clz = LLDP_ORG_SPEC_TLV_CLS.get((oui, subtype), LLDPOrgSpecGeneric)
+			# Get body bytes
+			tlv_body = buf[shift: tlv_len + shift + TLV_HEADER_LEN]
+			# update shift to begin of next TLV (TLV_HEADER_LEN:2 + content:x)
+
 		shift += TLV_HEADER_LEN + tlv_len
+
+		if onlylen:
+			continue
+
+		#if type(tlv_body) == memoryview:
+		#	tlv_body = tlv_body.tobytes()
 		clz_bts_list.append((clz, tlv_body))
 
 	return shift, clz_bts_list
