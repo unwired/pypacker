@@ -25,9 +25,7 @@ class TriggerList(list):
 		headerfield_name -- name of this triggerlist when placed in a packet
 		"""
 		super().__init__()
-		# set by external Packet
-		# logger.debug(">>> init of TriggerList (contained in %s): %s" %
-		# (packet.__class__.__name__, buffer))
+		# Set by external Packet
 		self._packet = packet
 		self._dissect_callback = dissect_callback
 		self._cached_result = buffer
@@ -36,17 +34,16 @@ class TriggerList(list):
 	def _lazy_dissect(self):
 		if self._packet._unpacked == False:
 			# Before changing TriggerList we need to unpack or
-			# cached header won't fit on _unpack(...)
+			# cached header won't fit on _unpack(...).
+			# Ignored if still in dissect (_unpacked == None).
 			# This is called before any changes to TriggerList so place it here.
-			# Ignore if TriggerList changed in _dissect (_unpacked is None)
 			self._packet._unpack()
 
 		if self._dissect_callback is None:
-			# already dissected, ignore
+			# Already dissected, ignore
 			return
 
 		try:
-			#logger.debug("Dissecting in TL")
 			initial_list_content = self._dissect_callback(self._cached_result)
 		except:
 			# If anything goes wrong: raw bytes will be accessible in any case
@@ -116,7 +113,6 @@ class TriggerList(list):
 			self.__refresh_listener([value])
 
 	def __delitem__(self, k):
-		# logger.debug("removing elements: %r" % k)
 		self._lazy_dissect()
 		if type(k) is int:
 			itemlist = [self[k]]
@@ -124,10 +120,7 @@ class TriggerList(list):
 			# Assume slice: [x:y]
 			itemlist = self[k]
 		super().__delitem__(k)
-		# logger.debug("removed, handle mod")
 		self.__refresh_listener(itemlist, connect_packet=False)
-
-	# logger.debug("finished removing")
 
 	def __len__(self):
 		self._lazy_dissect()
@@ -140,10 +133,7 @@ class TriggerList(list):
 	def append(self, v):
 		self._lazy_dissect()
 		super().append(v)
-		# logger.debug("handling mod")
 		self.__refresh_listener([v])
-
-	# logger.debug("finished")
 
 	def extend(self, v):
 		self._lazy_dissect()
@@ -189,7 +179,6 @@ class TriggerList(list):
 				v._remove_change_listener()
 				# Remove old parent
 				v._triggelistpacket_parent = None
-		# logger.debug("refreshed listener!")
 		self._notify_change()
 
 	def _notify_change(self):
@@ -198,9 +187,7 @@ class TriggerList(list):
 		this TriggerList as field and _cached_result.
 		Called by: this list on changes or Packets in this list
 		"""
-		# logger.debug("!!! Packet notified about update: %r -> %r" % (self._packet.__class__, self))
-
-		self._packet._header_changed = True
+		self._packet._header_value_changed = True
 		self._packet._header_format_changed = True
 		# List changed: old cache of TriggerList not usable anymore
 		self._cached_result = None
@@ -210,16 +197,12 @@ class TriggerList(list):
 		Output the TriggerLists elements as concatenated bytestring.
 		Custom implementations for tuple-handling can be set by overwriting _pack().
 		"""
-		# logger.debug("packing triggerlist content")
-		# logger.debug("sep in TriggerList: %r" % self._packet.sep)
-
 		if self._cached_result is None:
 			result_arr = []
 			entry_type = None
 
 			for entry in self:
 				entry_type = type(entry)
-				# logger.debug("type is: %r" % entry_type)
 
 				if entry_type is bytes:
 					result_arr.append(entry)
@@ -230,7 +213,6 @@ class TriggerList(list):
 					result_arr.append(entry.bin())
 
 			self._cached_result = b"".join(result_arr)
-		# logger.debug("new cached result: %s" % self._cached_result)
 
 		return self._cached_result
 

@@ -164,7 +164,7 @@ class TCP(pypacker.Packet):
 		update = True
 		# update header length. NOTE: needs to be a multiple of 4 Bytes.
 		# options length need to be multiple of 4 Bytes
-		if self._header_changed and self.off_x2_au_active:
+		if self._header_value_changed and self.off_x2_au_active:
 			self.off = int(self.header_len / 4) & 0xF
 
 		# we need some IP as lower layer
@@ -175,7 +175,7 @@ class TCP(pypacker.Packet):
 
 		try:
 			# changes to IP-layer, don't mind if this isn't IP
-			if not self._lower_layer._header_changed:
+			if not self._lower_layer._header_value_changed:
 				# pseudoheader didn't change, further check for changes in layers
 				update = self._changed()
 		except:

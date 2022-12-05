@@ -34,7 +34,7 @@ def get_setter(varname, is_field_type_simple=True, is_field_static=True):
 
 		value -- bytes, int or None
 		"""
-		if obj._unpacked is not None and not obj._unpacked:
+		if obj._unpacked == False:
 			# obj._unpacked = None means: dissect not yet finished
 			obj._unpack()
 
@@ -60,7 +60,7 @@ def get_setter(varname, is_field_type_simple=True, is_field_static=True):
 
 		#logger.debug("setting simple field: %r=%r" % (varname_shadowed, value))
 		object__setattr__(obj, varname_shadowed, value)
-		obj._header_changed = True
+		obj._header_value_changed = True
 		obj._notify_changelistener()
 
 	def setfield_triggerlist(obj, value):
@@ -92,7 +92,7 @@ def get_setter(varname, is_field_type_simple=True, is_field_static=True):
 			tl.extend(value)
 		else:
 			tl.append(value)
-		obj._header_changed = True
+		obj._header_value_changed = True
 		obj._notify_changelistener()
 
 	if is_field_type_simple:
@@ -114,7 +114,8 @@ def get_getter(varname, is_field_type_simple=True):
 		Unpack field ondemand
 		"""
 		# logger.debug("getting value for simple field: %s" % varname_shadowed)
-		if obj._unpacked is not None and not obj._unpacked:
+		if obj._unpacked == False:
+			# obj._unpacked = None means: dissect not yet finished
 			obj._unpack()
 		# logger.debug("getting simple field: %r=%r" %
 		# (varname_shadowed, obj.__getattribute__(varname_shadowed)))
@@ -368,18 +369,21 @@ class MetaPacket(type):
 		# Track changes to header values: This is needed for layers like TCP for
 		# checksum-recalculation. Set to "True" on changes to header/body values, set to False on "bin()"
 		# Track changes to header values
-		t._header_changed = False
+		t._header_value_changed = False
 		# Track changes to body value like [None | bytes | body-handler] -> [None | bytes | body-handler]
-		t._body_changed = False
-		# Objects which get notified on changes on header or body (shared)
-		# Needs to be None do identify none-initialized variable
+		t._body_value_changed = False
+		# Objects which get notified on changes on header or body (shared),
+		# eg packet_parent -> TriggerList[packet_sub, ...]:
+		# Changes to packet_sub need to be known by packet_parent for format updates
+		# and TriggerList to clear cache.
+		# Needs to be None do identify uninitialized state.
 		t._changelistener = None
 		# Parent of the packet which is contained in a triggerlist
 		# parent_packet.triggerlist[sub] -> sub._triggelistpacket_parent == parent_packet
 		t._triggelistpacket_parent = None
 		# Lazy handler data: [name, class, bytes]
 		t._lazy_handler_data = None
-		# indicates if static header values got already unpacked
+		# Indicates if static header values got already unpacked
 		# [True|False] = Status after dissect, None = pre-dissect (not unpacked)
 		t._unpacked = None
 		# Concatination of errors, see pypacker.py -> ERROR_...

@@ -74,7 +74,7 @@ class UDP(pypacker.Packet):
 
 		try:
 			# changes to IP-layer, don't mind if this isn't IP
-			if not self._lower_layer._header_changed:
+			if not self._lower_layer._header_value_changed:
 				# lower layer doesn't need update, check for changes in present and upper layer
 				# logger.debug("lower layer did NOT change!")
 				update = True

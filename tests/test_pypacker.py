@@ -282,7 +282,7 @@ class GeneralTestCase(unittest.TestCase):
 
 		self.assertIsNone(eth._body_bytes)
 		self.assertIsNotNone(eth._lazy_handler_data)
-		self.assertFalse(eth._header_changed)
+		self.assertFalse(eth._header_value_changed)
 
 		print(">>> checking Exceptions")
 
@@ -298,7 +298,7 @@ class GeneralTestCase(unittest.TestCase):
 		print(">>> checking status")
 		self.assertIsNone(eth._body_bytes)
 		self.assertIsNone(eth._lazy_handler_data)
-		self.assertFalse(ip1._header_changed)
+		self.assertFalse(ip1._header_value_changed)
 		self.assertIsNone(ip1._body_bytes)
 		self.assertIsNotNone(ip1._lazy_handler_data)
 

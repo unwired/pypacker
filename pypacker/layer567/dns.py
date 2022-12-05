@@ -363,7 +363,7 @@ class DNS(pypacker.Packet):
 		return off
 
 	def _update_fields(self):
-		if self._header_changed:
+		if self._header_value_changed:
 			#logger.debug("updating lenghts")
 			# Avoid lazy dissect by checking for [b"bytes", dissect_callback]
 			# First assigning to length will trigger _unpack(...)

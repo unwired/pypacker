@@ -285,6 +285,7 @@ class Interceptor(object):
 				# TODO: exception in outer loop?
 				try:
 					# Max IP packet size = 65535 bytes
+					# TODO: use recvmsg_into()?
 					bts = recv(65535)
 				except socket_timeout:
 					continue

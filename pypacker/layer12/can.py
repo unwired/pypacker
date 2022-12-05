@@ -602,7 +602,7 @@ class CAN(pypacker.Packet):
 		return 8
 
 	def _update_fields(self):
-		if not self._header_changed:
+		if not self._header_value_changed:
 			return
 
 		if self.id > 0x7FF:
