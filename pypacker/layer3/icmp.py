@@ -64,8 +64,7 @@ class ICMP(pypacker.Packet):
 
 	def _dissect(self, buf):
 		# logger.debug("ICMP: adding fields for type: %d" % buf[0])
-		self._init_handler(buf[0], buf[4:])
-		return 4
+		return 4, buf[0]
 
 	class Echo(pypacker.Packet):
 		__hdr__ = (

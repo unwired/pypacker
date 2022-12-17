@@ -93,7 +93,9 @@ def get_bts_for_msg_compression(tl_packet):
 	"""return -- header bytes of DNS or b"" """
 	# DNS.Triggestlist[sub] -> sub._triggelistpacket_parent == DNS
 	if tl_packet._triggelistpacket_parent is not None:
+		#logger.debug("Returning parent header bytes")
 		return tl_packet._triggelistpacket_parent.header_bytes
+	#logger.debug("No parent header bytes :/")
 	return b""
 
 
@@ -179,8 +181,8 @@ class DNS(pypacker.Packet):
 		def _dissect(self, buf):
 			# Needed set format
 			# Find server name by 0-termination
-			buf = buf.tobytes()
-			off_end = buf.find(b"\x00", 12)
+			buf_bts = buf.tobytes()
+			off_end = buf_bts.find(b"\x00", 12)
 
 			if off_end == -1:
 				off_end = len(buf)
@@ -217,11 +219,12 @@ class DNS(pypacker.Packet):
 		mailbox_s = pypacker.get_property_dnsname("mailbox", get_bts_for_msg_compression)
 
 		def _dissect(self, buf):
-			# set format
-			# find server name by 0-termination
-			idx = buf.find(b"\x00", 12)
+			# Set format
+			# Find server name by 0-termination
+			buf_bts = buf.tobytes()
+			idx = buf_bts.find(b"\x00", 12)
 			#logger.debug(buf[12: idx+1])
-			# don't add trailing \0
+			# Don't add trailing \0
 			self.name = buf[12: idx + 1]
 			#logger.debug("name: %s" % buf[idx + 1: -14])
 			self.mailbox = buf[idx + 1: -14]
@@ -259,16 +262,16 @@ class DNS(pypacker.Packet):
 	@staticmethod
 	def get_dns_length(bts):
 		"""
-		return -- length of DNS name including terminating 0 (if present)
+		return -- Length of DNS name including terminating 0 (if present)
 		"""
 		off = 0
 
 		while off < len(bts):
-			# check for pointer
+			# Check for pointer
 			if bts[off] & 0xC0:
 				#logger.debug("Found pointer at %d", off)
 				return off + 2
-			# found terminating 0
+			# Found terminating 0
 			elif bts[off] == 0x00:
 				#logger.debug("Found 0 byte at %d", off)
 				return off + 1
@@ -276,106 +279,136 @@ class DNS(pypacker.Packet):
 
 		return 0
 
+	@staticmethod
+	def _dissect_queries(amount, collect_queries=True):
+		amount_collect = [amount, collect_queries]
+
+		def _dissect_queries_sub(buf):
+			#logger.debug(">> Dissecting questions: %r" % amount_collect)
+			queries = []
+			off = 0
+			while amount_collect[0] > 0 and off < len(buf):
+				# Find name by 0-termination
+				q_end = off + DNS.get_dns_length(buf[off:]) + 4
+
+				if amount_collect[1]:
+					q = DNS.Query(buf[off: q_end])
+					queries.append(q)
+				off = q_end
+				amount_collect[0] -= 1
+			return queries if amount_collect[1] else off
+		return _dissect_queries_sub
+
+	@staticmethod
+	def _dissect_answers(amount, collect_answers=True):
+		amount_collect = [amount, collect_answers]
+
+		def _dissect_answers_sub(buf):
+			#logger.debug(">> Dissecting answers: %r" % amount_collect)
+			answers = []
+			off = 0
+
+			while amount_collect[0] > 0 and off < len(buf):
+				# Find name by label/0-termination
+				# DNS name:x + type:2 + class:2 + ttl:4
+				a_end = off + DNS.get_dns_length(buf[off:]) + 2 + 2 + 4
+				dlen = unpack_H(buf[a_end: a_end + 2])[0]
+				# dlen header: 2 + dlen
+				a_end += (2 + dlen)
+
+				if amount_collect[1]:
+					a = DNS.Answer(buf[off: a_end])
+					answers.append(a)
+				off = a_end
+				amount_collect[0] -= 1
+			return answers if amount_collect[1] else off
+		return _dissect_answers_sub
+
+	@staticmethod
+	def _dissect_authserver(amount, collect_authserver=True):
+		amount_collect = [amount, collect_authserver]
+
+		def _dissect_authserver_sub(buf):
+			#logger.debug(">> Dissecting authserver: %r" % amount_collect)
+			authserver = []
+			off = 0
+
+			while amount_collect[0] > 0 and off < len(buf):
+				dlen = unpack_H(buf[off + 10: off + 12])[0]
+				authlen = 12 + dlen
+
+				if amount_collect[1]:
+					a = DNS.Auth(buf[off: off + authlen])
+					authserver.append(a)
+				off += authlen
+				amount_collect[0] -= 1
+			return authserver if amount_collect[1] else off
+		return _dissect_authserver_sub
+
+	@staticmethod
+	def _dissect_addreq(amount, collect_addreq=True):
+		amount_collect = [amount, collect_addreq]
+
+		def _dissect_addreq_sub(buf):
+			#logger.debug(">> Dissecting addreq: %r" % amount_collect)
+			addrecords = []
+			off = 0
+
+			while amount_collect[0] > 0 and off < len(buf):
+				if buf[off: off + 3] == b"\x00\x00\x29":
+					if amount_collect[1]:
+						a = DNS.AddRecordRoot(buf[off: off + 11])
+						addrecords.append(a)
+					off += 11
+				else:
+					dlen = unpack_H(buf[off + 10: off + 10 + 2])[0]
+
+					if amount_collect[1]:
+						a = DNS.AddRecord(buf[off: off + 12 + dlen])
+						addrecords.append(a)
+					off += 12 + dlen
+
+				amount_collect[0] -= 1
+			return addrecords if amount_collect[1] else off
+		return _dissect_addreq_sub
+
 	def _dissect(self, buf):
-		# unpack basic data to get things done
-		quests_amount, ans_amount, authserver_amount, addreq_amount = unpack_HHHH(buf[4:12])
+		# Unpack basic data to get things done
+		quests_amount, ans_amount, authserver_amount, addreq_amount = unpack_HHHH(buf[4: 12])
 		# Sanity check: assume max amount of 50 addresses
 		if quests_amount > 50 or ans_amount > 50 or authserver_amount > 50 or addreq_amount > 50:
-			raise Exception("Adress count too high, invalid packet")
+			raise Exception("Address count too high, invalid packet")
 		off = 12
+		#logger.debug(self.__class__)
+		addlen = DNS._dissect_queries(quests_amount, collect_queries=False)(buf[off:])
+		self.queries(buf[off: off + addlen], DNS._dissect_queries(quests_amount))
+		off += addlen
 
-		# Lazy dissect not possible, dns seems to be too shitty for this
-		#
-		# parse queries
-		#
-		#logger.debug(">>> parsing questions: %d" % quests_amount)
-		while quests_amount > 0 and off < len(buf):
-			# find name by 0-termination
-			q_end = off + DNS.get_dns_length(buf[off:]) + 4
-			#logger.debug("name is: %s" % buf[off: q_end-4])
-			#logger.debug("Query is: %s" % buf[off: q_end])
-			#logger.debug(len(buf[off: q_end]))
-			q = DNS.Query(buf[off: q_end])
-			q.dns_bytes = buf
-			#logger.debug("query is following..")
-			#logger.debug("Query: %s" % q)
-			#logger.debug("query name format: %s" % q._name_format)
-			self.queries.append(q)
-			off = q_end
-			quests_amount -= 1
+		addlen = DNS._dissect_answers(ans_amount, collect_answers=False)(buf[off:])
+		self.answers(buf[off: off + addlen], DNS._dissect_answers(ans_amount))
+		off += addlen
 
-		#
-		# parse answers
-		#
-		#logger.debug(">>> parsing answers: %d" % ans_amount)
-		while ans_amount > 0 and off < len(buf):
-			# find name by label/0-termination
-			# DNS name:x + type:2 + class:2 + ttl:4
-			a_end = off + DNS.get_dns_length(buf[off:]) + 2 + 2 + 4
-			#logger.debug("name is: %s" % buf[off: a_end-8])
-			dlen = unpack_H(buf[a_end: a_end + 2])[0]
-			#logger.debug("dlen: %d", dlen)
-			# dlen header: 2 + dlen
-			a_end += (2 + dlen)
-			#logger.debug("Answer is: %r" % buf[off: a_end])
-			a = DNS.Answer(buf[off: a_end])
-			a.dns_bytes = buf
-			#logger.debug("Answer: %s" % a)
-			self.answers.append(a)
-			off = a_end
-			ans_amount -= 1
+		addlen = DNS._dissect_authserver(authserver_amount, collect_authserver=False)(buf[off:])
+		self.auths(buf[off: off + addlen], DNS._dissect_authserver(authserver_amount))
+		off += addlen
 
-		#
-		# parse authorative servers
-		#
-		#logger.debug(">>> parsing authorative servers: %d" % authserver_amount)
-		while authserver_amount > 0 and off < len(buf):
-			dlen = unpack_H(buf[off + 10: off + 12])[0]
-			authlen = 12 + dlen
-			#logger.debug("Auth: %r" % buf[off: off + authlen])
-			a = DNS.Auth(buf[off: off + authlen])
-			a.dns_bytes = buf
+		addlen = DNS._dissect_addreq(addreq_amount, collect_addreq=False)(buf[off:])
+		self.addrecords(buf[off: off + addlen], DNS._dissect_addreq(addreq_amount))
+		off += addlen
 
-			#logger.debug("Auth server: %s" % a)
-			self.auths.append(a)
-			off += authlen
-			authserver_amount -= 1
-
-		#
-		# parse additional requests
-		#
-		#logger.debug(">>> parsing additional records: %d" % addreq_amount)
-		while addreq_amount > 0 and off < len(buf):
-			if buf[off: off + 3] == b"\x00\x00\x29":
-				a = DNS.AddRecordRoot(buf[off: off + 11])
-				off += 11
-			else:
-				#logger.debug(buf[idx:])
-				#logger.debug(buf[off:])
-				#logger.debug("data length via: %r" % buf[idx + 9: idx + 11])
-				dlen = unpack_H(buf[off + 10: off + 10 + 2])[0]
-				#logger.debug("AddRecord: %s" % buf[off: off + 12 + dlen])
-				a = DNS.AddRecord(buf[off: off + 12 + dlen])
-				#logger.debug("Additional Record: %s" % a)
-				off += 12 + dlen
-			self.addrecords.append(a)
-			addreq_amount -= 1
-
-		#logger.debug("dns: %s" % self)
 		return off
 
 	def _update_fields(self):
 		if self._header_value_changed:
-			#logger.debug("updating lenghts")
-			# Avoid lazy dissect by checking for [b"bytes", dissect_callback]
-			# First assigning to length will trigger _unpack(...)
-			if self.questions_amount_au_active and self._queries.__class__ is not list:
+			#logger.debug("Updating lenghts")
+
+			if self.questions_amount_au_active:
 				self.questions_amount = len(self.queries)
-			if self.answers_amount_au_active and self._answers.__class__ is not list:
+			if self.answers_amount_au_active:
 				self.answers_amount = len(self.answers)
-			if self.authrr_amount_au_active and self._auths.__class__ is not list:
+			if self.authrr_amount_au_active:
 				self.authrr_amount = len(self.auths)
-			if self.addrr_amount_au_active and self._addrecords.__class__ is not list:
+			if self.addrr_amount_au_active:
 				self.addrr_amount = len(self.addrecords)
 			#logger.debug("finished updating lengths")
 

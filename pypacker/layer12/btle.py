@@ -114,7 +114,7 @@ class AdvInd(pypacker.Packet):
 	)
 
 	def _dissect(self, buf):
-		self._init_triggerlist("adv_data", buf[6:], parse_advdata)
+		self.adv_data(buf[6:], parse_advdata)
 		return len(buf)
 
 	adv_addr_s = property(lambda obj: reverse_bts_to_str(obj.adv_addr))
@@ -128,7 +128,7 @@ class AdvNonconnInd(pypacker.Packet):
 	)
 
 	def _dissect(self, buf):
-		self._init_triggerlist("adv_data", buf[6:], parse_advdata)
+		self.adv_data(buf[6:], parse_advdata)
 		return len(buf)
 
 	adv_addr_s = property(lambda obj: reverse_bts_to_str(obj.adv_addr))
@@ -152,7 +152,7 @@ class ScanResponse(pypacker.Packet):
 	)
 
 	def _dissect(self, buf):
-		self._init_triggerlist("adv_data", buf[6:], parse_advdata)
+		self.adv_data(buf[6:], parse_advdata)
 		return len(buf)
 
 	adv_addr_s = property(lambda obj: reverse_bts_to_str(obj.adv_addr))
@@ -303,8 +303,7 @@ class DataLLID3(pypacker.Packet):
 	}
 
 	def _dissect(self, buf):
-		self._init_handler(buf[0], buf[1:])
-		return 1
+		return 1, buf[0]
 
 
 #
@@ -385,20 +384,15 @@ class BTLE(pypacker.Packet):
 
 	def _dissect(self, buf):
 		hlen = 6
-		#logger.debug("buf: %r" % buf)
 
 		if buf[: 4] == b"\xd6\xbe\x89\x8e":
-			#logger.debug("got ADV... packet")
 			btle_type = buf[4] & 0x0F
 		else:
-			#logger.debug("got data packet")
 			# max value is 15, shift to avoid collision with ADV... packets
 			btle_type = ((buf[4] & 0x03) + 1) << 8
-		#logger.warning("unpacked type: %r" % btle_type)
-		self._init_handler(btle_type, buf[hlen: -3])
 
 		self._crc = buf[-3:]
-		return hlen
+		return hlen, btle_type, buf[hlen: -3]
 
 	def bin(self, update_auto_fields=True):
 		"""Custom bin(): handle crc for BTLE."""
@@ -407,17 +401,7 @@ class BTLE(pypacker.Packet):
 	def __len__(self):
 		return super().__len__() + len(self.crc)
 
-	# handle crc attribute
-	def __get_crc(self):
-		try:
-			return self._crc
-		except AttributeError:
-			return b""
-
-	def __set_crc(self, crc):
-		self._crc = crc
-
-	crc = property(__get_crc, __set_crc)
+	crc = pypacker.get_ondemand_property("crc", lambda: b"")
 
 	def is_crc_ok(self, crc_init=0xAAAAAA):
 		return crc_btle_check(self.bin(), crc_init)
@@ -444,7 +428,4 @@ class BTLEHdr(pypacker.Packet):
 	}
 
 	def _dissect(self, buf):
-		self._init_handler(BTLE_HANDLE_TYPE, buf[10:])
-		#logger.debug("BTLE header: %r" % buf[:10])
-		#logger.debug(adding %d flags" % len(self.flags))
-		return 10
+		return 10, BTLE_HANDLE_TYPE

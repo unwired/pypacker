@@ -35,7 +35,7 @@ class Telnet(pypacker.Packet):
 	)
 
 	def _dissect(self, buf):
-		self._init_triggerlist("telnet_data", buf, self._parse_data)
+		self.telnet_data(buf, self._parse_data)
 		return len(buf)
 
 	@staticmethod

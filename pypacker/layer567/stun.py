@@ -51,7 +51,7 @@ class STUN(Packet):
 	)
 
 	@staticmethod
-	def __parse_attrs(buf):
+	def _parse_attrs(buf):
 		attributes = []
 		off = 0
 
@@ -68,5 +68,5 @@ class STUN(Packet):
 
 	def _dissect(self, buf):
 		# logger.debug("dissecting: %s" % buf)
-		self._init_triggerlist("attrs", buf[20:], self.__parse_attrs)
+		self.attrs(buf[20:], self._parse_attrs)
 		return len(buf)

@@ -71,9 +71,9 @@ class IPOptMulti(pypacker.Packet):
 
 class IP(pypacker.Packet):
 	__hdr__ = (
-		("v_hl", "B", 69, FIELD_FLAG_AUTOUPDATE),  # = 0x45
+		("v_hl", "B", 69, FIELD_FLAG_AUTOUPDATE),  # = 0x45, hl = Header length (=hl*4 bytes)
 		("tos", "B", 0),
-		("len", "H", 20, FIELD_FLAG_AUTOUPDATE),
+		("len", "H", 20, FIELD_FLAG_AUTOUPDATE),  # Header + data length
 		("id", "H", 0),
 		("frag_off", "H", 0),
 		("ttl", "B", 64),
@@ -173,41 +173,43 @@ class IP(pypacker.Packet):
 	p_t = pypacker.get_property_translator("p", "IP_PROTO_")
 
 	def _dissect(self, buf):
+		# 4 bits that specify the number of 32-bit words in the header
 		total_header_length = ((buf[0] & 0xF) << 2)
+		#logger.debug("Total length: %d" % total_header_length)
 		options_length = total_header_length - 20  # total IHL - standard IP-len = options length
 
+		#logger.debug("Optlen: %d" % options_length)
 		if options_length > 0:
 			# logger.debug("got some IP options: %s" % tl_opts)
-			self._init_triggerlist("opts", buf[20: 20 + options_length], self._parse_opts)
+			self.opts(buf[20: 20 + options_length], self._dissect_opts)
 		elif options_length < 0:
 			# invalid header length: assume no options at all
 			raise Exception("Invalid options length: %d" % options_length)
-		# TODO: extract real data length:
+
 		# There are some cases where padding can not be identified on ethernet -> do it here (eg VSS shit trailer)
-		self._init_handler(buf[9], buf[total_header_length:])
-		return total_header_length
+		return total_header_length, buf[9]
 
 	__IP_OPT_SINGLE = {IP_OPT_EOOL, IP_OPT_NOP}
 
 	@staticmethod
-	def _parse_opts(buf):
+	def _dissect_opts(buf):
 		"""Parse IP options and return them as list."""
 		optlist = []
 		i = 0
 		p = None
 
 		while i < len(buf):
-			# logger.debug("got IP-option type %s" % buf[i])
+			#logger.debug("Dissecting IP-option type %s" % buf[i])
 			if buf[i] in IP.__IP_OPT_SINGLE:
 				p = IPOptSingle(type=buf[i])
 				i += 1
 			else:
 				olen = buf[i + 1]
-				# logger.debug("IPOptMulti")
+				#logger.debug("IPOptMulti")
 				p = IPOptMulti(type=buf[i], len=olen, body_bytes=buf[i + 2: i + olen])
-				# logger.debug("body bytes: %s" % buf[i + 2: i + olen])
+				#logger.debug("body bytes: %s" % buf[i + 2: i + olen])
 				i += olen		# typefield + lenfield + data-len
-				# logger.debug("IPOptMulti 2")
+				#logger.debug("IPOptMulti 2")
 			optlist.append(p)
 		return optlist
 
@@ -218,18 +220,17 @@ class IP(pypacker.Packet):
 			self.len = len(self)
 		if self.v_hl_au_active:
 			# Update header length. NOTE: needs to be a multiple of 4 Bytes.
-			# logger.debug("updating: %r" % self._packet)
-				# options length need to be multiple of 4 Bytes
+			#logger.debug("Updating: %r" % self._packet)
+			# options length need to be multiple of 4 Bytes
 			self.hl = int(self.header_len / 4) & 0xF
 		if self.sum_au_active:
 			# length changed so we have to recalculate checksum
-			# logger.debug(">>> IP: calculating sum, current: %0X" % self.sum)
 			# reset checksum for recalculation,  mark as changed / clear cache
 			self.sum = 0
-			# logger.debug(">>> IP: bytes for sum: %s" % self.header_bytes)
+			#logger.debug("Calculating sum over %d bytes (%r), current: %0X" % (
+			#	len(self._pack_header()), self._pack_header(), self.sum))
 			self.sum = in_cksum(self._pack_header())
-			# logger.debug("IP: new hl: %d / %d" % (self._packet.hdr_len, hdr_len_off))
-			# logger.debug("new sum: %0X" % self.sum)
+			#logger.debug("Updated sum=%d, should be %0X" % (self.sum, in_cksum(self._pack_header())))
 
 	def direction(self, other):
 		# logger.debug("checking direction: %s<->%s" % (self, next))

@@ -38,18 +38,23 @@ class Prism(pypacker.Packet):
 		PRISM_TYPE_80211: ieee80211.IEEE80211
 	}
 
-	def _dissect(self, buf):
-		off = 24
-		# assume 10 DIDs, 24 + 10*12 = 144 bytes prism header
+	@staticmethod
+	def _dissect_dids(buf, collect_dids=True):
+		off = 0
+		# Assume 10 DIDs, 24 + 10*12 = 144 bytes prism header
 		end = off + 10 * 12
-
 		dids = []
 
 		while off < end:
-			did = Did(buf[off:off + 12])
-			dids.append(did)
+			if collect_dids:
+				did = Did(buf[off:off + 12])
+				dids.append(did)
 			off += 12
 
-		self.dids.extend(dids)
-		self._init_handler(PRISM_TYPE_80211, buf)
-		return off
+		return dids if collect_dids else off
+
+	def _dissect(self, buf):
+		off_tl = 24
+		self.dids(buf[off_tl:], Prism._dissect_dids)
+		hlen = off_tl + Prism._dissect_dids(buf[off_tl:], collect_dids=False)
+		return hlen, PRISM_TYPE_80211

@@ -125,7 +125,7 @@ class DHCP(pypacker.Packet):
 
 	def _dissect(self, buf):
 		# logger.debug("DHCP: parsing options, buflen: %d" % len(buf))
-		self._init_triggerlist("opts", buf[28 + 16 + 64 + 128 + 4:], DHCP.__get_opts)
+		self.opts(buf[28 + 16 + 64 + 128 + 4:], DHCP.__get_opts)
 		# logger.debug(buf[28+16+64+128+4:])
 		# logger.debug("amount of options after parsing: %d" % len(self.opts))
 		return len(buf)

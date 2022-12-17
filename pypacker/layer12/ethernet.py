@@ -143,40 +143,38 @@ class Ethernet(pypacker.Packet):
 		if eth_type in VLAN_TAG_START:
 			if eth_type == ETH_TYPE_8021Q:
 				#logger.debug("VLAN: ETH_TYPE_8021Q")
-				self._init_triggerlist("vlan", buf[12: 16], lambda tval: Dot1Q(tval))
+				self.vlan(buf[12: 16], lambda tval: Dot1Q(tval))
 				hlen += 4
 				# Get real higher layer type
 				eth_type = unpack_H(buf[16: 18])[0]
 			# 802.1ad: support up to 2 tags (double tagging aka QinQ)
 			else:
 				#logger.debug("VLAN: 802.1ad")
-				self._init_triggerlist("vlan", buf[12: 20],
-					lambda tval: [Dot1Q(tval[0: 4]), Dot1Q(tval[4: 8])])
+				self.vlan(buf[12: 20], lambda tval: [Dot1Q(tval[0: 4]), Dot1Q(tval[4: 8])])
 				hlen += 8
 				# Get real higher layer type
 				eth_type = unpack_H(buf[20: 22])[0]
 
-		# logger.debug("eth type is: %d" % eth_type)
+		#logger.debug("eth type is: %d" % eth_type)
 
 		# Handle ethernet-padding: remove it but save for later use.
 		# Don't use headers for this because this is a rare situation.
 		dlen = len(buf) - hlen  # data length [+ padding?]
 
-		# Assume padding only present if len(higher_layer.bin()) <= 46
-		if dlen <= 46:
+		# Assume padding only present if len(higher_layer.bin()) <= 46 (payload, w/o ethernet header/crc)
+		if dlen < 46:
 			try:
 				# This will only work on complete headers: Ethernet + IP + ...
 				# Handle padding using IPv4, IPv6 etc (min size "eth + ..." = 60 bytes)
-				#logger.debug("Checking for padding")
+				#logger.debug("Checking for padding, dlen: %d < 46" % dlen)
 				if eth_type == ETH_TYPE_IP:
 					#logger.debug("ETH_TYPE_IP")
 					dlen_ip = unpack_H(buf[hlen + 2: hlen + 4])[0]  # Real data length
 
 					if dlen_ip < dlen:
 						# Padding found
-						#logger.debug("Padding found")
 						self._padding = buf[hlen + dlen_ip:].tobytes()
-						# logger.debug("got padding for IPv4: %r" % self._padding)
+						#logger.debug("Got padding for (ip total length=%d): %r" % (dlen_ip, self._padding))
 						dlen = dlen_ip
 				# Handle padding using IPv6
 				# IPv6 is a piece of sh$§! payloadlength (in header) = exclusive standard header
@@ -189,7 +187,7 @@ class Ethernet(pypacker.Packet):
 					if 40 + dlen_ip < dlen:
 						# Padding found
 						self._padding = buf[hlen + 40 + dlen_ip:].tobytes()
-						# logger.debug("got padding for IPv6: %r" % self._padding)
+						#logger.debug("Got padding for IPv6: %r" % self._padding)
 						dlen = 40 + dlen_ip
 				elif eth_type == ETH_TYPE_LLDP:
 					#logger.debug("ETH_TYPE_LLDP")
@@ -206,9 +204,9 @@ class Ethernet(pypacker.Packet):
 				# Could not extract padding info, assuming incomplete ethernet frame.
 				# Init of handler will take place after all.
 				pass
-		# logger.debug("len(buf)=%d, len(higher)=%d" % (len(buf), dlen))
-		self._init_handler(eth_type, buf[hlen: hlen + dlen])
-		return hlen
+		#logger.debug("len(buf)=%d, hlen=%d, len(higher)=%d" % (len(buf), hlen, dlen))
+		#logger.debug("Upper layer bytes will be: %r" % buf[hlen: hlen + dlen].tobytes())
+		return hlen, eth_type, buf[hlen: hlen + dlen]
 
 	def _update_fields(self):
 		self._update_higherlayer_id()
@@ -221,7 +219,7 @@ class Ethernet(pypacker.Packet):
 		return super().__len__() + len(self.padding)
 
 	def direction(self, other):
-		# logger.debug("checking direction: %s<->%s" % (self, other))
+		#logger.debug("checking direction: %s<->%s" % (self, other))
 		if self.dst == other.dst and self.src == other.src:
 			# Consider packet to itself: can be DIR_REV
 			return pypacker.Packet.DIR_SAME | pypacker.Packet.DIR_REV

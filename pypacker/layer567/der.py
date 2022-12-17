@@ -142,7 +142,7 @@ class LinkedTLVList(list):
 		super().__setitem__(idx, val)
 
 		if update_needed:
-			logger.debug("Update of length needed")
+			#logger.debug("Update of length needed")
 			self.update_len_uptoroot()
 
 	"""

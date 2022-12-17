@@ -91,11 +91,14 @@ for subfield_name, mask_off in _FRAMECTRL_SUBHEADERDATA.items():
 	subheader = [
 		subfield_name,
 		# lambda**2: avoid lexical closure, do not refer to value via reference
+		# Could be called in _dissect: used shadowed variable instead
 		(lambda mask, off:
-			(lambda _obj: (_obj.framectl & mask) >> off))(mask_off[0], mask_off[1]),
+			(lambda _obj:
+			((_obj.framectl if _obj._unpacked is not None else _obj._framectl) & mask) >> off))(mask_off[0], mask_off[1]),
 		(lambda mask, off:
-			(lambda _obj, _val: _obj.__setattr__("framectl",
-				(_obj.framectl & ~mask) | (_val << off))))(mask_off[0], mask_off[1]),
+			(lambda _obj, _val:
+				_obj.__setattr__("framectl",
+				((_obj.framectl if _obj._unpacked is not None else _obj._framectl) & ~mask) | (_val << off))))(mask_off[0], mask_off[1]),
 	]
 	_subheader_properties.append(subheader)
 
@@ -111,16 +114,11 @@ class IEEE80211(pypacker.Packet):
 	__hdr_sub__ = _subheader_properties
 
 	def _dissect(self, buf):
-		#logger.debug("Starting to dissect")
-		# self.type/self.subtype use self.framectl, no unpack will happen in dissect so this has
-		# to be done manually
-		self.framectl = unpack_H(buf[0:2])[0]
-		#logger.debug("ieee80211 bytes=%X, type/subtype is=%X/%X, handler=%r" %
-		#	(self.framectl, self.type, self.subtype,
+		self._framectl = unpack_H(buf[:2])[0]
+		#logger.debug("ieee80211 type/subtype is=%X/%X, handler=%r" %
+		#	(self.type, self.subtype,
 		#	pypacker.Packet._id_handlerclass_dct[self.__class__][TYPE_FACTORS[self.type] + self.subtype]))
-		self._init_handler(TYPE_FACTORS[self.type] + self.subtype, buf[4:])
-		#logger.debug("Finished IEEE dissect")
-		return 4
+		return 4, TYPE_FACTORS[self.type] + self.subtype
 
 	def is_beacon(self):
 		"""return -- True if packet is a beacon. Avoids parsing upper layer."""
@@ -185,7 +183,8 @@ class IEEE80211(pypacker.Packet):
 		essid = property(_get_essid)
 
 		def _dissect(self, buf):
-			self._init_triggerlist("params", buf[32:], IEEE80211._unpack_ies)
+			#logger.debug(self.__class__)
+			self.params(buf[32:], IEEE80211._unpack_ies)
 			return len(buf)
 
 		def reverse_address(self):
@@ -236,8 +235,7 @@ class IEEE80211(pypacker.Packet):
 		def _dissect(self, buf):
 			# logger.debug(">>>>>>>> ACTION!!!")
 			# category: block ack, code: request or response
-			self._init_handler(buf[20] * 4 + buf[21], buf[22:])
-			return 22
+			return 22, buf[20] * 4 + buf[21]
 
 		def reverse_address(self):
 			self.dst, self.src = self.src, self.dst
@@ -264,7 +262,7 @@ class IEEE80211(pypacker.Packet):
 		seq = property(_get_seq, _set_seq)
 
 		def _dissect(self, buf):
-			self._init_triggerlist("params", buf[20:], IEEE80211._unpack_ies)
+			self.params(buf[20:], IEEE80211._unpack_ies)
 			return len(buf)
 
 		def reverse_address(self):
@@ -297,7 +295,7 @@ class IEEE80211(pypacker.Packet):
 		seq = property(_get_seq, _set_seq)
 
 		def _dissect(self, buf):
-			self._init_triggerlist("params", buf[24:], IEEE80211._unpack_ies)
+			self.params(buf[24:], IEEE80211._unpack_ies)
 			return len(buf)
 
 		def reverse_address(self):
@@ -328,7 +326,7 @@ class IEEE80211(pypacker.Packet):
 		seq = property(_get_seq, _set_seq)
 
 		def _dissect(self, buf):
-			self._init_triggerlist("params", buf[26:], IEEE80211._unpack_ies)
+			self.params(buf[26:], IEEE80211._unpack_ies)
 			return len(buf)
 
 		def reverse_address(self):
@@ -693,7 +691,6 @@ class IEEE80211(pypacker.Packet):
 		ies = []
 		off = 0
 		buflen = len(buf)
-		# logger.debug("lazy dissecting: %s" % buf)
 
 		while off + 2 < buflen:
 			ie_id = buf[off]
@@ -712,7 +709,6 @@ class IEEE80211(pypacker.Packet):
 				# Not enough bytes for handler, add raw bytes
 				ies.append(buf[off: off + 2 + dlen])
 			off += 2 + dlen
-		#logger.debug("Finished IE parsing")
 
 		return ies
 

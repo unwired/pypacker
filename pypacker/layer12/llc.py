@@ -28,8 +28,8 @@ class LLC(pypacker.Packet):
 		if buf[0] == 170:		# = 0xAA
 			# SNAP is following ctrl
 			htype = unpack_H(buf[5:7])[0]
-			self._init_handler(htype, buf[8:])
+			return 8, htype
 		else:
 			# deactivate SNAP
 			self.snap = None
-		return 8
+			return 8

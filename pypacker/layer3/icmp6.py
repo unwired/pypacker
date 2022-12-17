@@ -78,8 +78,7 @@ class ICMP6(pypacker.Packet):
 		#logger.debug(">>> new checksum: %0X" % self.sum)
 
 	def _dissect(self, buf):
-		self._init_handler(buf[0], buf[4:])
-		return 4
+		return 4, buf[0]
 
 	def _update_fields(self):
 		try:
@@ -137,7 +136,7 @@ class ICMP6(pypacker.Packet):
 		)
 
 		def _dissect(self, buf):
-			self._init_triggerlist("opts", buf[20:], ICMP6._parse_icmp6opt)
+			self.opts(buf[20:], ICMP6._parse_icmp6opt)
 			return len(buf)
 
 	class NeighbourAdvertisement(pypacker.Packet):
@@ -148,7 +147,7 @@ class ICMP6(pypacker.Packet):
 		)
 
 		def _dissect(self, buf):
-			self._init_triggerlist("opts", buf[20:], ICMP6._parse_icmp6opt)
+			self.opts(buf[20:], ICMP6._parse_icmp6opt)
 			return len(buf)
 
 	__handler__ = {

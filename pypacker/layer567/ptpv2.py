@@ -99,23 +99,21 @@ class PTPv2(pypacker.Packet):
 	def _dissect(self, buf):
 		header_len = 34
 		ptpv2_type = buf[0] & 0xF
+		hndl_id = None
 
 		if ptpv2_type in TYPES_TS_ACTIVATE:
-			#logger.debug("activating ts fields")
+			#logger.debug("Re-activating tssec_bts, tsnano")
 			self.tssec_bts = b"\x00" * 6
 			self.tsnano = 0
 			header_len += 10
 
 		if ptpv2_type in TYPES_REQ_PORT_ACTIVATE:
-			#logger.debug("activating req fields")
+			#logger.debug("Re-activating reqclockid, reqportid")
 			self.reqclockid = 0
 			self.reqportid = 0
 			header_len += 10
 		elif ptpv2_type == PTPv2_TYPE_ANNOUNCE:
-			#logger.debug("got announce")
-			self._init_handler(ptpv2_type, buf[header_len:])
+			#logger.debug("Got announce")
+			hndl_id = ptpv2_type
 
-		if len(buf) < header_len:
-			logger.warning("not enough bytes for header: %d < %d", len(buf), header_len)
-
-		return header_len
+		return header_len, hndl_id

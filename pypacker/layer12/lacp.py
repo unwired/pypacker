@@ -52,11 +52,11 @@ class LACP(pypacker.Packet):
 	)
 
 	def _dissect(self, buf):
-		self._init_triggerlist("tlvlist", buf[LACP_HEADER_LEN:], self.__parse_tlv)
+		self.tlvlist(buf[LACP_HEADER_LEN:], self._parse_tlv)
 		return len(buf)
 
 	@staticmethod
-	def __parse_tlv(buf):
+	def _parse_tlv(buf):
 		"""Parse LACP TLVs and return them as list."""
 		tlvlist = []
 		shift = 0

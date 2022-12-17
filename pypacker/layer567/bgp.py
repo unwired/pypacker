@@ -127,9 +127,9 @@ class BGP(pypacker.Packet):
 	)
 
 	def _dissect(self, buf):
+		#logger.debug("BGP bytes: %d/%r" % (len(buf), buf))
 		htype = buf[18]
-		self._init_handler(htype, buf[19:])
-		return 19
+		return 19, htype
 
 	class Open(pypacker.Packet):
 		__hdr__ = (
@@ -141,18 +141,27 @@ class BGP(pypacker.Packet):
 			("params", None, triggerlist.TriggerList)
 		)
 
-		def _dissect(self, buf):
-			#logger.debug("parsing Parameter")
-			pcount = buf[9]
-			off = 10
+		@staticmethod
+		def _dissect_params(buf):
+			buflen = len(buf)
+			off = 0
+			params = []
 
-			while pcount > 0:
+			while off < buflen:
 				plen = buf[off + 2]
-				param = self.Parameter(buf[off:off + plen])
-				self.params.append(param)
-				pcount -= 1
+				param = BGP.Open.Parameter(buf[off:off + plen])
+				params.append(param)
 				off += plen
-			return off
+			return params
+
+		def _dissect(self, buf):
+			#logger.debug("Parsing Parameter")
+			pcount = buf[9]
+
+			if pcount != 0:
+				OFF_PARAMS = 10
+				self.params(buf[OFF_PARAMS:], BGP.Open._dissect_params)
+			return len(buf)
 
 		class Parameter(pypacker.Packet):
 			__hdr__ = (
@@ -169,41 +178,60 @@ class BGP(pypacker.Packet):
 			("anncroutes", None, triggerlist.TriggerList),
 		)
 
+		@staticmethod
+		def _dissect_wroutes(buf):
+			off = 0
+			buflen = len(buf)
+			wroutes = []
+
+			while off < buflen:
+				#logger.debug("bytes for wroutes...")
+				rlen = 3 + 0
+				route = Route(buf[off: off + rlen])
+				wroutes.append(route)
+				off += rlen
+			return wroutes
+
+		@staticmethod
+		def _dissect_pathattrs(buf):
+			off = 0
+			buflen = len(buf)
+			pathattrs = []
+
+			while off < buflen:
+				alen = 3 + buf[off + 2]
+				attr = BGP.Update.Attribute(buf[off: off + alen])
+				pathattrs.append(attr)
+				off += alen
+			return pathattrs
+
+		@staticmethod
+		def _dissect_anncroutes(buf):
+			off = 0
+			buflen = len(buf)
+			anncroutes = []
+
+			while off + 3 <= buflen:
+				rlen = 3 + 0
+				route = Route(buf[off: off + rlen])
+				anncroutes.append(route)
+				off += rlen
+
+			return anncroutes
+
 		def _dissect(self, buf):
-			# Withdrawn Routes
-			#logger.debug("Dissecting BGP update")
 			off = 4
 			off_end = off + unpack_H(buf[:2])[0]
+			self.wroutes(buf[off: off_end], BGP.Update._dissect_wroutes)
 
-			while off < off_end:
-				rlen = 3 + 0
-				route = Route(buf[off:])
-				self.wroutes.append(route)
-				off += rlen
-
-			# Path attributes
+			off = off_end
 			off_end = off + unpack_H(buf[2:4])[0]
-			#logger.debug("Unpacking attributes")
+			self.pathattrs(buf[off: off_end], BGP.Update._dissect_pathattrs)
 
-			while off < off_end:
-				alen = 3 + buf[off + 2]
-				#logger.debug("bytes for attribute: %r" % buf[off: off + alen])
-				attr = BGP.Update.Attribute(buf[off: off + alen])
-				self.pathattrs.append(attr)
-				off += alen
-
-			# Announced routes
+			off = off_end
 			off_end = len(buf)
-			#logger.debug("Unpacking routes")
-
-			while off + 3 <= off_end:
-				rlen = 3 + 0
-				#logger.debug("bytes for route: %r" % buf[off:off + rlen])
-				route = Route(buf[off: off + rlen])
-				self.anncroutes.append(route)
-				off += rlen
-			#logger.debug("Finished, off=%d off_end=%d" % (off, off_end))
-			return off
+			self.anncroutes(buf[off: off_end], BGP.Update._dissect_anncroutes)
+			return off_end
 
 		class Attribute(pypacker.Packet):
 			__hdr__ = (
@@ -239,16 +267,11 @@ class BGP(pypacker.Packet):
 			extended_length = property(__get_e)
 
 			def _dissect(self, buf):
+				typeid = None
+
 				if len(buf) > 3:
-					try:
-						atype = buf[2]
-						type_instance = BGP.Update.Attribute._switch_type_attribute[atype](buf[3:])
-						self._set_bodyhandler(type_instance)
-						# any exception will lead to: body = raw bytes
-					except Exception:
-						#logger.debug("BGP > Update > Attribute failed to set handler: %s" % e)
-						pass
-				return 3
+					typeid = buf[2]
+				return 3, typeid
 
 			class Origin(pypacker.Packet):
 				__hdr__ = (
@@ -260,16 +283,22 @@ class BGP(pypacker.Packet):
 					("segments", None, triggerlist.TriggerList),
 				)
 
-				def _dissect(self, buf):
-					off = 1
+				@staticmethod
+				def _dissect_aspaths(buf):
+					off = 0
 					buflen = len(buf)
+					segments = []
 
 					while off < buflen:
 						seglen = buf[off + 2]
-						seg = self.ASPathSegment(buf[off + 1:seglen])
-						self.segments.append(seg)
+						seg = BGP.Attribute.ASPath.ASPathSegment(buf[off + 1:seglen])
+						segments.append(seg)
 						off += seglen
-					return off
+					return segments
+
+				def _dissect(self, buf):
+					self.segments(buf[1:], BGP.Attribute.ASPath._dissect_aspaths)
+					return len(buf)
 
 				class ASPathSegment(pypacker.Packet):
 					__hdr__ = (
@@ -324,7 +353,7 @@ class BGP(pypacker.Packet):
 			class Communitie(pypacker.Packet):
 				pass
 
-			_switch_type_attribute = {
+			__handler__ = {
 				ORIGIN: Origin,
 				AS_PATH: ASPath,
 				NEXT_HOP: NextHop,

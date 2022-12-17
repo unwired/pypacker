@@ -18,7 +18,7 @@ from pypacker.layer4 import tcp, udp, sctp
 
 logger = logging.getLogger("pypacker")
 
-ext_hdrs = {
+EXT_HDRS = {
 	IP_PROTO_HOPOPTS,
 	IP_PROTO_IP6,
 	IP_PROTO_ROUTING,
@@ -35,7 +35,7 @@ ext_hdrs = {
 class IP6(pypacker.Packet):
 	__hdr__ = (
 		("v_fc_flow", "I", 0x60000000),
-		("dlen", "H", 0, FIELD_FLAG_AUTOUPDATE),  # Length of extension header (opts header) + upwards
+		("dlen", "H", 0, FIELD_FLAG_AUTOUPDATE),  # Length of extension header (opts header) + upwards data
 		# Body handler type OR type of first extension hedader (opts header)
 		("nxt", "B", 0),
 		("hlim", "B", 0),  # hop limit
@@ -84,34 +84,55 @@ class IP6(pypacker.Packet):
 
 	update_dependants = {tcp.TCP, udp.UDP}
 
-	def _dissect(self, buf):
-		# IP6 header and upwards
-		len_total = 40 + unpack_H(buf[4: 6])[0]
-		type_nxt = buf[6]
-		off = 40
+	def _dissect_opts(self, buf, collect_opts=True):
+		off = 0
 		opts = []
+		type_current = self._type_first
+		OPT_BASEHEADER_LEN = 8
+		OPT_OFF_OLEN_SUB = 1
+		OPT_OFF_TYPENXT_IP6 = 6
+		OPTLEN_IP6 = 40
 
-		# logger.debug("type: %d buflen: %d" % (type_nxt, len(buf)))
-		# logger.debug("parsing opts from bytes (dst: %s): (len: %d) %s" %
-		#	 (buf[24:40], self.hdr_len, buf[off:]))
-		# parse options until type is an upper layer one
-		while type_nxt in ext_hdrs and off < len_total:
+		while type_current in EXT_HDRS and off < len(buf):
+			# Assume there is at least one option.
 			# Different header structure for IP6 and sub-header
 			# IP6: Total length = 8 + Payload length
-			length = 8 + buf[off + 1] * 8 if type_nxt != IP_PROTO_IP6 else 8 + unpack_H(buf[off + 4: off + 6])[0]
-			#logger.debug("next type is: %s, len: %d, %r" % (type_nxt, length, buf[off:off + length]))
-			opt = ext_hdrs_cls[type_nxt](buf[off:off + length].tobytes())
-			opts.append(opt)
-			# Different header structure for IP6 and sub-header
-			type_nxt = buf[off] if type_nxt != IP_PROTO_IP6 else buf[off + 6]
-			off += length
+			if type_current != IP_PROTO_IP6:
+				optlen = OPT_BASEHEADER_LEN + buf[off + OPT_OFF_OLEN_SUB] * 8
+				type_next = buf[off]
+			else:
+				# Fixed header length
+				optlen = OPTLEN_IP6
+				type_next = buf[off + OPT_OFF_TYPENXT_IP6]
 
-		# TODO: lazy dissect possible?
-		self.opts.extend(opts)
-		# IPv6 and IPv4 share same handler
-		# There are some cases where padding can not be identified on ethernet -> do it here (eg VSS shit trailer)
-		self._init_handler(type_nxt, buf[off:])
-		return off
+			if collect_opts:
+				opt = ext_hdrs_cls[type_current](buf[off:off + optlen])
+				opts.append(opt)
+			#logger.debug("Current type=%d, next type=%d, optlen=%d, %r" % (
+			#	type_current, type_next, optlen, buf[off:off + optlen]))
+			type_current = type_next
+			off += optlen
+
+		return (off, type_current) if not collect_opts else opts
+
+	def _dissect(self, buf):
+		BASEHEADER_LEN = 40  # w/o opts
+		TYPENXT_OFF = 6
+		type_last = buf[TYPENXT_OFF]
+		optlen = 0
+		#logger.debug("1st type: %r" % type_last)
+
+		# Parse options until type is an upper layer one
+		if type_last in EXT_HDRS:
+			dlen = unpack_H(buf[4: 6])[0]
+			# Used by tl
+			self._type_first = type_last
+			optlen, type_last = self._dissect_opts(buf[BASEHEADER_LEN: BASEHEADER_LEN + dlen],
+				collect_opts=False)
+			#logger.debug("Handler will be=%r, optlen=%r" % (type_last, optlen))
+			self.opts(buf[BASEHEADER_LEN: BASEHEADER_LEN + optlen], self._dissect_opts)
+
+		return BASEHEADER_LEN + optlen, type_last
 
 	def _update_fields(self):
 		if self.dlen_au_active:
@@ -156,30 +177,37 @@ class IP6OptsHeader(pypacker.Packet):
 		("opts", None, triggerlist.TriggerList)
 	)
 
-	def _dissect(self, buf):
-		length = 8 + buf[1] * 8
-		options = []
-		off = 2
+	@staticmethod
+	def parse_opts(buf):
+		off = 0
+		opts = []
 
-		while off < length:
+		while off < len(buf):
 			opt_type = buf[off]
-			# logger.debug("IP6OptsHeader: type: %d" % opt_type)
+			#logger.debug("IP6OptsHeader: type: %d" % opt_type)
 
 			# http://tools.ietf.org/html/rfc2460#section-4.2
 			# PAD1 option: no length or data field
-			if opt_type == 0:
-				opt = IP6OptionPad(type=opt_type)
-				# logger.debug("next ip6 bytes 1: %r" % (buf[off:off + 2]))
-				off += 1
+			if opt_type == 1:
+				#logger.debug("IP6OptionPad")
+				opt = IP6OptionPad(buf[off: off + 2])
+				off += 2  # type field + length field
 			else:
+				#logger.debug("IP6Option")
 				opt_len = buf[off + 1]
-				opt = IP6Option(type=opt_type, len=opt_len, body_bytes=buf[off + 2: off + 2 + opt_len].tobytes())
-				# logger.debug("next ip6 bytes 2: %r" % (buf[off + 2: off + 2 + opt_len]))
-				off += 2 + opt_len
-			options.append(opt)
+				opt = IP6Option(buf[off: off + opt_len])
+				off += 2 + opt_len  # type field + length field + dat
 
-		self.opts.extend(options)
-		return off
+			opts.append(opt)
+		#logger.debug("Returning opts: %r" % opts)
+		return opts
+
+	def _dissect(self, buf):
+		hlen = 8 + buf[1] * 8
+		OPTS_OFF = 2
+
+		self.opts(buf[OPTS_OFF: hlen], IP6OptsHeader.parse_opts)
+		return hlen
 
 
 class IP6Option(pypacker.Packet):
@@ -218,23 +246,18 @@ class IP6RoutingHeader(pypacker.Packet):
 
 	def __set_sl_bits(self, v):
 		self.rsvd_sl_bits = (self.rsvd_sl_bits & ~0xFFFFF) | (v & 0xFFFFF)
+
 	sl_bits = property(__get_sl_bits, __set_sl_bits)
 
 	def _dissect(self, buf):
 		hdr_size = 8
 		addr_size = 16
-		addresses = []
 		num_addresses = int(buf[1] / 2)
+		buf_opts = buf[hdr_size: hdr_size + num_addresses * addr_size]
+		self.addresses(buf_opts,
+			lambda buf: [buf[i * addr_size: i * addr_size + addr_size] for i in range(num_addresses)])
 
-		buf = buf[hdr_size: hdr_size + num_addresses * addr_size]
-
-		for i in range(num_addresses):
-			addresses.append(buf[i * addr_size: i * addr_size + addr_size].tobytes())
-
-		self.addresses.extend(addresses)
-		#logger.debug(addresses)
-		#print("num_addresses=%d, addr_size=%d" % (num_addresses, addr_size))
-		return 8 + num_addresses * addr_size
+		return hdr_size + num_addresses * addr_size
 
 
 class IP6FragmentHeader(pypacker.Packet):

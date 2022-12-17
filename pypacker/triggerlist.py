@@ -17,19 +17,19 @@ class TriggerList(list):
 	Custom reassemblation for tuples can be done by overwriting "_pack()".
 	"""
 
-	def __init__(self, packet, dissect_callback=None, buffer=b"", headerfield_name=""):
+	def __init__(self, packet, headername, dissect_callback=None, buffer=b""):
 		"""
 		packet -- packet where this TriggerList gets integrated
 		dissect_callback -- callback which dessects byte string b"buffer", returns [a, b, c, ...]
-		buffer -- byte string to be dissected
-		headerfield_name -- name of this triggerlist when placed in a packet
+		buffer -- memoryview (standard init) or byte string (packet called pack_header()) for dissecting
 		"""
 		super().__init__()
 		# Set by external Packet
 		self._packet = packet
+		self._headername = headername
 		self._dissect_callback = dissect_callback
-		self._cached_result = buffer
-		self._headerfield_name = headerfield_name
+		self._cached_bin = buffer
+		#logger.debug("Triggerlist %r: buffer type=%r" % (self.__class__, type(buffer)))
 
 	def _lazy_dissect(self):
 		if self._packet._unpacked == False:
@@ -47,13 +47,21 @@ class TriggerList(list):
 			# TODO: use memoryview?
 			initial_list_content = self._dissect_callback(self.bin())
 		except:
+			#except Exception as ex:
 			# If anything goes wrong: raw bytes will be accessible in any case
 			#logger.debug("Failed to dissect in TL")
-			initial_list_content = [self.bin()]
+			#logger.exception(ex)
+			if type(self._cached_bin) == memoryview:
+				self._cached_bin = self._cached_bin.tobytes()
+
+			initial_list_content = [self._cached_bin]
 
 		self._dissect_callback = None
 		# This is re-calling _lazy_dissect(), avoid by calling parent version
+		#logger.debug("Initial list content=%r" % str(initial_list_content))
 		super(TriggerList, self).extend(initial_list_content)
+		# Nothing has changed, just initial dissect
+		self._refresh_listener(initial_list_content, notify_change=False)
 
 	# Python predefined overwritten methods
 
@@ -78,7 +86,7 @@ class TriggerList(list):
 		"""Item can be added using '+=', use 'append()' instead."""
 		self._lazy_dissect()
 		super().__iadd__(v)
-		self.__refresh_listener([v])
+		self._refresh_listener([v])
 		return self
 
 	def __setitem__(self, needle, value):
@@ -108,7 +116,7 @@ class TriggerList(list):
 			super().__setitem__(idx_to_set, value)
 
 		if len(idxs_to_set) > 0:
-			self.__refresh_listener([value])
+			self._refresh_listener([value])
 
 	def __delitem__(self, k):
 		self._lazy_dissect()
@@ -118,7 +126,7 @@ class TriggerList(list):
 			# Assume slice: [x:y]
 			itemlist = self[k]
 		super().__delitem__(k)
-		self.__refresh_listener(itemlist, connect_packet=False)
+		self._refresh_listener(itemlist, connect_packet=False)
 
 	def __len__(self):
 		self._lazy_dissect()
@@ -131,25 +139,25 @@ class TriggerList(list):
 	def append(self, v):
 		self._lazy_dissect()
 		super().append(v)
-		self.__refresh_listener([v])
+		self._refresh_listener([v])
 
 	def extend(self, v):
 		self._lazy_dissect()
 		super().extend(v)
-		self.__refresh_listener(v)
+		self._refresh_listener(v)
 
 	def insert(self, pos, v):
 		self._lazy_dissect()
 		super().insert(pos, v)
-		self.__refresh_listener([v])
+		self._refresh_listener([v])
 
 	def clear(self):
 		self._lazy_dissect()
 		items = [item for item in self]
 		super().clear()
-		self.__refresh_listener(items, connect_packet=False)
+		self._refresh_listener(items, connect_packet=False)
 
-	def __refresh_listener(self, val, connect_packet=True):
+	def _refresh_listener(self, val, connect_packet=True, notify_change=True):
 		"""
 		Handle modifications of this TriggerList (adding, removing, ...).
 		WARNING: packets can only be put in one tl once at a time
@@ -177,25 +185,36 @@ class TriggerList(list):
 				v._remove_change_listener()
 				# Remove old parent
 				v._triggelistpacket_parent = None
-		self._notify_change()
+		if notify_change:
+			self._notify_change()
 
 	def _notify_change(self):
 		"""
-		Update _header_changed and _header_format_changed of the Packet having
-		this TriggerList as field and _cached_result.
+		Inform the Packet having this TriggerList as field:
+		- pkt.tl_name <- tl
+		- pkt.tl_name <- tl <- pkt
 		Called by: this list on changes or Packets in this list
 		"""
-		self._packet._header_value_changed = True
-		self._packet._header_format_changed = True
-		# List changed: old cache of TriggerList not usable anymore
-		self._cached_result = None
+		# Format *may* not have changed but we don't know until bin()
+		#logger.debug("_notify_change")
+		self._packet._header_format_cached = None
+		self._packet._header_cached = None
+
+		if self._packet._tlchanged_shared:
+			# Unshare to allow later add()
+			self._packet._tlchanged = set(self._packet._tlchanged)
+			self._packet._tlchanged_shared = False
+
+		self._packet._tlchanged.add(self._headername)
+		self._cached_bin = None
 
 	def bin(self):
 		"""
 		Output the TriggerLists elements as concatenated bytestring.
 		Custom implementations for tuple-handling can be set by overwriting _pack().
 		"""
-		if self._cached_result is None:
+		#logger.debug(self.__class__)
+		if self._cached_bin is None:
 			result_arr = []
 			entry_type = None
 
@@ -210,11 +229,11 @@ class TriggerList(list):
 					# This Must be a packet, otherthise invalid entry!
 					result_arr.append(entry.bin())
 
-			self._cached_result = b"".join(result_arr)
-		elif type(self._cached_result) == memoryview:
-			self._cached_result = self._cached_result.tobytes()
+			self._cached_bin = b"".join(result_arr)
+		elif type(self._cached_bin) == memoryview:
+			self._cached_bin = self._cached_bin.tobytes()
 
-		return self._cached_result
+		return self._cached_bin
 
 	def _pack(self, tuple_entry):
 		"""
@@ -227,6 +246,10 @@ class TriggerList(list):
 	def __repr__(self):
 		self._lazy_dissect()
 		return super().__repr__()
+
+	def __eq__(self, obj):
+		self._lazy_dissect()
+		return super().__eq__(obj)
 
 	def __str__(self):
 		self._lazy_dissect()
@@ -251,7 +274,7 @@ class TriggerList(list):
 			final_descr = ["(see below)\n" + "-" * 10 + "\n"]
 
 			for idx, val in enumerate(tl_descr_l):
-				idx_descr = "%s[%d]" % (self._headerfield_name[1:], idx)
+				idx_descr = "[%d]" % idx
 				final_descr.append("-> %s:\n%s\n" % (idx_descr, val))
 			final_descr.append("-" * 10)
 			return "".join(final_descr)

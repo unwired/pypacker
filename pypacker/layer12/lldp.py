@@ -109,11 +109,11 @@ class LLDP(pypacker.Packet):
 	)
 
 	def _dissect(self, buf):
-		self._init_triggerlist("tlvlist", buf, self.__parse_tlv)
+		self.tlvlist(buf, LLDP._parse_tlv)
 		return len(buf)
 
 	@staticmethod
-	def __parse_tlv(buf):
+	def _parse_tlv(buf):
 		"""Parse LLDP TLVs and return them as list."""
 		_, clz_bts_list = count_and_dissect_tlvs(buf)
 		tlvlist = []
@@ -316,7 +316,8 @@ class LLDPManagementAddress(pypacker.Packet):
 		addrval_position = TLV_HEADER_LEN + 2
 		self.addrval = buf[addrval_position: addrval_position + addrlen - 1]
 		oidlen_postion = addrval_position + addrlen + 4
-		oidlen = unpack_B(buf[oidlen_postion: oidlen_postion + 1].tobytes())[0]
+		oidlen = buf[oidlen_postion]
+
 		if oidlen:
 			self.oid = buf[oidlen_postion + 1: oidlen_postion + 1 + oidlen]
 		return len(buf)
@@ -421,11 +422,9 @@ class DCBXConfiguration(pypacker.Packet):
 	maxtcs = property(__get_maxtcs, __set_maxtcs)
 
 	def _dissect(self, buf):
-		for i in range(11, 19):
-			self.tcbandwith.append(buf[i:i + 1].tobytes())
-		for i in range(19, 27):
-			self.tsaassigment.append(buf[i:i + 1].tobytes())
-		return len(self)
+		self.tcbandwith(buf[11: 19], lambda v: [v[i:i + 1] for i in range(9)])
+		self.tsaassigment(buf[19: 27], lambda v: [v[i:i + 1] for i in range(9)])
+		return len(buf)
 
 
 class DCBXRecommendation(pypacker.Packet):
@@ -449,11 +448,9 @@ class DCBXRecommendation(pypacker.Packet):
 	def _dissect(self, buf):
 		# start from TLV_HEADER_LEN + ORG_SPEC_HEADER_LEN +
 		# 1 byte(reserved) + 4 bytes(priority)
-		for i in range(11, 19):
-			self.tcbandwith.append(buf[i:i + 1].tobytes())
-		for i in range(19, 27):
-			self.tsaassigment.append(buf[i:i + 1].tobytes())
-		return len(self)
+		self.tcbandwith(buf[11: 19], lambda v: [v[i:i + 1] for i in range(9)])
+		self.tsaassigment(buf[19: 27], lambda v: [v[i:i + 1] for i in range(9)])
+		return len(buf)
 
 
 class DCBXPriorityBasedFlowControlConfiguration(pypacker.Packet):
@@ -506,9 +503,9 @@ class DCBXApplicationPriority(pypacker.Packet):
 	subtype = get_property_tlv_subtype()
 
 	def _dissect(self, buf):
-		# start from TLV_HEADER_LEN + ORG_SPEC_HEADER_LEN + 1 byte(reserved)
-		for i in range(7, len(buf), 3):
-			self.apppriotable.append(DCBXApplicationPriorityTable(buf[i:i + 3].tobytes()))
+		# Start from TLV_HEADER_LEN + ORG_SPEC_HEADER_LEN + 1 byte(reserved)
+		self.apppriotable(buf[7:],
+			lambda tlbuf: [DCBXApplicationPriorityTable(tlbuf[i:i + 3]) for i in range(0, len(tlbuf), 3)])
 		return len(self)
 
 	def _update_fields(self):
@@ -594,8 +591,6 @@ def count_and_dissect_tlvs(buf, onlylen=False):
 		if onlylen:
 			continue
 
-		#if type(tlv_body) == memoryview:
-		#	tlv_body = tlv_body.tobytes()
 		clz_bts_list.append((clz, tlv_body))
 
 	return shift, clz_bts_list

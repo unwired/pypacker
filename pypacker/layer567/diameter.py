@@ -59,7 +59,7 @@ class Diameter(pypacker.Packet):
 	retransmit_flag = property(__get_t, __set_t)
 
 	def _dissect(self, buf):
-		self._init_triggerlist("avps", buf[20:], self._parse_avps)
+		self.avps(buf[20:], self._parse_avps)
 		return len(buf)
 
 	def _parse_avps(self, buf):

@@ -21,10 +21,10 @@ class RIP(pypacker.Packet):
 	)
 
 	def _dissect(self, buf):
-		self._init_triggerlist("rte_auth", buf[4:], self.__parse_auths)
+		self.rte_auth(buf[4:], self._parse_auths)
 		return len(buf)
 
-	def __parse_auths(self, buf):
+	def _parse_auths(self, buf):
 		off = 0
 		auths = []
 

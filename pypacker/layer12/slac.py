@@ -103,7 +103,7 @@ TYPEINFO_DESCRIPTION = {
 	0xA0B8: "VS_PL_LNK_STATUS"
 }
 
-# reverse access of message IDs
+# Reverse access of message IDs
 for msgid, name in TYPEINFO_DESCRIPTION.items():
 	setattr(module_this, name, msgid)
 
@@ -436,8 +436,7 @@ class Slac(Packet):
 			self.frag_seq = None
 			hlen = 3
 		# logger.debug("Got type %X", typeinfo_be)
-		self._init_handler(typeinfo_be, buf[hlen:])
-		return hlen
+		return hlen, typeinfo_be
 
 	def _get_fragcount(self):
 		return (self.frag_info & MASK_FRAGCOUNT)

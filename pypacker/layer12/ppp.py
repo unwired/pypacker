@@ -29,14 +29,14 @@ class PPP(pypacker.Packet):
 	}
 
 	def _dissect(self, buf):
-		offset = 1
+		hlen = 1
 		ppp_type = buf[0]
 
 		if ppp_type & PFC_BIT == 0:
 			ppp_type = unpack_H(buf[:2])[0]
-			offset = 2
-			self._init_triggerlist("p", buf[0:2], lambda tval: tval)
+			hlen = 2
+			self.p(buf[0:2], lambda tval: tval)
 		else:
-			self._init_triggerlist("p", buf[0:1], lambda tval: tval)
-		self._init_handler(ppp_type, buf[offset:])
-		return offset
+			self.p(buf[0:1], lambda tval: tval)
+
+		return hlen, ppp_type

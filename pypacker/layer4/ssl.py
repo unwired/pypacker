@@ -133,24 +133,25 @@ class SSL(pypacker.Packet):
 		("records", None, triggerlist.TriggerList),
 	)
 
-	def _dissect(self, buf):
-		# logger.debug("parsing SSL")
-		# parse all records out of message
-		# possible types are Client/Sevrer Hello, Change Cipher Spec etc.
+	@staticmethod
+	def _dissect_records(buf):
+		# Parse all records out of message
+		# Possible types are Client/Sevrer Hello, Change Cipher Spec etc.
 		records = []
 		offset = 0
 		dlen = len(buf)
 
-		# records is the only header so it's ok to avoid lazy dissecting
 		while offset < dlen:
 			record_len = unpack_H(buf[offset + 3: offset + 5])[0]
 			record = Record(buf[offset: offset + 5 + record_len])
 			records.append(record)
 			offset += 5 + record_len
-		#logger.debug("adding %d records", len(records))
+		return records
 
-		self.records.extend(records)
-		return dlen
+	def _dissect(self, buf):
+		# logger.debug("parsing SSL")
+		self.records(buf, SSL._dissect_records)
+		return len(buf)
 
 	def get_cert_length(self):
 		"""
@@ -165,7 +166,7 @@ class SSL(pypacker.Packet):
 					# Handshake Proto -> Cert -> Length
 					return record.higher_layer.len_i - 3
 			except Exception as ex:
-				logger.warning(ex)
+				logger.exception(ex)
 				pass
 		return 0
 
@@ -190,7 +191,7 @@ class Handshake(pypacker.Packet):
 		("len", "3s", b"\x00" * 3)
 	)
 
-	len_i = pypacker.get_property_bytes_num("len", ">I")
+	len_i = pypacker.get_property_bytes_num("len")
 
 	def extract_certificates(self):
 		"""
@@ -203,7 +204,7 @@ class Handshake(pypacker.Packet):
 		ret = []
 
 		if self.type != HNDS_CERTIFICATE:
-			logger.warning("not a certificate handshake: %r", self)
+			logger.warning("Not a certificate handshake: %r", self)
 			return ret
 
 		bts_body = self.body_bytes
@@ -240,7 +241,7 @@ class HandshakeHello(pypacker.Packet):
 		("extensions", None, triggerlist.TriggerList),
 	)
 
-	len_i = pypacker.get_property_bytes_num("len", ">I")
+	len_i = pypacker.get_property_bytes_num("len")
 
 	@staticmethod
 	def __parse_extension(buf):
@@ -260,7 +261,7 @@ class HandshakeHello(pypacker.Packet):
 		sid_len = buf[38]
 		offset_extlen = 38 + sid_len + 3
 		# ext_len = unpack_H(buf[offset_extlen: offset_extlen+2])
-		self._init_triggerlist("extensions", buf[offset_extlen + 2:], self.__parse_extension)
+		self.extensions(buf[offset_extlen + 2:], self.__parse_extension)
 
 
 class HandshakeData(pypacker.Packet):
@@ -298,5 +299,4 @@ class Record(pypacker.Packet):
 		# TODO: check for other handshakes
 		#if buf[0] == RECORD_TLS_HANDSHAKE:
 		#	logger.debug("got a handshake")
-		self._init_handler(buf[0], buf[5:])
-		return 5
+		return 5, buf[0]

@@ -91,10 +91,9 @@ class UDP(pypacker.Packet):
 		try:
 			# source or destination port should match
 			htype = [x for x in ports if x in pypacker.Packet._id_handlerclass_dct[UDP]][0]
-			self._init_handler(htype, buf[8:])
+			return 8, htype
 		except:
-			# no type found
-			# logger.debug("could not parse type: %d because: %s" % (type, e))
+			# No type found
 			pass
 		return 8
 

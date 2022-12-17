@@ -104,6 +104,8 @@ TCP_PROTO_HTTP		= (80, 8008, 8080)
 TCP_PROTO_RTP 		= (5004, 5005)
 TCP_PROTO_SIP		= (5060, 5061)
 
+TCP_OFF_BTS_OPTS	= 20
+
 
 def cb_get_flag_description(value, value_name):
 	descr = [name_d for value_d, name_d in value_name.items() if value_d & value != 0]
@@ -116,7 +118,7 @@ class TCP(pypacker.Packet):
 		("dport", "H", 0, FIELD_FLAG_IS_TYPEFIELD),
 		("seq", "I", 0xDEADBEEF),
 		("ack", "I", 0),
-		("off_x2", "B", ((5 << 4) | 0), FIELD_FLAG_AUTOUPDATE),  # 10*4 Byte
+		("off_x2", "B", ((5 << 4) | 0), FIELD_FLAG_AUTOUPDATE),  # off=# 4-byte words, 10*4 Byte
 		("flags", "B", TH_SYN),  # acces via (obj.flags & TH_XYZ)
 		("win", "H", TCP_WIN_MAX),
 		("sum", "H", 0, FIELD_FLAG_AUTOUPDATE),
@@ -186,34 +188,36 @@ class TCP(pypacker.Packet):
 			self._calc_sum()
 
 	def _dissect(self, buf):
-		# update dynamic header parts. buf: 1010???? -clear reserved-> 1010 -> *4
-		ol = ((buf[12] >> 4) << 2) - 20	 # dataoffset - TCP-standard length
+		# Header length: 20 + len(opts)
+		# XXXX???? (headerlen:4 reserved:4) -zero out-> 0000XXXX -*4-> 00XXXX00 (0x3C)
+		olen = ((buf[12] >> 2) & 0x3C) - TCP_OFF_BTS_OPTS  # optlen = dataoffset - fixedlen
 
-		if ol > 0:
-			# parse options, add offset-length to standard-length
-			opts_bytes = buf[20: 20 + ol]
-			self._init_triggerlist("opts", opts_bytes, self._parse_opts)
-		elif ol < 0:
-			raise Exception("invalid header length")
+		if olen > 0:
+			# Parse options, add offset-length to standard-length
+			opts_bytes = buf[TCP_OFF_BTS_OPTS: TCP_OFF_BTS_OPTS + olen]
+			self.opts(opts_bytes, self._parse_opts)
+		elif olen < 0:
+			raise Exception("TCP length is invalid: %d" % olen)
 
-		ports = [unpack_H(buf[0:2])[0], unpack_H(buf[2:4])[0]]
+		htype = None
 
 		try:
-			# source or destination port should match
+			# Source or destination port should match
+			ports = [unpack_H(buf[0:2])[0], unpack_H(buf[2:4])[0]]
 			htype = [x for x in ports if x in self._id_handlerclass_dct[TCP]][0]
 			#logger.debug("TCP: trying to set handler, type: %d = %s" %
 			#(type, self._id_handlerclass_dct[TCP][type]))
-			self._init_handler(htype, buf[20 + ol:])
 		except:
-			# no type found
+			# No type found
 			pass
-		return 20 + ol
+		return 20 + olen, htype
 
 	__TCP_OPT_SINGLE = {TCP_OPT_EOL, TCP_OPT_NOP}
 
 	@staticmethod
 	def _parse_opts(buf):
 		"""Parse TCP options using buf and return them as List."""
+		#logger.debug("Parsing opts")
 		optlist = []
 		i = 0
 
@@ -226,7 +230,7 @@ class TCP(pypacker.Packet):
 				olen = buf[i + 1]
 				# p = TCPOptMulti(type=buf[i], len=olen, body_bytes=buf[i + 2: i + olen])
 				p = TCPOptMulti(buf[i: i + olen])
-				i += olen     # typefield + lenfield + data-len
+				i += olen  # typefield + lenfield + data-len
 			optlist.append(p)
 		# logger.debug("tcp: parseopts finished, length: %d" % len(optlist))
 		return optlist

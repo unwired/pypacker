@@ -1,6 +1,10 @@
 """Ethernet Flow Control"""
+import logging
+
 from pypacker import pypacker, triggerlist
 from pypacker.structcbs import pack_H, unpack_H
+
+logger = logging.getLogger("pypacker")
 
 PAUSE_OPCODE	= 0x0001		# Pause frame IEEE 802.3x
 PFC_OPCODE	= 0x0101		# Priority Flow Control IEEE 802.1Qbb
@@ -13,10 +17,10 @@ class FlowControl(pypacker.Packet):
 
 	def _dissect(self, buf):
 		if buf[:2] == b"\x01\x01":
-			self._init_handler(PFC_OPCODE, buf[2:])
+			ul_type = PFC_OPCODE
 		else:
-			self._init_handler(PAUSE_OPCODE, buf[2:])
-		return 2
+			ul_type = PAUSE_OPCODE
+		return 2, ul_type
 
 	class Pause(pypacker.Packet):
 		__hdr__ = (
@@ -25,36 +29,42 @@ class FlowControl(pypacker.Packet):
 
 	class PFC(pypacker.Packet):
 		__hdr__ = (
-			("ms", "B", 0),  # most significant octet is reserved,set to zero
-			("ls", "B", 0),  # least significant octet indicates time_vector parameter
+			("ms", "B", 0),  # Most significant octet is reserved,set to zero
+			("ls", "B", 0),  # Least significant octet indicates time_vector parameter
 			("time", None, triggerlist.TriggerList),
 		)
 
 		# Conveniant access to ls field(bit representation via list)
 		# e.g. 221 -> [1, 1, 0, 1, 1, 1, 0, 1]
-		def __get_ls(self):
+		def _get_ls(self):
 			#return [(self.ls >> x) & 1 for x in reversed(range(8))]
 			return [int(bstr) for bstr in bin(self.ls)[2:]]
 
 		# e.g. [1, 1, 0, 1, 1, 1, 0, 1] -> 221
-		def __set_ls(self, value):
+		def _set_ls(self, value):
 			#self.ls = int("".join(map(str, value)), 2)
 			self.ls = int("".join(["%d" % bint for bint in value]), 2)
-		ls_list = property(__get_ls, __set_ls)
+		ls_list = property(_get_ls, _set_ls)
 
-		# Conveniant access to time field(decimal representation via list)
-		def __get_time(self):
+		# Conveniant access to time field (decimal representation via list)
+		def _get_time(self):
 			return [unpack_H(x)[0] for x in self.time]
 
-		def __set_time(self, value):
+		def _set_time(self, value):
 			self.time = [pack_H(x) for x in value]
-		time_list = property(__get_time, __set_time)
+		time_list = property(_get_time, _set_time)
+
+		@staticmethod
+		def _get_times(buf):
+			times = []
+			for i in range(0, 16, 2):
+				times.append(buf[i:i + 2])
+			return times
 
 		def _dissect(self, buf):
-			for i in range(2, 18, 2):
-				self.time.append(buf[i:i + 2].tobytes())
-			# TODO: find more efficient way, always correct?
-			return 2 + len(self.time) * 2
+			#logger.debug("Buf for PFC: %r" % buf.tobytes())
+			self.time(buf[2:], FlowControl.PFC._get_times)
+			return len(buf)
 
 	__handler__ = {
 		PAUSE_OPCODE: Pause,

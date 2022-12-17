@@ -37,7 +37,8 @@ class PPPoE(pypacker.Packet):
 		code = buf[1]
 		if code == PPPoE_SESSION:
 			try:
-				self._set_bodyhandler(PPP(buf[6:]))
+				# TODO: needs testing
+				return 6, code
 			except Exception:
 				pass
 		else:

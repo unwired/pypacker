@@ -214,38 +214,44 @@ Tests are executed as follows:
 
 **Performance test results: pypacker**
 ```
-orC = Intel CPU, 4 Cores @ 3GHz, CPython v3.6
-orP = Intel CPU, 4 Cores @ 3GHz, PyPy v7.3.0
+nr = Intel CPU, 4 Cores @ 2.5 GHz, CPython v3.6
+
 rounds per test: 10000
 =====================================
->>> full packet parsing (Ethernet + IP + TCP + HTTP)
-orC = 28300 p/s
-orP = 78232 p/s
->>> parsing (IP + ICMP)
-orC =  405921 p/s
-orP =  1018554 p/s
->>> creating/direct assigning (IP only header)
-orC =  166124 p/s
-orP =  263307 p/s
+>>> Packet parsing (Ethernet + IP + UDP + DBS): Search UDP port
+Time diff: 0.41541337966918945s
+nr = 24072 p/s
+>>> Packet parsing (Ethernet + IP + TCP + HTTP): Search TCP port
+Time diff: 0.788198709487915s
+nr = 12687 p/s
+>>> Packet parsing (Ethernet + IP + TCP + HTTP): reading all header
+Time diff: 1.32124924659729s
+nr = 7568 p/s
+>>> Parsing first layer (IP + ICMP)
+Time diff: 0.05343985557556152s
+nr = 187126 p/s
+>>> Creating/direct assigning (IP only header)
+Time diff: 0.11874556541442871s
+nr = 84213 p/s
 >>> bin() without change (IP)
-orC =  722147 p/s
-orP =  1255403 p/s
->>> output with change/checksum recalculation (IP)
-orC =  37826 p/s
-orP =  77582 p/s
->>> basic/first layer parsing (Ethernet + IP + TCP + HTTP)
-orC =  380642 p/s
-orP =  907858 p/s
->>> changing Triggerlist element value (Ethernet + IP + TCP + HTTP)
-orC =  303882 p/s
-orP =  596451 p/s
->>> changing dynamic field (Ethernet + IP + TCP + HTTP)
-orC = 511238 p/s
-orP =  1041597 p/s
->>> direct assigning and concatination (Ethernet + IP + TCP + HTTP)
-time diff: 0.2921011447906494s
-orC = 34229 p/s
-orP = 59600 p/s
+Time diff: 0.028677940368652344s
+nr = 348700 p/s
+>>> Output with change/checksum recalculation (IP)
+Time diff: 0.2695651054382324s
+nr = 37096 p/s
+>>> Basic/first layer parsing (Ethernet + IP + TCP + HTTP)
+Time diff: 0.062027692794799805s
+nr = 161218 p/s
+>>> Changing Triggerlist element value (Ethernet + IP + TCP + HTTP)
+Time diff: 0.061231374740600586s
+nr = 163314 p/s
+>>> Changing dynamic field (Ethernet + IP + TCP + HTTP)
+Time diff: 0.02509450912475586s
+nr = 398493 p/s
+>>> Direct assigning and concatination (Ethernet + IP + TCP + HTTP)
+Time diff: 0.5904519557952881s
+nr = 16936 p/s
+
 ```
 
 **Performance test results: pypacker vs. dpkt vs. scapy**
@@ -255,7 +261,7 @@ orC = Intel CPU, 4 Cores @ 3GHz, CPython v3.6
 rounds per test: 10000
 =====================================
 >>> testing pypacker parsing speed
-orC = 131770 p/s
+nr = 55374 p/s
 >>> testing dpkt parsing speed
 (Not working anymore)
 >>> testing scapy parsing speed

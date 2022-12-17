@@ -225,13 +225,10 @@ class Radiotap(pypacker.Packet):
 				pos_end = -4
 
 		hdr_len = unpack_H_le(buf[2:4])[0]
-		#logger.debug("Bytes for flags (%d): %s" % (hdr_len, buf[8: hdr_len]))
-		self._init_triggerlist("flags", buf[8: hdr_len], self._parse_flags)
-		#logger.debug("rtap bytes:=%r" % buf[:hdr_len])
-		# now we got the correct header length
-		self._init_handler(RTAP_TYPE_80211, buf[hdr_len: pos_end])
-		#logger.debug("Adding %d flags" % len(self.flags))
-		return hdr_len
+		self.flags(buf[8: hdr_len], self._parse_flags)
+		# Now we got the correct header length
+		#logger.debug("hlen=%r, buf=%r" % (hdr_len, buf[hdr_len: pos_end]))
+		return hdr_len, RTAP_TYPE_80211, buf[hdr_len: pos_end]
 
 	def _parse_flags(self, buf):
 		off = 0

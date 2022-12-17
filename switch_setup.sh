@@ -1,5 +1,5 @@
 # set this to the NEXT (not yet published) version
-VERSION="5.1"
+VERSION="5.2"
 
 function msg {
 	echo ""
@@ -57,7 +57,7 @@ case "$1" in
 	# --exclude-standard:
 	# Add the standard Git exclusions: .git/info/exclude, .gitignore in each directory, and the user’s global exclusion file.
 	#git ls-files --others --exclude-standard | grep -v -P ".pyc|doc_sphinx_generated|.idea|dist"
-	git ls-files --others --exclude-from=.git/.gitignore
+	git ls-files --others --exclude-from=.gitignore
 
 	msg "Header definition: string instead of bytes?"
 	grep -ir -Po "\"\ds\", *\".+"

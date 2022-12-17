@@ -7,8 +7,8 @@ from pypacker.structcbs import unpack_H
 
 logger = logging.getLogger("pypacker")
 
-PROG_SPLIT_NULLBYTE = re.compile(b"\x00")
-split_nullbyte = PROG_SPLIT_NULLBYTE.split
+PATTERN_00 = re.compile(b"\x00")
+split_nullbyte = PATTERN_00.split
 
 # Opcodes
 OP_RRQ = 1  # read request

@@ -171,16 +171,11 @@ class MQTTBase(Packet):
 
 	def _dissect(self, buf):
 		# Length MUST be decoded, flexible format but more imperformant bc parsing needed
-		mlen_len, _ = MQTTBase.decode_length(buf[1:].tobytes())
+		mlen_len, _ = MQTTBase.decode_length(buf[1:])
 		self.mlen = buf[1: 1 + mlen_len]
 		hlen = 1 + mlen_len
 
-		try:
-			self._init_handler((buf[0] & 0xF0) >> 4, buf[hlen:])
-		except:
-			# no type found
-			pass
-		return hlen
+		return hlen, (buf[0] & 0xF0) >> 4
 
 	@staticmethod
 	def decode_length(buf):

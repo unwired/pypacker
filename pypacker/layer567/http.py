@@ -38,18 +38,18 @@ PROG_SPLIT_KEYVAL_SPLIT		= PROG_SPLIT_KEYVAL.split
 class HTTP(pypacker.Packet):
 	__hdr__ = (
 		# content: b"startline"
-		("startline", None, None),
+		("startline", None, None),  # Including trailing \r\n
 		# content: [("name", "value"), ...]
-		("hdr", None, HTTPHeader),
+		("hdr", None, HTTPHeader),  # Including trailing \r\n
 		("sep", "2s", b"\r\n")
 	)
 
 	def _dissect(self, buf):
-		# requestline: [method] [uri] [version] eg GET / HTTP/1.1
-		# responseline: [version] [status] [reason] eg HTTP/1.1 200 OK
+		# Requestline: [method] [uri] [version] eg GET / HTTP/1.1
+		# Responseline: [version] [status] [reason] eg HTTP/1.1 200 OK
 		#logger.debug("Full HTTP: %s", buf)
 		# Request/responseline is mendatory to parse header
-		if not PROG_STARTLINE_MATCH(buf):
+		if len(buf) == 0 or not PROG_STARTLINE_MATCH(buf):
 			self.sep = None
 			return 0
 
@@ -58,9 +58,9 @@ class HTTP(pypacker.Packet):
 			#logger.debug("Header: %s\nBody: %s", bts_header, bts_body)
 		except ValueError:
 			#logger.debug("no startline/header present")
-			# deactivate separator
+			# Deactivate separator
 			self.sep = None
-			# assume this is part of a bigger (splittet) HTTP-message: no header/only body
+			# Assume this is part of a bigger (splittet) HTTP-message: no header/only body
 			return 0
 
 		try:
@@ -69,32 +69,22 @@ class HTTP(pypacker.Packet):
 			# logger.debug("just startline: %r, hdr length=%d" % (bts_header, len(bts_header) + 4))
 			# bts_header was something like "HTTP/1.1 123 status" (\r\n\r\n previously removed)
 			self.startline = bts_header + b"\r\n"
-			#self._init_triggerlist("hdr", b"", lambda _: [])
 			return len(bts_header) + 4  # startline + 2 (CR NL) + 0 (header) + 2 (sep: CR NL) + 0 (body)
 
 		self.startline = startline + b"\r\n"
 		# bts_header = hdr1\r\nhdr2 -> hdr1\r\nhdr2\r\n
-		self._init_triggerlist("hdr", bts_header + b"\r\n", self.__parse_header)
-
-		#logger.debug("startline: %s" % self.startline)
-		#logger.debug("hdr: %s" % self.hdr)
-		#logger.debug("bts_header: %s" % (bts_header+b"\r\n"))
-		#logger.debug("sep: %s" % self.sep)
-
-		# logger.debug(len(startline+b"\r\n") + len(bts_header+b"\r\n\r\n"))
-		# logger.debug("lengths head/body: %d %d" % (len(buf), len(bts_body)))
-		# logger.debug(buf[:len(buf) - len(bts_body)])
+		self.hdr(memoryview(bts_header + b"\r\n"), self._parse_header)
 		# HEADER + "\r\n" + BODY -> newline is part of the header
 		return len(buf) - len(bts_body)
 
 	@staticmethod
-	def __parse_header(buf):
-		#logger.debug("parsing header: %s", buf)
+	def _parse_header(buf):
+		#logger.debug("Parsing header: %s", buf)
 		header = []
 		lines = PROG_SPLIT_HEADER_SPLIT(buf)
 
 		for line in lines:
-			#logger.debug("checking line: %s", line)
+			#logger.debug("Checking line: %s", line)
 			if len(line) == 0:
 				break
 			try:

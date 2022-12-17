@@ -7,7 +7,8 @@ import logging
 
 from pypacker import pypacker, triggerlist, checksum
 from pypacker.pypacker import FIELD_FLAG_AUTOUPDATE
-# handler
+# Handler
+from pypacker.layer4 import tcp
 from pypacker.layer567 import diameter
 from pypacker.structcbs import unpack_H, unpack_I
 
@@ -36,8 +37,19 @@ class Chunk(pypacker.Packet):
 	__hdr__ = (
 		("type", "B", INIT),
 		("flags", "B", 0),
-		("len", "H", 0)		# length of header + data = 4 + x Bytes
+		("len", "H", 0)		# length of header up to end (including data)
 	)
+	# May have padding
+"""
+Data Chunk:
+type		B
+flags		B
+len		H
+tseq		I
+streamid	H
+sseq		H
+ppid		I
+"""
 
 
 class SCTP(pypacker.Packet):
@@ -49,67 +61,86 @@ class SCTP(pypacker.Packet):
 		("chunks", None, triggerlist.TriggerList)
 	)
 
-	# handle padding attribute
-	def __get_padding(self):
-		try:
-			return self._padding
-		except:
-			return b""
-
-	def __set_padding(self, padding):
-		self._padding = padding
-	padding = property(__get_padding, __set_padding)
+	padding = pypacker.get_ondemand_property("padding", lambda: b"")
 
 	__handler__ = {
 		123: diameter.Diameter,
 	}
 
+	@staticmethod
+	def _dissect_chunks(collect_chunks=True):
+		collect = [collect_chunks]
+
+		def _dissect_chunks_sub(buf):
+			off = 0
+			buflen = len(buf)
+			padding = b""
+			chunks = []
+			CHUNKHEADER_DATA_OFF_PPID = 12
+			CHUNKHEADER_DATA_LEN = CHUNKHEADER_DATA_OFF_PPID + 4
+
+			while off + 4 < buflen:
+				chunktype = buf[off]
+				dlen = unpack_H(buf[off + 2: off + 4])[0]
+				#logger.debug("Chunk: chunktype=%r, dlen=%r" % (chunktype, dlen))
+
+				if chunktype != 0:
+					chunk = Chunk(buf[off: off + dlen])
+					chunks.append(chunk)
+					off += dlen
+				else:
+					#logger.debug("Got DATA chunk")
+					# Check for padding (this should be a data chunk)
+					if not collect_chunks:
+						if off + dlen < buflen:
+							padding = buf[off + dlen:].tobytes()
+					else:
+						# Remove data from chunk: use those for handler
+						chunk = Chunk(buf[off: off + CHUNKHEADER_DATA_LEN])
+						chunks.append(chunk)
+
+					off += CHUNKHEADER_DATA_LEN
+					# Assume DATA is the last chunk
+					break
+
+				off += dlen
+
+			#logger.debug("Returning chunks (%r)/off,padding: %r/%r,%r" % (collect[0], chunks, off, padding))
+			return chunks if collect[0] else (off, padding)
+
+		return _dissect_chunks_sub
+
 	def _dissect(self, buf):
-		# parse chunks
-		chunks = []
-		off = 12
-		blen = len(buf)
+		off_chunks = 12
+		chunks_len, padding = SCTP._dissect_chunks(collect_chunks=False)(buf[off_chunks:])
+		self._padding = padding
+		self.chunks(buf[off_chunks: off_chunks + chunks_len], SCTP._dissect_chunks())
+		#logger.debug("sctp base header len=%r, Chunk len=%r, padding len=%r" % (off_chunks, chunks_len, len(padding)))
+		hlen = off_chunks + chunks_len
+		htype = None
 
-		# logger.debug("SCTP: parsing chunks")
-		chunktype = -1
+		try:
+			# Source or destination port should match
+			ports = [unpack_H(buf[0:2])[0], unpack_H(buf[2:4])[0]]
+			htype = [x for x in ports if x in self._id_handlerclass_dct[tcp.TCP]][0]
+		except:
+			#except Exception as ex:
+			# No type found
+			#logger.warning("Invalid htypt? %r, %r" % (htype, ex))
+			pass
+		return hlen, htype, buf[hlen: -len(padding)]
 
-		# TODO: use lazy dissect, possible?
-		while off + 4 < blen:
-			dlen = unpack_H(buf[off + 2: off + 4])[0]
-			# check for padding (this should be a data chunk)
-			if off + dlen < blen:
-				self.padding = buf[off + dlen:]
-				# logger.debug("found padding: %s" % self.padding)
+	def bin(self, update_auto_fields=True):
+		# Padding needs to be placed at the end
+		return pypacker.Packet.bin(self, update_auto_fields=update_auto_fields) + self.padding
 
-			chunk = Chunk(buf[off: off + dlen])
-			# logger.debug("SCTP: Chunk; %s " % chunk)
-			chunks.append(chunk)
-
-			# get payload chunktype from DATA chunks
-			if chunk.type == 0:
-				chunktype = unpack_I(buf[off + chunk.header_len + 8: off + chunk.header_len + 8 + 4])[0]
-				# logger.debug("got DATA chunk, chunktype: %d" % chunktype)
-				# remove data from chunk: use bytes for handler
-				chunk.body_bytes = b""
-				off += len(chunk)
-				# assume DATA is the last chunk
-				break
-
-			off += dlen
-
-		self.chunks.extend(chunks)
-
-		chunktype = unpack_H(buf[2: 4])[0]
-		self._init_handler(chunktype, buf[off:-len(self.padding)])
-		return off
+	def __len__(self):
+		return super().__len__() + len(self.padding)
 
 	def _update_fields(self):
 		if self.sum_au_active and self._changed():
 			# logger.debug("updating checksum")
 			self._calc_sum()
-
-	def bin(self, update_auto_fields=True):
-		return pypacker.Packet.bin(self, update_auto_fields=update_auto_fields) + self.padding
 
 	def _calc_sum(self):
 		# mark as changed
@@ -120,13 +151,13 @@ class SCTP(pypacker.Packet):
 		if padlen == 0:
 			s = checksum.crc32_add(s, self.body_bytes)
 		else:
-			# logger.debug("checksum with padding")
+			#logger.debug("checksum with padding")
 			s = checksum.crc32_add(s, self.body_bytes[:-padlen])
 
 		self.sum = checksum.crc32_done(s)
 
 	def direction(self, other):
-		# logger.debug("checking direction: %s<->%s" % (self, other))
+		#logger.debug("checking direction: %s<->%s" % (self, other))
 		if self.sport == other.sport and self.dport == other.dport:
 			# consider packet to itself: can be DIR_REV
 			return pypacker.Packet.DIR_SAME | pypacker.Packet.DIR_REV

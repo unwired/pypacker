@@ -79,7 +79,7 @@ class NewProtocol(pypacker.Packet):
 	def _parse_options(buf):
 		"""
 		Callback to parse contents for TriggerList-field options,
-		see _dissec(...) -> _init_triggerlist(...).
+		see _dissec(...) -> self.options(...).
 		return -- [Option(), ...]
 		"""
 		ret = []
@@ -111,25 +111,23 @@ class NewProtocol(pypacker.Packet):
 		# logger.debug("Found length: %d, yolo=%d" % (total_header_length, yolo_len))
 		tl_bts = buf[12 + yolo_len: total_header_length]  # options are the the end of the header
 		# logger.debug("Bytes for TriggerList: %r" % tl_bts)
-		# self._init_triggerlist(...) should be called to initiate TriggerLists,
+		# self.name_of_triggerlist(buf, lambda tlbuf: [...]) should be called to initiate TriggerLists,
 		# otherwise the list will be empty. _parse_options(...) is a callback returning a list
 		# of [raw bytes | key/value tuples | Packets] parsed from tl_bts.
-		self._init_triggerlist("options", tl_bts, NewProtocol._parse_options)
+		self.options(tl_bts, NewProtocol._parse_options)
 
-		# self._init_handler(...) must be called to initiate the handler of the next
-		# upper layer and makes it accessible (eg via ethernet[ip.IP]).
+		# hlen, handler_id must be returned to initiate the handler of the next
+		# upper layer and makes it accessible (eg via ethernet.higher_layer).
 		# Which handler to be initialized generally depends on the type information (here higher_layer_type)
 		# found in the current layer (see layer12/ethernet.py -> type).
 		# Here higher_layer_type can become the value 0x66 (defined by __handler__ field) and
 		# as a result ip.IP will be created as upper layer using the bytes given by "buf[total_header_length:]".
-		self._init_handler(higher_layer_type, buf[total_header_length:])
-		return total_header_length
+		return total_header_length, higher_layer_type
 
 	# Handler can be registered by defining the static dictionary
-	# __handler__ where the key is extracted from raw bytes in _dissect(...) and
-	# given to _init_handler(...) and the value is the Packet class used to
-	# create the next upper layer (here ip.IP). Add the "FIELD_FLAG_IS_TYPEFIELD"
-	# to the corresponding type field in __hdr__.
+	# __handler__ where the key is extracted from raw bytes in _dissect(...).
+	# The value is the Packet class used to create the next upper layer (here ip.IP).
+	# Add the "FIELD_FLAG_IS_TYPEFIELD" to the corresponding type field in __hdr__.
 	__handler__ = {TYPE_VALUE_IP: ip.IP}  # just 1 possible upper layer
 
 	def _update_fields(self):

@@ -370,7 +370,6 @@ class Interceptor(object):
 		# TODO: better solution to check for running state? close socket and raise exception does not work in stop()
 		nfq_socket.settimeout(1)
 
-		# TODO: faster w/ asyncio?
 		thread = threading.Thread(
 			target=Interceptor.verdict_trigger_cycler,
 			args=[nfq_socket.recv, nfq_handle, self]

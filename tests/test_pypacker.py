@@ -17,7 +17,7 @@ from pypacker.layer12 import aoe, arp, btle, can, dtp, ethernet, ieee80211, linu
 	flow_control, lldp, slac
 from pypacker.layer3 import ip, ip6, ipx, icmp, igmp, ospf, pim
 from pypacker.layer4 import tcp, udp, ssl, sctp
-from pypacker.layer567 import diameter, dhcp, dns, der, hsrp, http, mqtt, ntp, pmap, radius, rip, rtp, someip,\
+from pypacker.layer567 import bgp, diameter, dhcp, dns, der, hsrp, http, mqtt, ntp, pmap, radius, rip, rtp, someip,\
 	telnet, tpkt
 
 DIR_CURRENT = os.path.dirname(os.path.realpath(__file__)) + "/"
@@ -123,11 +123,13 @@ class GeneralTestCase(unittest.TestCase):
 		# print(str(eth))
 		self.assertEqual(eth.bin(), b"\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\x08\x00")
 		eth = ethernet.Ethernet(dst=b"\x00\x01\x02\x03\x04\x05", src=b"\x06\x07\x08\x09\x0a\x0b", type=2048)
+		print("str()")
 		print(str(eth))
+		print("bin()")
 		print(eth.bin())
 		self.assertEqual(eth.bin(), b"\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x08\x00")
 
-		# test packet creation (default, keyword, bytes + keyword)
+		# Test packet creation (default, keyword, bytes + keyword)
 		bts = get_pcap(DIR_CURRENT +"ether.pcap")[0]
 		eth = ethernet.Ethernet()
 		self.assertEqual(eth.src_s, "FF:FF:FF:FF:FF:FF")
@@ -164,9 +166,11 @@ class GeneralTestCase(unittest.TestCase):
 	def test_highest_layer(self):
 		print_header("Highest layer")
 		bts = get_pcap(DIR_CURRENT + "/ether.pcap")[13]
-		eth = ethernet.Ethernet(bts)
-		highest_layer = eth.highest_layer
-		self.assertEqual(highest_layer.__class__.__name__, "TCP")
+		eth0 = ethernet.Ethernet(bts)
+		print(eth0)
+		highest_layer = eth0.highest_layer
+		# HTTP packet is empty but initiated
+		self.assertEqual(highest_layer.__class__, http.HTTP)
 
 	def test_add(self):
 		print_header("pkt1 + pkt2 + pkt3")
@@ -206,16 +210,26 @@ class GeneralTestCase(unittest.TestCase):
 			print("%r" % eth)
 
 		eth1 = ethernet.Ethernet(bts)
+		print("Opts buffer raw: %r, type=%r" % (eth1.higher_layer.higher_layer.opts[0],
+			type(eth1.higher_layer.higher_layer.opts[0])))
 		eth1[tcp.TCP].body_bytes = b"qwertz"
-		print("calling bin()")
+		print("Opts buffer raw: %r, type=%r" % (eth1.higher_layer.higher_layer.opts[0],
+			type(eth1.higher_layer.higher_layer.opts[0])))
+		print("Calling bin()")
 		eth1.bin()
+		print("Opts buffer raw: %r, type=%r" % (eth1.higher_layer.higher_layer.opts[0],
+			type(eth1.higher_layer.higher_layer.opts[0])))
 		tcp_sum_original = eth1[tcp.TCP].sum
+		print("Opts buffer raw: %r, type=%r" % (eth1.higher_layer.higher_layer.opts[0],
+			type(eth1.higher_layer.higher_layer.opts[0])))
 		eth1[tcp.TCP].body_bytes = b"asdfgh"
 		# ip checksum should be recalculated
-		print("calling __str__")
+		print("Calling __str__")
+		print("Opts buffer raw: %r, type=%r" % (eth1.higher_layer.higher_layer.opts[0],
+			type(eth1.higher_layer.higher_layer.opts[0])))
 		tmp = "%s" % eth1
 		self.assertNotEqual(tcp_sum_original, eth1[tcp.TCP].sum)
-		# original checksum value should be calculated
+		# Original checksum value should be calculated
 		eth1[tcp.TCP].body_bytes = b"qwertz"
 		tmp = "%s" % eth1
 		self.assertEqual(tcp_sum_original, eth1[tcp.TCP].sum)
@@ -223,6 +237,7 @@ class GeneralTestCase(unittest.TestCase):
 	def test_headerupate(self):
 		print_header("Header update (most common protos)")
 		pkt1 = ethernet.Ethernet() + ip.IP() + tcp.TCP() + dns.DNS()
+		print("Finished creating pkt1")
 		layers = [layer for layer in pkt1]
 		layers.reverse()
 		# make sure every header in stack A.B.C... is uptodate starting from highest
@@ -234,7 +249,9 @@ class GeneralTestCase(unittest.TestCase):
 		dns1 = pkt1.higher_layer.higher_layer.higher_layer
 		dns_amounts = dns1.questions_amount + dns1.answers_amount + dns1.authrr_amount + dns1.addrr_amount
 		self.assertEqual(dns_amounts, 0)
-		# change highest layer and check checksums
+		# Change highest layer and check checksums
+		print("DNS? %r" % dns1.__class__)
+		print(dns1)
 		dns1.queries.append(dns.DNS.Query())
 		dns1.answers.append(dns.DNS.Answer())
 		dns1.auths.append(dns.DNS.Auth())
@@ -270,6 +287,8 @@ class GeneralTestCase(unittest.TestCase):
 		bts_list = get_pcap(DIR_CURRENT + "/rtap_sel.pcap")
 
 		beacon = radiotap.Radiotap(bts_list[0])[ieee80211.IEEE80211.Beacon]
+		print(beacon)
+		print(beacon.params)
 		essid = beacon.params[lambda v: v.id == 0][0][1].body_bytes
 		print(essid)
 		self.assertEqual(essid, b"system1")
@@ -277,14 +296,15 @@ class GeneralTestCase(unittest.TestCase):
 	def test_lazyinit(self):
 		print_header("Lazy init")
 		bts = get_pcap(DIR_CURRENT + "/ether.pcap")[14]
-		print(">>> creating ethernet packet")
-		eth = ethernet.Ethernet(bts)
+		print(">>> Creating ethernet packet")
+		eth0 = ethernet.Ethernet(bts)
 
-		self.assertIsNone(eth._body_bytes)
-		self.assertIsNotNone(eth._lazy_handler_data)
-		self.assertFalse(eth._header_value_changed)
+		self.assertIsNone(eth0._body_bytes)
+		self.assertIsNotNone(eth0._lazy_handler_data)
+		self.assertFalse(eth0._header_value_changed)
 
-		print(">>> checking Exceptions")
+		"""
+		print(">>> Checking Exceptions")
 
 		def getattr_ip():
 			object.__getattribute__(eth, "ip")
@@ -292,39 +312,43 @@ class GeneralTestCase(unittest.TestCase):
 
 		# ip not present until accessing
 		self.assertRaises(AttributeError, getattr_ip)
+		"""
 
-		ip1 = eth.higher_layer
+		ip0 = eth0.higher_layer
 
-		print(">>> checking status")
-		self.assertIsNone(eth._body_bytes)
-		self.assertIsNone(eth._lazy_handler_data)
-		self.assertFalse(ip1._header_value_changed)
-		self.assertIsNone(ip1._body_bytes)
-		self.assertIsNotNone(ip1._lazy_handler_data)
+		print(">>> Checking status")
+		self.assertIsNone(eth0._body_bytes)
+		self.assertIsNone(eth0._lazy_handler_data)
+		self.assertFalse(ip0._header_value_changed)
+		self.assertIsNone(ip0._body_bytes)
+		self.assertIsNotNone(ip0._lazy_handler_data)
 
-		print(">>> getting tcp")
-		tcp1 = eth.higher_layer.higher_layer
+		print(">>> Getting tcp")
+		tcp0 = eth0.higher_layer.higher_layer
 
-		print("getting opts")
-		opts = tcp1.opts
-		print("asserting..")
-		# no writing access to packet: format changed by init of triggerlist
-		self.assertTrue(tcp1._header_format_changed)
-		# callback is not removed anymore
-		# self.assertIsNone(tcp1.opts._dissect_callback)
-		self.assertIsNotNone(tcp1.opts._cached_result)
-		print("triggering lazy init")
-		opt_val = tcp1.opts[0]
-		self.assertIsNone(tcp1.opts._dissect_callback)
-		self.assertIsNotNone(tcp1.opts._cached_result)
+		print("> Getting opts")
+		opts = tcp0.opts
+		print("> Asserting..")
+		# No writing access to packet: format changed by init of triggerlist
+		self.assertEqual(type(tcp0._headername_tlobj["opts"]), tuple)
+		self.assertIsNone(tcp0._header_format_cached)
+		self.assertIsNotNone(tcp0._header_cached)
+		self.assertEqual(len(tcp0._tlchanged), 0)
+		self.assertIsNotNone(tcp0.opts._cached_bin)
+		print("Triggering lazy init")
+		opt_val = tcp0.opts[0]
+		self.assertIsNone(tcp0.opts._dissect_callback)
+		self.assertIsNotNone(tcp0.opts._cached_bin)
 		print("--------------- deleting first option")
-		del tcp1.opts[0]
-		print("start: opts uncached")
+		del tcp0.opts[0]
+		print("Start: opts uncached")
 		# TCP Triggerlist is updating header length which leads to cache update
-		self.assertIsNone(tcp1.opts._cached_result)
-
-		self.assertIsNotNone(tcp1._body_bytes)
-		self.assertIsNone(tcp1._lazy_handler_data)
+		self.assertIsNone(tcp0.opts._cached_bin)
+		http0 = tcp0.higher_layer
+		# Handler should be HTTP, no raw bytes
+		self.assertIsNone(tcp0._body_bytes)
+		self.assertIsNone(tcp0._lazy_handler_data)
+		self.assertEqual(http0.__class__, http.HTTP)
 
 		print(">>> Iter over TriggerList")
 		ipopts = [
@@ -347,10 +371,12 @@ class GeneralTestCase(unittest.TestCase):
 		# Raises Exception because of not enough bytes for dissecting
 		self.assertRaises(Exception, lambda: ethernet.Ethernet(b"XXX"))
 
-		tcp_bytes_fail = b"\x00" * 16
+		tcp_bytes_fail = b"\x00" * 26
 		pkt1 = ethernet.Ethernet() + ip.IP() + tcp_bytes_fail
 		pkt1_bts = pkt1.bin()
+		print("Complete input: %d, %r" % (len(pkt1_bts), pkt1_bts))
 		self.assertTrue(pkt1_bts.endswith(tcp_bytes_fail))
+		print("Next: Ethernet init")
 		pkt1 = ethernet.Ethernet(pkt1_bts)
 		pkt_tcp = pkt1.higher_layer.higher_layer
 		print("TCP for dissectfail #1 (higher layer not present, via higher_layer): %r" % pkt_tcp)
@@ -367,6 +393,7 @@ class GeneralTestCase(unittest.TestCase):
 
 		ip_bytes_orig = pkt1_bts[-len(tcp_bytes_fail):]
 		ip_bytes = pkt1.higher_layer.body_bytes
+		print(pkt1)
 		self.assertEqual(ip_bytes, ip_bytes_orig)
 
 		print("TirrgerList dissect fail")
@@ -382,7 +409,7 @@ class GeneralTestCase(unittest.TestCase):
 				raise Exception()
 
 			def _dissect(self, buf):
-					self._init_triggerlist("field2", buf[2:10], PktTlist.tlist_cb_fail)
+					self.field2(buf[2: 10], PktTlist.tlist_cb_fail)
 					return 10
 
 		# Triggerlist dissect fail: raw bytes must be present after all
@@ -437,11 +464,11 @@ class GeneralTestCase(unittest.TestCase):
 		self.assertEqual(pkt.udp.dport, 53)
 		"""
 
-	def test_multivalue_getitem(self):
-		print_header("Multi type __getitem__")
-		pkt1 = ethernet.Ethernet(dst_s="00:11:22:33:44:55") + ip.IP(src_s="12.34.56.78") + tcp.TCP(dport=80) + http.HTTP()
+	def test_multivalue_getitem_0(self):
+		print_header("Multi type __getitem__ 0")
+		pkt0 = ethernet.Ethernet(dst_s="00:11:22:33:44:55") + ip.IP(src_s="12.34.56.78") + tcp.TCP(dport=80) + http.HTTP()
 		# Match on end
-		_, _, _, pkt1_http = pkt1[
+		_, _, _, pkt1_http = pkt0[
 			(ethernet.Ethernet, lambda a: a.dst_s=="00:11:22:33:44:55"),
 			(None, lambda b: b.__class__ in [ip.IP, ip6.IP6]),
 			(tcp.TCP, lambda c: c.dport==80),
@@ -449,14 +476,30 @@ class GeneralTestCase(unittest.TestCase):
 		]
 		self.assertEqual(pkt1_http.__class__, http.HTTP)
 		# Match before end
-		_, _, pkt1_tcp = pkt1[ethernet.Ethernet, ip.IP, tcp.TCP]
+		_, _, pkt1_tcp = pkt0[ethernet.Ethernet, ip.IP, tcp.TCP]
 		self.assertEqual(pkt1_tcp.__class__, tcp.TCP)
 		# No match on start
-		_, pkt1_none = pkt1[ethernet.Ethernet, ethernet.Ethernet]
+		_, pkt1_none = pkt0[ethernet.Ethernet, ethernet.Ethernet]
 		self.assertEqual(pkt1_none, None)
 		# No match on end
-		_, _, _, pkt1_none = pkt1[ethernet.Ethernet, ip.IP, tcp.TCP, telnet.Telnet]
+		_, _, _, pkt1_none = pkt0[ethernet.Ethernet, ip.IP, tcp.TCP, telnet.Telnet]
 		self.assertEqual(pkt1_none, None)
+	
+	def test_multivalue_getitem_1(self):
+		print_header("Multi type __getitem__ 1")
+		pkt0 = ethernet.Ethernet(dst_s="00:11:22:33:44:55") + ip.IP(src_s="12.34.56.78") + udp.UDP(dport=80)
+
+		eth0, ip0, tcp0, na0 = pkt0[
+			None,
+			(None, lambda b: b.__class__ in [ip.IP, ip6.IP6]),
+			(tcp.TCP, lambda c: c.dport==80),
+			(None, lambda p: True)
+		]
+		
+		self.assertEqual(eth0.__class__, ethernet.Ethernet)
+		self.assertEqual(ip0.__class__, ip.IP)
+		self.assertIsNone(tcp0)
+		self.assertIsNone(na0)
 
 	def test_output(self):
 		print_header("Output")
@@ -657,7 +700,9 @@ class EthTestCase(unittest.TestCase):
 		    b"\x08\x00E\x00\x00&\x00\x01\x00\x00@\x00|\xd5\x7f\x00\x00\x01\x7f\x00\x00"\
 		    b"\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
 		eth1 = ethernet.Ethernet(s)
-		# parsing
+		# Parsing
+		# bin() not yet called -> memoryview still present
+		self.assertEqual(type(eth1._lazy_handler_data[1]), memoryview)
 		self.assertEqual(eth1.bin(), s)
 		self.assertEqual(eth1.dst_s, "00:00:00:00:00:AA")
 		self.assertEqual(eth1.src_s, "00:00:00:00:00:BB")
@@ -671,7 +716,9 @@ class EthTestCase(unittest.TestCase):
 		self.assertEqual(eth1.vlan[1].prio, 2)
 		self.assertEqual(eth1.vlan[1].cfi, 0)
 		self.assertEqual(eth1.vlan[1].vid, 99)
-		self.assertEqual(type(eth1.higher_layer).__name__, "IP")
+		# bin() was called -> memoryview converted to bytes
+		self.assertEqual(type(eth1._lazy_handler_data[1]), bytes)
+		self.assertEqual(type(eth1.higher_layer), ip.IP)
 
 		# Ethernet + QinQ(double tags, type 0x9100 ) + IP
 		# Outer tag: type=0x8100, prio=7, cfi=1, vid=4000
@@ -810,7 +857,6 @@ class IPTestCase(unittest.TestCase):
 		# header field udpate
 		src = "1.2.3.4"
 		dst = "4.3.2.1"
-		# TODO: triggering _update_header_format?
 		print(ip1)
 		ip1.src_s = src
 		ip1.dst_s = dst
@@ -818,7 +864,7 @@ class IPTestCase(unittest.TestCase):
 		self.assertEqual(ip1.dst_s, dst)
 		self.assertEqual(ip1.direction(ip1), pypacker.Packet.DIR_SAME)
 
-		print(">>> checksum")
+		print(">>> Checksum")
 		ip2 = ip.IP(ip1_bytes)
 		ip2.bin()
 		print("IP sum 1 (original): %s" % ip2.sum)
@@ -1058,14 +1104,15 @@ class IP6TestCase(unittest.TestCase):
 
 		eth = ethernet.Ethernet(s)
 		print("> searching ip6 in ether")
-		ip_6 = eth[ip6.IP6]
+		ip60 = eth[ip6.IP6]
 		print("> calling bin on eth")
 		self.assertEqual(eth.bin(), s)
 		print("> counting options")
-		self.assertEqual(len(ip_6.opts), 1)
-		self.assertEqual(len(ip_6.opts[0].opts), 2)
-		self.assertEqual(ip_6.opts[0].opts[0].type, 5)
-		self.assertEqual(ip_6.opts[0].opts[1].type, 1)
+		print(ip60)
+		self.assertEqual(len(ip60.opts), 1)
+		self.assertEqual(len(ip60.opts[0].opts), 2)
+		self.assertEqual(ip60.opts[0].opts[0].type, 5)
+		self.assertEqual(ip60.opts[0].opts[1].type, 1)
 
 		pkt_eth_ip_tcp = ethernet.Ethernet() + ip6.IP6() + tcp.TCP()
 		pkt_eth_ip_tcp.bin()
@@ -1084,20 +1131,21 @@ class IP6TestCase(unittest.TestCase):
 
 		for idx, bts in enumerate(packet_bytes):
 			print("%d" % (idx + 1) + "-" * 4)
-			pkt_eth = ethernet.Ethernet(bts)
+			eth0 = ethernet.Ethernet(bts)
 			# Routing header should be present
-			pkt_ip6 = pkt_eth[ip6.IP6]
-			self.assertIsNotNone(pkt_ip6)
+			ip60 = eth0[ip6.IP6]
+			print(eth0)
+			self.assertIsNotNone(ip60)
 
-			if len(pkt_ip6.opts) == 0:
-				self.assertEqual(pkt_ip6.src_s, "fc00:2:0:2::1")
-				self.assertEqual(pkt_ip6.dst_s, "fc00:2:0:1::1")
+			if len(ip60.opts) == 0:
+				self.assertEqual(ip60.src_s, "fc00:2:0:2::1")
+				self.assertEqual(ip60.dst_s, "fc00:2:0:1::1")
 			else:
-				self.assertEqual(pkt_ip6.src_s, "fc00:42:0:1::2")
-				self.assertEqual(pkt_ip6.dst_s, "fc00:2:0:5::1")
-				self.assertEqual(len(pkt_ip6.opts), 2)
+				self.assertEqual(ip60.src_s, "fc00:42:0:1::2")
+				self.assertEqual(ip60.dst_s, "fc00:2:0:5::1")
+				self.assertEqual(len(ip60.opts), 2)
 
-				pkt_ip6opt = pkt_ip6.opts[0]
+				pkt_ip6opt = ip60.opts[0]
 				ip6_routingaddr = pkt_ip6opt.addresses
 				self.assertEqual(len(ip6_routingaddr), 3)
 				self.assertEqual(ip6_routingaddr[0], b"\xfc\x00\x00\x02\x00\x00\x00\x06\x00\x00\x00\x00\x00\x00\x00\x01")
@@ -1582,70 +1630,69 @@ class DNSTestCase(unittest.TestCase):
 		packet_bytes = get_pcap(DIR_CURRENT + "/dns.pcap")
 
 		print()
-		print(">>> DNS 1")
-		dns1 = ethernet.Ethernet(packet_bytes[0])[dns.DNS]
-		print(dns1.bin())
+		print(">>> DNS 0")
+		dns0 = ethernet.Ethernet(packet_bytes[0])[dns.DNS]
+		print(dns0.bin())
 		print(packet_bytes[0][42:])
-		self.assertEqual(dns1.bin(), packet_bytes[0][42:])
+		self.assertEqual(dns0.bin(), packet_bytes[0][42:])
+		self.assertEqual(len(dns0.queries), 1)
+		self.assertEqual(len(dns0.answers), 0)
+		self.assertEqual(len(dns0.auths), 0)
+		self.assertEqual(len(dns0.addrecords), 1)
+		print()
+		print(">>> DNS 1")
+		dns1 = ethernet.Ethernet(packet_bytes[1])[dns.DNS]
+		print("---> Checking bin")
+		self.assertEqual(dns1.bin(), packet_bytes[1][42:])
+		print("---> Checking repr")
+		print("%s" % dns1)
 		self.assertEqual(len(dns1.queries), 1)
-		self.assertEqual(len(dns1.answers), 0)
+		self.assertEqual(len(dns1.answers), 3)
 		self.assertEqual(len(dns1.auths), 0)
 		self.assertEqual(len(dns1.addrecords), 1)
+		print("---> Checking names")
+		print(dns1)
+		self.assertEqual(dns1.answers[0].name_s, dns1.queries[0].name_s)
+		self.assertEqual(dns1.answers[1].name_s, dns1.queries[0].name_s)
+		self.assertEqual(dns1.answers[2].name_s, dns1.queries[0].name_s)
 		print()
 		print(">>> DNS 2")
-		dns2 = ethernet.Ethernet(packet_bytes[1])[dns.DNS]
-		print("---> checking bin")
-		print(dns2.queries[0]._name_format)
-		self.assertEqual(dns2.bin(), packet_bytes[1][42:])
-		print("---> checking repr")
-		print(dns2.queries[0]._name_format)
+		print("---> Checking bin")
+		dns2 = ethernet.Ethernet(packet_bytes[2])[dns.DNS]
+		self.assertEqual(dns2.bin(), packet_bytes[2][42:])
+		print("---> Checking str")
 		print("%s" % dns2)
 		self.assertEqual(len(dns2.queries), 1)
-		self.assertEqual(len(dns2.answers), 3)
-		self.assertEqual(len(dns2.auths), 0)
-		self.assertEqual(len(dns2.addrecords), 1)
-		print("---> checking names")
-		self.assertEqual(dns2.answers[0].name_s, dns2.queries[0].name_s)
-		self.assertEqual(dns2.answers[1].name_s, dns2.queries[0].name_s)
-		self.assertEqual(dns2.answers[2].name_s, dns2.queries[0].name_s)
-		print()
-		print(">>> DNS 3")
-		print("---> checking bin")
-		dns3 = ethernet.Ethernet(packet_bytes[2])[dns.DNS]
-		self.assertEqual(dns3.bin(), packet_bytes[2][42:])
-		print("---> checking str")
-		print("%s" % dns3)
-		self.assertEqual(len(dns3.queries), 1)
-		self.assertEqual(len(dns3.answers), 0)
-		self.assertEqual(len(dns3.auths), 1)
-		self.assertEqual(len(dns3.addrecords), 0)
+		self.assertEqual(len(dns2.answers), 0)
+		self.assertEqual(len(dns2.auths), 1)
+		self.assertEqual(len(dns2.addrecords), 0)
 
 		dns_string = "www.test1.test2.de."
 		dns_bytes = b"\x03www\x05test1\x05test2\x02de\x00"
-		dns3.queries[0].name_s = dns_string
-		self.assertEqual(dns_bytes, dns3.queries[0].name)
-		dns3.queries[0].name = dns_bytes
-		self.assertEqual(dns_string, dns3.queries[0].name_s)
+		dns2.queries[0].name_s = dns_string
+		self.assertEqual(dns_bytes, dns2.queries[0].name)
+		dns2.queries[0].name = dns_bytes
+		self.assertEqual(dns_string, dns2.queries[0].name_s)
 
 		print()
-		print(">>> DNS 4")
+		print(">>> DNS 3")
 		packet_bytes = get_pcap(DIR_CURRENT + "/dns3.pcap")
 
 		for bts in packet_bytes:
-			dns2 = ethernet.Ethernet(bts)[dns.DNS]
+			dns1 = ethernet.Ethernet(bts)[dns.DNS]
 
 		print()
-		print(">>> DNS 5")
+		print(">>> DNS 4")
 		packet_bytes = get_pcap(DIR_CURRENT + "/dns2.pcap")
 
-		dns2 = ethernet.Ethernet(packet_bytes[5])[dns.DNS]
+		dns1 = ethernet.Ethernet(packet_bytes[5])[dns.DNS]
 		print(ethernet.Ethernet(packet_bytes[5]))
-		ip_to_dns = dns2.get_resolved_addresses()
+		ip_to_dns = dns1.get_resolved_addresses()
 		self.assertEqual(len(ip_to_dns), 1)
 		self.assertEqual(ip_to_dns["207.46.130.100"], "time.windows.com")
 
-		dns2 = ethernet.Ethernet(packet_bytes[7])[dns.DNS]
-		ip_to_dns = dns2.get_resolved_addresses()
+		dns1 = ethernet.Ethernet(packet_bytes[7])[dns.DNS]
+		ip_to_dns = dns1.get_resolved_addresses()
 		self.assertEqual(len(ip_to_dns), 4)
 		self.assertEqual(ip_to_dns["64.4.25.86"], "teredo.ipv6.microsoft.com")
 		self.assertEqual(ip_to_dns["64.4.25.80"], "teredo.ipv6.microsoft.com")
@@ -1653,13 +1700,13 @@ class DNSTestCase(unittest.TestCase):
 		self.assertEqual(ip_to_dns["64.4.25.84"], "teredo.ipv6.microsoft.com")
 
 		print()
-		print(">>> DNS 6")
+		print(">>> DNS 5")
 		# this test file contains a long packet, where pointer addresses exceed 0xFF
 		# and thus checks for pointers need to be made using the bitmask 0xC0
 		packet_bytes = get_pcap(DIR_CURRENT + "/dns4.pcap")
 
-		dns2 = linuxcc.LinuxCC(packet_bytes[0])[dns.DNS]
-		ip_to_dns = dns2.get_resolved_addresses()
+		dns1 = linuxcc.LinuxCC(packet_bytes[0])[dns.DNS]
+		ip_to_dns = dns1.get_resolved_addresses()
 		self.assertEqual(len(ip_to_dns), 1)
 		self.assertEqual(ip_to_dns["13.107.246.10"], "collection.wifi4eu.ec.europa.eu")
 
@@ -1724,14 +1771,20 @@ class SCTPTestCase(unittest.TestCase):
 		packet_bytes = get_pcap(DIR_CURRENT + "/sctp.pcap")
 
 		# parsing
-		sct1_bytes = packet_bytes[0]
-		eth_ip_sct = ethernet.Ethernet(sct1_bytes)
-		sct = eth_ip_sct[sctp.SCTP]
-		print(sct1_bytes)
-		print(eth_ip_sct.bin())
-		for chunk in sct.chunks:
-			print("%s" % chunk.bin())
-		self.assertEqual(eth_ip_sct.bin(), sct1_bytes)
+		sctp0_bytes = packet_bytes[0]
+		eth0 = ethernet.Ethernet(sctp0_bytes)
+		sctp0 = eth0[sctp.SCTP]
+		self.assertEqual(sctp0.padding, b"\x67")
+		#print(eth0)
+		#print(sctp0)
+		print("> bin() + compare")
+		self.assertEqual(eth0.bin(), sctp0_bytes)
+
+		print("> Iterating chunks")
+		for chunk in sctp0.chunks:
+			val = chunk.bin()
+		print("> bin() + compare")
+		self.assertEqual(eth0.bin(), sctp0_bytes)
 		# checksum (CRC32)
 		# print("sctp sum1: %X" % sct.sum)
 		# self.assertTrue(sct.sum == 0x6DB01882)
@@ -1742,18 +1795,18 @@ class SCTPTestCase(unittest.TestCase):
 		# print(sct)
 		# self.assertTrue(sct.sum == 0x6DB01882)
 
-		self.assertEqual(sct.sport, 16384)
-		self.assertEqual(sct.dport, 2944)
-		self.assertEqual(len(sct.chunks), 1)
+		self.assertEqual(sctp0.sport, 16384)
+		self.assertEqual(sctp0.dport, 2944)
+		self.assertEqual(len(sctp0.chunks), 1)
 
-		chunk = sct.chunks[0]
+		chunk = sctp0.chunks[0]
 		self.assertEqual(chunk.type, sctp.DATA)
 		self.assertEqual(chunk.len, 91)
 		# dynamic fields
 		# sct.chunks.append((sctp.DATA, 0xFF, b"\x00\x01\x02"))
-		sct.chunks.append(sctp.Chunk(type=sctp.DATA, flags=0xFF, len=8, body_bytes=b"\x00\x01\x02\x03"))
-		self.assertEqual(len(sct.chunks), 2)
-		self.assertEqual(sct.chunks[1].body_bytes, b"\x00\x01\x02\x03")
+		sctp0.chunks.append(sctp.Chunk(type=sctp.DATA, flags=0xFF, len=8, body_bytes=b"\x00\x01\x02\x03"))
+		self.assertEqual(len(sctp0.chunks), 2)
+		self.assertEqual(sctp0.chunks[1].body_bytes, b"\x00\x01\x02\x03")
 		# lazy init of chunks
 		sct2 = sctp.SCTP()
 		sct2.chunks.append((sctp.DATA, 0xFF, b"\x00\x01\x02\x03"))
@@ -1767,7 +1820,8 @@ class ReaderTestCase(unittest.TestCase):
 
 		cnt = 0
 		# HTTP found = TCP having payload!
-		proto_cnt = {arp.ARP: 4, tcp.TCP: 34, udp.UDP: 4, icmp.ICMP: 7, http.HTTP: 12}
+		proto_cnt = {arp.ARP: 4, tcp.TCP: 34, udp.UDP: 4, icmp.ICMP: 7, http.HTTP: 34}
+		print(">>> Going through packets")
 
 		for ts, buf in reader:
 			if cnt == 0:
@@ -1775,17 +1829,22 @@ class ReaderTestCase(unittest.TestCase):
 				self.assertEqual(ts, (0x5118D5D0 * 10 ** 9) + 335929000)
 
 			cnt += 1
-			# print("%02d TS: %.40f LEN: %d" % (cnt, ts, len(buf)))
-			eth = ethernet.Ethernet(buf)
+			print(">> %02d" % cnt)
+			eth0 = ethernet.Ethernet(buf)
 			keys = proto_cnt.keys()
 
 			for k in keys:
-				if eth[k] is not None:
+				k_obj = eth0[k]
+
+				if k_obj is not None:
 					proto_cnt[k] -= 1
+					
+					if k == http.HTTP:
+						print(k_obj.__class__.__name__)
 
 		self.assertEqual(cnt, 49)
 
-		print("proto summary:")
+		print("Proto summary:")
 		for k, v in proto_cnt.items():
 			print("%s: %s" % (k.__name__, v))
 			self.assertEqual(v, 0)
@@ -2176,9 +2235,37 @@ class PerfTestCase(unittest.TestCase):
 			time_diff = time_end - time_start
 			print("Time diff: %ss" % time_diff)
 			print("nr = %d p/s" % (cnt / time_diff))
+			
+		print(">>> Packet parsing (Ethernet + IP + UDP + DBS): Search UDP port")
+		dns0 = ethernet.Ethernet() + ip.IP() + udp.UDP() + dns.DNS(dport=53)
+		BYTES_ETH_IP_UDP_DNS = dns0.bin()
+		start = time.time()
+		for i in range(cnt):
+			p = ethernet.Ethernet(BYTES_ETH_IP_UDP_DNS)
+			eth0, ip0, udp0, dns0 = p[
+				None,
+				ip.IP,
+				(udp.UDP, lambda pkt: pkt.dport==53),
+				None
+			]
+		print_result(start, time.time(), cnt)
 
-		print(">>> Packet parsing (Ethernet + IP + TCP + HTTP) + reading all header")
+	
+		print(">>> Packet parsing (Ethernet + IP + TCP + HTTP): Search TCP port")
+		start = time.time()
+		for i in range(cnt):
+			p = ethernet.Ethernet(BYTES_ETH_IP_TCP_HTTP)
+			eth0, ip0, tcp0 = p[
+				None,
+				ip.IP,
+				(tcp.TCP, lambda pkt: pkt.sport==6667)
+			]
+			#self.assertEquals(tcp0.sport, 123)
+			#self.assertIsNotNone(tcp0)
+		print_result(start, time.time(), cnt)
 
+		print(">>> Packet parsing (Ethernet + IP + TCP + HTTP): reading all header")
+		# TODO: use DNS
 		start = time.time()
 		for i in range(cnt):
 			p = ethernet.Ethernet(BYTES_ETH_IP_TCP_HTTP)
@@ -2203,7 +2290,6 @@ class PerfTestCase(unittest.TestCase):
 		ip2 = ip.IP(src=b"\x01\x02\x03\x04", dst=b"\x05\x06\x07\x08", p=17, len=1234, body_bytes=b"abcd")
 		ip2.bin()
 		start = time.time()
-
 		for i in range(cnt):
 			ip2.bin()
 		print_result(start, time.time(), cnt)
@@ -2211,7 +2297,6 @@ class PerfTestCase(unittest.TestCase):
 		print(">>> Output with change/checksum recalculation (IP)")
 		ip3 = ip.IP(src=b"\x01\x02\x03\x04", dst=b"\x05\x06\x07\x08", p=17, len=1234, body_bytes=b"abcd")
 		start = time.time()
-
 		for i in range(cnt):
 			ip3.src = b"\x01\x02\x03\x04"
 			ip3.bin()
@@ -2219,7 +2304,6 @@ class PerfTestCase(unittest.TestCase):
 
 		print(">>> Basic/first layer parsing (Ethernet + IP + TCP + HTTP)")
 		start = time.time()
-
 		for i in range(cnt):
 			eth = ethernet.Ethernet(BYTES_ETH_IP_TCP_HTTP)
 		print_result(start, time.time(), cnt)
@@ -2230,7 +2314,6 @@ class PerfTestCase(unittest.TestCase):
 		tcp1 = eth1[tcp.TCP]
 		# Initiate TriggerList before performance test
 		tmp = tcp1.opts[0].type
-
 		for i in range(cnt):
 			tcp1.opts[0].type = tcp.TCP_OPT_WSCALE
 		print_result(start, time.time(), cnt)
@@ -2239,7 +2322,6 @@ class PerfTestCase(unittest.TestCase):
 		start = time.time()
 		eth1 = ethernet.Ethernet(BYTES_ETH_IP_TCP_HTTP)
 		http1 = eth1[http.HTTP]
-
 		for i in range(cnt):
 			http1.startline = b"GET / HTTP/1.1"
 		print_result(start, time.time(), cnt)
@@ -2550,28 +2632,28 @@ class SSLTestCase(unittest.TestCase):
 		first_segment = None
 		cert_length = 0
 
-		# search first segment of SSL Hello containing certs
+		# Search first segment of SSL Hello containing certs
 		for bts in packet_bytes_iter:
 			#print("=" * 100)
-			eth1 = ethernet.Ethernet(bts)
-			ssl1 = eth1[ssl.SSL]
-			#print("checking for cert: %r" % ssl1)
-			cert_length = ssl1.get_cert_length()
+			eth0 = ethernet.Ethernet(bts)
+			ssl0 = eth0[ssl.SSL]
+			#print("Checking for cert: %r" % ssl1)
+			cert_length = ssl0.get_cert_length()
 
-			if ssl1 is not None and cert_length > 0:
-				first_segment = eth1.higher_layer.higher_layer
-				print("certificate length: %d" % ssl1.get_cert_length())
+			if ssl0 is not None and cert_length > 0:
+				first_segment = eth0.higher_layer.higher_layer
+				print("Certificate length: %d" % ssl0.get_cert_length())
 				break
 
 		self.assertNotEqual(first_segment, None)
 		assembled_cnt = len(first_segment.body_bytes)
 
 		for bts in packet_bytes_iter:
-			eth1 = ethernet.Ethernet(bts)
+			eth0 = ethernet.Ethernet(bts)
 
-			if eth1[tcp.TCP] is None:
+			if eth0[tcp.TCP] is None:
 				continue
-			assembled, final = first_segment.ra_collect(eth1[tcp.TCP])
+			assembled, final = first_segment.ra_collect(eth0[tcp.TCP])
 			assembled_cnt += assembled
 
 			if assembled_cnt >= cert_length:
@@ -2695,16 +2777,19 @@ class BGPTestCase(unittest.TestCase):
 		print_header("BGP2")
 		packet_bytes = get_pcap(DIR_CURRENT + "/bgp2.pcap")
 
-		for bts in packet_bytes:
-			eth = ethernet.Ethernet(bts)
-			bgp_check = eth.highest_layer
-			if bgp_check.dissect_error:
-				print("?" * 20)
-			print("%s" % eth)
-			self.assertFalse(bgp_check.dissect_error)
+		for idx, bts in enumerate(packet_bytes):
+			eth0 = ethernet.Ethernet(bts)
+			tcp_bytes = eth0.higher_layer.higher_layer.body_bytes
 
-			if not isinstance(bgp_check, tcp.TCP):
-				print("%r" % bgp_check)
+			# Search for complete BGP packets
+			if len(tcp_bytes) < 19:
+				continue
+			print(">> Checking bgp pkt %d" % (idx+1))
+			print("%s" % eth0)
+			bgp0 = eth0.highest_layer
+			print("Dissect error in %r?"% bgp0.__class__)
+			self.assertFalse(bgp0.dissect_error)
+			print("%r" % bgp0)
 
 
 class StaticsTestCase(unittest.TestCase):
@@ -2737,30 +2822,38 @@ class FlowControlTestCase(unittest.TestCase):
 	def test_pfc(self):
 		print_header("FLOW CONTROL PFC")
 		# PFC frame
-		raw_pkt = b"\x01\x01\x00\xdd\x00\x00\x00\x01\x00\x00\x00\x14\x00\x03\x00(\x00\x03\x01\xf4\x00\x00"
-		bytes_time_list = [b'\x00\x00', b'\x00\x01', b'\x00\x00', b'\x00\x14', b'\x00\x03', b'\x00(',
-			b'\x00\x03', b'\x01\xf4']
-		pkt = flow_control.FlowControl(raw_pkt)
-		# parsing
-		self.assertEqual(pkt.bin(), raw_pkt)
-		self.assertEqual(pkt.opcode, flow_control.PFC_OPCODE)
-		self.assertEqual(type(pkt.higher_layer).__name__, "PFC")
-		self.assertEqual(pkt.higher_layer.ms, 0)
-		self.assertEqual(pkt.higher_layer.ls, 221)
-		self.assertEqual(type(pkt.higher_layer.time).__name__, "TriggerList")
-		self.assertEqual(pkt.higher_layer.time, bytes_time_list)
-		self.assertEqual(pkt.higher_layer.ls_list, [1, 1, 0, 1, 1, 1, 0, 1])
-		self.assertEqual(pkt.higher_layer.time_list, [0, 1, 0, 20, 3, 40, 3, 500])
+		raw_pkt = b"\x01\x01\x00\xdd"\
+			b"\x00\x00" + b"\x00\x01" + b"\x00\x00" + b"\x00\x14" + b"\x00\x03" + b"\x00(" \
+			b"\x00\x03" + b"\x01\xf4" + b"\x00\x00"
+		bytes_time_list = [b"\x00\x00", b"\x00\x01", b"\x00\x00", b"\x00\x14", b"\x00\x03", b"\x00(",
+			b"\x00\x03", b"\x01\xf4"]
+		flowctrl = flow_control.FlowControl(raw_pkt)
+		# Parsing
+		self.assertEqual(flowctrl.bin(), raw_pkt)
+		self.assertEqual(flowctrl.opcode, flow_control.PFC_OPCODE)
+		self.assertEqual(type(flowctrl.higher_layer).__name__, "PFC")
+		self.assertEqual(flowctrl.higher_layer.ms, 0)
+		self.assertEqual(flowctrl.higher_layer.ls, 221)
+		self.assertEqual(type(flowctrl.higher_layer.time).__name__, "TriggerList")
+		print(flowctrl)
+		self.assertEqual(flowctrl.higher_layer.time, bytes_time_list)
+		self.assertEqual(flowctrl.higher_layer.ls_list, [1, 1, 0, 1, 1, 1, 0, 1])
+		self.assertEqual(flowctrl.higher_layer.time_list, [0, 1, 0, 20, 3, 40, 3, 500])
+		print(flowctrl)
+
+		print("Test after changing header")
 		# update ls and time fields via list
-		pkt.higher_layer.ls_list = [1, 1, 1, 0, 1, 1, 1, 0]
-		self.assertEqual(pkt.higher_layer.ls_list, [1, 1, 1, 0, 1, 1, 1, 0])
-		self.assertEqual(pkt.higher_layer.ls, 238)
+		flowctrl.higher_layer.ls_list = [1, 1, 1, 0, 1, 1, 1, 0]
+		self.assertEqual(flowctrl.higher_layer.ls_list, [1, 1, 1, 0, 1, 1, 1, 0])
+		self.assertEqual(flowctrl.higher_layer.ls, 238)
+		
 		time_list = [10, 20, 1, 2, 3, 100, 255, 65535]
-		raw_time_list = [b'\x00\n', b'\x00\x14', b'\x00\x01', b'\x00\x02', b'\x00\x03', b'\x00d', b'\x00\xff',
-			b'\xff\xff']
-		pkt.higher_layer.time_list = time_list
-		self.assertEqual(pkt.higher_layer.time_list, time_list)
-		self.assertEqual(pkt.higher_layer.time, raw_time_list)
+		raw_time_list = [b"\x00\n", b"\x00\x14", b"\x00\x01", b"\x00\x02", b"\x00\x03", b"\x00d", b"\x00\xff",
+			b"\xff\xff"]
+		flowctrl.higher_layer.time_list = time_list
+		print(flowctrl)
+		self.assertEqual(flowctrl.higher_layer.time_list, time_list)
+		self.assertEqual(flowctrl.higher_layer.time, raw_time_list)
 
 	def test_pause(self):
 		print_header("FLOW CONTROL PAUSE")
@@ -3104,12 +3197,12 @@ class DERTestCase(unittest.TestCase):
 			#print(len(tlv_list))
 
 			if len(tlv_list) == 2:
-				# b'U\x04\x03' = 2.5.4.3 - id-at-commonName
-				# b'U\x04\x06' = 2.5.4.6 - id-at-countryName
-				# b'U\x04\x07' = 2.5.4.7 - id-at-localityName
-				# b'U\x04\x08' = 2.5.4.8 - id-at-stateOrProvinceName
-				# b'U\x04\n' = 2.5.4.10 - id-at-organizationName
-				# b'U\x04\x0b' = 2.5.4.11 - id-at-organizationalUnitName
+				# b"U\x04\x03" = 2.5.4.3 - id-at-commonName
+				# b"U\x04\x06" = 2.5.4.6 - id-at-countryName
+				# b"U\x04\x07" = 2.5.4.7 - id-at-localityName
+				# b"U\x04\x08" = 2.5.4.8 - id-at-stateOrProvinceName
+				# b"U\x04\n" = 2.5.4.10 - id-at-organizationName
+				# b"U\x04\x0b" = 2.5.4.11 - id-at-organizationalUnitName
 				#print(tlv_list)
 				try:
 					v1, v2 = tlv_list[0][2], tlv_list[1][2]

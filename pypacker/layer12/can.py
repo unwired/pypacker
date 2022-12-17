@@ -372,20 +372,22 @@ class ISOTPBase(pypacker.Packet):
 		#logger.debug("ISOTP type: %X, offset: %d" % (sig, types_isotp_offset_upper[sig]))
 		#logger.debug("upper bytes: %r" % buf[types_isotp_offset_upper[sig]: ])
 
+		hlen = types_isotp_offset_upper[sig]
+
 		# check by request/response SID, on both OBD2 and UDS response will be SID+0x40
 		if sig in types_isotp_offset_upper_got_type or (sig - 0x40) in types_isotp_offset_upper_got_type:
 			obd_mode = buf[types_isotp_offset_upper[sig]]
 
 			if obd_mode in OBD2_MODE_DESCR:
-				# assume OBD2
+				# Assume OBD2
 				#logger.debug("got OBD2")
-				self._init_handler(0, buf[types_isotp_offset_upper[sig]:])
+				return hlen, 0
 			else:
-				# assume UDS
+				# Assume UDS
 				#logger.debug("got UDS, will use bytes: %r" % buf[types_isotp_offset_upper[sig]: ])
-				self._init_handler(1, buf[types_isotp_offset_upper[sig]:])
+				return hlen, 1
 
-		return types_isotp_offset_upper[sig]
+		return hlen
 
 
 class ISOTPSingleFrame(ISOTPBase):
@@ -598,8 +600,7 @@ class CAN(pypacker.Packet):
 		isotp_type = (buf[8] & 0xF0) >> 4
 		#logger.debug("got ISOTP type: %d, class will be: %r" %
 		#(isotp_type, isotp_type_class[isotp_type]))
-		self._init_handler(isotp_type, buf[8:])
-		return 8
+		return 8, isotp_type
 
 	def _update_fields(self):
 		if not self._header_value_changed:
