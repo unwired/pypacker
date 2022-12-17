@@ -218,13 +218,13 @@ nr = Intel CPU, 4 Cores @ 2.5 GHz, CPython v3.6
 
 rounds per test: 10000
 =====================================
->>> Packet parsing (Ethernet + IP + UDP + DBS): Search UDP port
+>>> Packet parsing (Ethernet + IP + UDP + DNS): Search UDP port
 Time diff: 0.41541337966918945s
 nr = 24072 p/s
 >>> Packet parsing (Ethernet + IP + TCP + HTTP): Search TCP port
 Time diff: 0.788198709487915s
 nr = 12687 p/s
->>> Packet parsing (Ethernet + IP + TCP + HTTP): reading all header
+>>> Packet parsing (Ethernet + IP + TCP + HTTP): Reading all header
 Time diff: 1.32124924659729s
 nr = 7568 p/s
 >>> Parsing first layer (IP + ICMP)

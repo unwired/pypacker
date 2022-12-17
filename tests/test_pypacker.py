@@ -2236,7 +2236,7 @@ class PerfTestCase(unittest.TestCase):
 			print("Time diff: %ss" % time_diff)
 			print("nr = %d p/s" % (cnt / time_diff))
 			
-		print(">>> Packet parsing (Ethernet + IP + UDP + DBS): Search UDP port")
+		print(">>> Packet parsing (Ethernet + IP + UDP + DNS): Search UDP port")
 		dns0 = ethernet.Ethernet() + ip.IP() + udp.UDP() + dns.DNS(dport=53)
 		BYTES_ETH_IP_UDP_DNS = dns0.bin()
 		start = time.time()
@@ -2264,7 +2264,7 @@ class PerfTestCase(unittest.TestCase):
 			#self.assertIsNotNone(tcp0)
 		print_result(start, time.time(), cnt)
 
-		print(">>> Packet parsing (Ethernet + IP + TCP + HTTP): reading all header")
+		print(">>> Packet parsing (Ethernet + IP + TCP + HTTP): Reading all header")
 		# TODO: use DNS
 		start = time.time()
 		for i in range(cnt):
