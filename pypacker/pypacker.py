@@ -935,7 +935,7 @@ class Packet(object, metaclass=MetaPacket):
 
 	def _update_cached_header_format_and_tl_states(self):
 		"""
-		Update format of this packet header. Needs to be called on changes to dynamic fields.
+		Update format of this packet header.
 		"""
 		#logger.debug(self.__class__)
 		#logger.debug("Formats: %s" % self._header_formats)
