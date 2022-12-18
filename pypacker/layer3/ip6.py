@@ -255,7 +255,7 @@ class IP6RoutingHeader(pypacker.Packet):
 		num_addresses = int(buf[1] / 2)
 		buf_opts = buf[hdr_size: hdr_size + num_addresses * addr_size]
 		self.addresses(buf_opts,
-			lambda buf: [buf[i * addr_size: i * addr_size + addr_size] for i in range(num_addresses)])
+			lambda buf: [buf[i * addr_size: i * addr_size + addr_size].tobytes() for i in range(num_addresses)])
 
 		return hdr_size + num_addresses * addr_size
 

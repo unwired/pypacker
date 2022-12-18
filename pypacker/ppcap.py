@@ -102,7 +102,7 @@ def pcap_cb_init_write(self, snaplen=1500, linktype=DLT_EN10MB, magic=TCPDUMP_MA
 
 	# A new pcap file is created
 	if self._fh.tell() == 0:
-		logger.debug("Creating new pcap")
+		#logger.debug("Creating new pcap")
 		self._resolution_factor, _, self._callback_pack_meta = MAGIC__PCAPFILECONFIG[magic]
 		header = PcapFileHdr(magic=magic, snaplen=snaplen, linktype=linktype)
 
@@ -116,7 +116,7 @@ def pcap_cb_init_write(self, snaplen=1500, linktype=DLT_EN10MB, magic=TCPDUMP_MA
 		self._fh.write(header.bin())
 	# File already present, read config
 	else:
-		logger.debug("File already present, reading config and appending to end")
+		#logger.debug("File already present, reading config and appending to end")
 		self._fh.seek(0)
 		buf = self._fh.read(24)
 		magic = PcapFileHdr(buf).magic
@@ -143,7 +143,7 @@ def pcap_cb_init_write(self, snaplen=1500, linktype=DLT_EN10MB, magic=TCPDUMP_MA
 			self._fh.seek(fhpos)
 
 		self._timestamp = d[0] * 1000000000 + (d[1] * self._resolution_factor)
-		logger.debug("Last ts: s=%d, subsec=%d, final=%d" % (d[0], d[1], self._timestamp))
+		#logger.debug("Last ts: s=%d, subsec=%d, final=%d" % (d[0], d[1], self._timestamp))
 
 
 def pcap_cb_write(self, bts, **metadata):
@@ -173,7 +173,7 @@ def pcap_cb_init_read(self, **initdata):
 
 	is_le = False if fhdr.magic in [TCPDUMP_MAGIC_MICRO, TCPDUMP_MAGIC_NANO] else True
 
-	logger.debug("Pcap magic: %X, le: %s" % (fhdr.magic, is_le))
+	#logger.debug("Pcap magic: %X, le: %s" % (fhdr.magic, is_le))
 	# Handle file types
 	# Note: we could use PcapPktHdr/PcapLEPktHdr to parse pre-packetdata but calling unpack directly
 	# greatly improves performance

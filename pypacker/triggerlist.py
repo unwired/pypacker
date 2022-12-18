@@ -44,8 +44,7 @@ class TriggerList(list):
 			return
 
 		try:
-			# TODO: use memoryview?
-			initial_list_content = self._dissect_callback(self.bin())
+			initial_list_content = self._dissect_callback(self._cached_bin)
 		except:
 			#except Exception as ex:
 			# If anything goes wrong: raw bytes will be accessible in any case
@@ -60,10 +59,8 @@ class TriggerList(list):
 		# This is re-calling _lazy_dissect(), avoid by calling parent version
 		#logger.debug("Initial list content=%r" % str(initial_list_content))
 		super(TriggerList, self).extend(initial_list_content)
-		# Nothing has changed, just initial dissect
+		# Add listener to packets in list. Nothing has changed, no notify needed.
 		self._refresh_listener(initial_list_content, notify_change=False)
-
-	# Python predefined overwritten methods
 
 	def __getitem__(self, needle):
 		self._lazy_dissect()
@@ -163,7 +160,7 @@ class TriggerList(list):
 		WARNING: packets can only be put in one tl once at a time
 
 		val -- list of bytes, tuples or packets
-		connect_packet -- connect packet to this tl and parent packet
+		connect_packet -- Connect packet to this tl and parent packet, otherwise disconnect
 		"""
 		for v in val:
 			# Ignore non-packets
@@ -237,10 +234,12 @@ class TriggerList(list):
 
 	def _pack(self, tuple_entry):
 		"""
-		This can  be overwritten to convert tuples in TriggerLists to bytes (see layer567/http.py)
+		This can  be overwritten to convert tuples (key, value) in TriggerLists
+		to bytes (see layer567/http.py)
 		return -- byte string representation of this tuple entry
 			eg (b"Host", b"localhost") -> b"Host: localhost"
 		"""
+		# Default implementation: return value
 		return tuple_entry[1]
 
 	def __repr__(self):

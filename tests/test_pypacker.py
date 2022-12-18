@@ -1280,14 +1280,14 @@ class AccessConcatTestCase(unittest.TestCase):
 		l_tcp = bytes_eth_ip_tcp_tn[34:66]
 		l_tn = bytes_eth_ip_tcp_tn[66:]
 
-		p_all = ethernet.Ethernet(bytes_eth_ip_tcp_tn)
-		self.assertEqual(p_all.bin(), bytes_eth_ip_tcp_tn)
+		eth0 = ethernet.Ethernet(bytes_eth_ip_tcp_tn)
+		self.assertEqual(eth0.bin(), bytes_eth_ip_tcp_tn)
 		print()
 		print(">>> Ascending layers from full bytes:")
-		print(p_all)
-		print(p_all.higher_layer)
-		print(p_all.higher_layer.higher_layer)
-		print(p_all.higher_layer.higher_layer.higher_layer)
+		print(eth0)
+		print(eth0.higher_layer)
+		print(eth0.higher_layer.higher_layer)
+		print(eth0.higher_layer.higher_layer.higher_layer)
 
 		print()
 		print(">>> Creating layers from bytes")
@@ -1308,35 +1308,35 @@ class AccessConcatTestCase(unittest.TestCase):
 
 		print()
 		print(">>> Comparing types")
-		self.assertEqual(type(p_all[ethernet.Ethernet]), type(eth1))
-		self.assertEqual(type(p_all[ip.IP]), type(ip1))
-		self.assertEqual(type(p_all[tcp.TCP]), type(tcp1))
-		self.assertEqual(type(p_all[telnet.Telnet]), type(tn1))
+		self.assertEqual(type(eth0[ethernet.Ethernet]), type(eth1))
+		self.assertEqual(type(eth0[ip.IP]), type(ip1))
+		self.assertEqual(type(eth0[tcp.TCP]), type(tcp1))
+		self.assertEqual(type(eth0[telnet.Telnet]), type(tn1))
 
 		print()
 		print(">>> Comparing assembled bytes")
 		# clean parsed = reassembled
 		bytes_concat = [eth1.bin(), ip1.bin(), tcp1.bin(), tn1.bin()]
-		self.assertEqual(p_all.bin(), b"".join(bytes_concat))
+		self.assertEqual(eth0.bin(), b"".join(bytes_concat))
 
 		p_all_concat = eth1 + ip1 + tcp1 + tn1
 		# p_all.bin()
 		# p_all_concat.bin()
-		print(p_all[ethernet.Ethernet])
+		print(eth0[ethernet.Ethernet])
 		print(p_all_concat[ethernet.Ethernet])
 		print("--------------")
-		print(p_all[ip.IP])
+		print(eth0[ip.IP])
 		print(p_all_concat[ip.IP])
 		print("--------------")
-		print(p_all[tcp.TCP])
+		print(eth0[tcp.TCP])
 		print(p_all_concat[tcp.TCP])
 		print("--------------")
-		print(p_all[telnet.Telnet])
+		print(eth0[telnet.Telnet])
 		print(p_all_concat[telnet.Telnet])
 		print("--------------")
 
-		self.assertEqual(p_all.bin(), bytes_eth_ip_tcp_tn)
-		self.assertEqual(p_all.bin(), p_all_concat.bin())
+		self.assertEqual(eth0.bin(), bytes_eth_ip_tcp_tn)
+		self.assertEqual(eth0.bin(), p_all_concat.bin())
 
 		print()
 		print(">>> Testing keyword construction")
@@ -1366,13 +1366,13 @@ class AccessConcatTestCase(unittest.TestCase):
 		p_all2 = eth2 + ip2 + tcp2 + tn2
 
 		for l in [ethernet.Ethernet, ip.IP, tcp.TCP, telnet.Telnet]:
-			print(p_all[l])
+			print(eth0[l])
 			print(p_all2[l])
 			print("-----")
 
-		print(p_all.bin())
+		print(eth0.bin())
 		print(p_all2.bin())
-		self.assertEqual(p_all2.bin(), p_all.bin())
+		self.assertEqual(p_all2.bin(), eth0.bin())
 
 
 class IterateTestCase(unittest.TestCase):
@@ -2260,12 +2260,9 @@ class PerfTestCase(unittest.TestCase):
 				ip.IP,
 				(tcp.TCP, lambda pkt: pkt.sport==6667)
 			]
-			#self.assertEquals(tcp0.sport, 123)
-			#self.assertIsNotNone(tcp0)
 		print_result(start, time.time(), cnt)
 
 		print(">>> Packet parsing (Ethernet + IP + TCP + HTTP): Reading all header")
-		# TODO: use DNS
 		start = time.time()
 		for i in range(cnt):
 			p = ethernet.Ethernet(BYTES_ETH_IP_TCP_HTTP)

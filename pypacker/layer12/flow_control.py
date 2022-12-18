@@ -58,7 +58,7 @@ class FlowControl(pypacker.Packet):
 		def _get_times(buf):
 			times = []
 			for i in range(0, 16, 2):
-				times.append(buf[i:i + 2])
+				times.append(buf[i:i + 2].tobytes())
 			return times
 
 		def _dissect(self, buf):

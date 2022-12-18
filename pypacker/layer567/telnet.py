@@ -40,28 +40,30 @@ class Telnet(pypacker.Packet):
 
 	@staticmethod
 	def _parse_data(buf):
-
 		off = 0
 		t_data = []
 		t_len = len(buf)
 
-		# parse telnet data:
+		# Parse telnet data:
 		# fffaXX = start of options
 		# fff0 = end of options
+		# Search needed, convert to bytes
+		buf = buf.tobytes()
+
 		while off < t_len:
 			if buf[off: off + 2] == TELNET_OPTION_START:
-				# add start marker
+				# Add start marker
 				t_data.append(buf[off: off + 3])
 				off += 3
-				# find end of option
+				# Find end of option
 				idx_end = buf.find(TELNET_OPTION_END, off)
-				# add option data
+				# Add option data
 				t_data.append(buf[off: idx_end + 1])
-				# add end marker
+				# Add end marker
 				t_data.append(TELNET_OPTION_END)
 				off = idx_end + 2
 			else:
-				# add command
+				# Add command
 				t_data.append(buf[off: off + 3])
 				off += 3
 		return t_data
