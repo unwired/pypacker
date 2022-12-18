@@ -180,6 +180,9 @@ class TCP(pypacker.Packet):
 			if not self._lower_layer._header_value_changed:
 				# pseudoheader didn't change, further check for changes in layers
 				update = self._changed()
+				#logger.debug("Changes in this + upper layer: %r" % update)
+			#else:
+			#	logger.debug("Lower layer %r changed!" % self._lower_layer.__class__)
 		except:
 			# Assume not an IP packet: we can't calculate the checksum
 			update = False
@@ -195,7 +198,7 @@ class TCP(pypacker.Packet):
 		if olen > 0:
 			# Parse options, add offset-length to standard-length
 			opts_bytes = buf[TCP_OFF_BTS_OPTS: TCP_OFF_BTS_OPTS + olen]
-			self.opts(opts_bytes, self._parse_opts)
+			self.opts(opts_bytes, TCP._dissect_opts)
 		elif olen < 0:
 			raise Exception("TCP length is invalid: %d" % olen)
 
@@ -215,23 +218,23 @@ class TCP(pypacker.Packet):
 	__TCP_OPT_SINGLE = {TCP_OPT_EOL, TCP_OPT_NOP}
 
 	@staticmethod
-	def _parse_opts(buf):
+	def _dissect_opts(buf):
 		"""Parse TCP options using buf and return them as List."""
 		#logger.debug("Parsing opts")
 		optlist = []
-		i = 0
+		off = 0
 
-		while i < len(buf):
+		while off < len(buf):
 			# logger.debug("got TCP-option type %s" % buf[i])
-			if buf[i] in TCP.__TCP_OPT_SINGLE:
-				p = TCPOptSingle(type=buf[i])
-				i += 1
+			if buf[off] in TCP.__TCP_OPT_SINGLE:
+				opt = TCPOptSingle(buf[off: off + 1])
+				off += 1
 			else:
-				olen = buf[i + 1]
+				olen = buf[off + 1]
 				# p = TCPOptMulti(type=buf[i], len=olen, body_bytes=buf[i + 2: i + olen])
-				p = TCPOptMulti(buf[i: i + olen])
-				i += olen  # typefield + lenfield + data-len
-			optlist.append(p)
+				opt = TCPOptMulti(buf[off: off + olen])
+				off += olen  # typefield + lenfield + data-len
+			optlist.append(opt)
 		# logger.debug("tcp: parseopts finished, length: %d" % len(optlist))
 		return optlist
 

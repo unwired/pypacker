@@ -175,7 +175,7 @@ class TriggerList(list):
 				# base packet <- TriggerList (observes changes, set changed status
 				# in basepacket) <- contained packet (changes)
 				# Add change listener to the packet this TL is contained in.
-				lwrapper = lambda: self._notify_change()
+				lwrapper = lambda informer: self._notify_change(informer)
 				v._add_change_listener(lwrapper)
 			else:
 				# Remove any old listener
@@ -183,9 +183,10 @@ class TriggerList(list):
 				# Remove old parent
 				v._triggelistpacket_parent = None
 		if notify_change:
-			self._notify_change()
+			#logger.debug("_refresh_listener -> _notify_change (tl add, remove etc)")
+			self._notify_change(self)
 
-	def _notify_change(self):
+	def _notify_change(self, informer):
 		"""
 		Inform the Packet having this TriggerList as field:
 		- pkt.tl_name <- tl
@@ -193,7 +194,7 @@ class TriggerList(list):
 		Called by: this list on changes or Packets in this list
 		"""
 		# Format *may* not have changed but we don't know until bin()
-		#logger.debug("_notify_change")
+		#logger.debug("tl %r : _notify_change by %r (clearing caches)" % (self.__class__, informer.__class__))
 		self._packet._header_format_cached = None
 		self._packet._header_cached = None
 

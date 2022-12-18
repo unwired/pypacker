@@ -342,6 +342,7 @@ class Packet(object, metaclass=MetaPacket):
 
 		value -- a bytestring
 		"""
+		#logger.debug(self.__class__)
 		if self._higher_layer is not None:
 			# Reset all handler data
 			self._set_higherlayer(None)
@@ -379,32 +380,37 @@ class Packet(object, metaclass=MetaPacket):
 			pass
 		return None
 
-	def _set_higherlayer(self, hndl):
+	def _set_higherlayer(self, hndl, notify_changelistener=True):
 		"""
 		Set body handler for this packet and make it accessible via layername[addedtypeclass]
 		like ethernet[ip.IP]. If handler is None any handler will be reset and data will be set to an empty byte string.
 
-		hndl -- the handler to be set: None or a Packet instance. Setting to None
+		hndl -- The handler to be set: None or a Packet instance. Setting to None
 			will clear any handler and set body_bytes to b"".
+		notify_changelistener -- Relevant for eg: if this packet is part of a tl -> later changes
 		"""
+		#logger.debug(self.__class__)
+		#logger.debug("Higher layer will be: %r" % hndl.__class__)
 		if self._higher_layer is not None:
 			# Clear old linked data of upper layer if body handler is already parsed
 			# A.B -> A.higher_layer = x -> B.lower_layer = None
 			self._higher_layer._lower_layer = None
 
-		if hndl is None:
-			# Avoid (body_bytes=None, handler=None)
-			self._body_bytes = b""
-		else:
+		if hndl is not None:
 			# Set a new body handler
 			# Associate ip, arp etc with handler-instance to call "ether.ip", "ip.tcp" etc
 			self._body_bytes = None
 			hndl._lower_layer = self
+		else:
+			# Avoid (body_bytes=None, handler=None)
+			self._body_bytes = b""
 
 		self._higher_layer = hndl
 		self._body_value_changed = True
 		self._lazy_handler_data = None
-		self._notify_changelistener()
+
+		if notify_changelistener:
+			self._notify_changelistener()
 
 	# Deprecated, wording "higher_layer/highest_layer layer is more consistent
 	upper_layer = property(_get_higherlayer, _set_higherlayer)
@@ -471,7 +477,9 @@ class Packet(object, metaclass=MetaPacket):
 		try:
 			# Instantiate handler class using lazy data buffer
 			handler_obj = handler_data[0](handler_data[1], self)
-			self.upper_layer = handler_obj
+			# No notify_changelistener:
+			# Avoid informing change listener if we are part of a tl (no changes so war)
+			self._set_higherlayer(handler_obj, notify_changelistener=False)
 			# This was a lazy init: same as direct dissecting -> no body change
 			self._body_value_changed = False
 		except:
@@ -983,6 +991,7 @@ class Packet(object, metaclass=MetaPacket):
 
 		while p_instance is not None:
 			if p_instance._header_cached is None or p_instance._body_value_changed:
+				#logger.debug("Found change in %r" % p_instance.__class__)
 				changed = True
 				break
 			elif p_instance._lazy_handler_data is None:
@@ -1029,7 +1038,7 @@ class Packet(object, metaclass=MetaPacket):
 			return
 
 		for listener_cb in self._changelistener:
-			listener_cb()
+			listener_cb(self)
 
 	@classmethod
 	def load_handler(cls, clz_add, handler):

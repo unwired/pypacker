@@ -623,11 +623,44 @@ class GeneralTestCase(unittest.TestCase):
 
 			bts_l = get_pcap(pcapfile)
 
-			for bts in bts_l:
-				print(".", end="")
+			for idx, bts in enumerate(bts_l):
+				pkt_num = idx + 1
+				print("%d " % pkt_num, end="")
 				sys.stdout.flush()
+
+				# Input = Output
 				pkt0 = lowest_layer_clz(bts)
 				summary = "%s" % pkt0
+				self.assertEqual(pkt0.bin(), bts)
+
+				# Input = Output (reassembled)
+				bts_l_extracted = []
+				paddings = []
+
+				for layer in pkt0:
+					try:
+						if len(layer.padding) > 0:
+							paddings.append(layer.padding)
+					except:
+						pass
+					self.assertIsNotNone(layer._header_cached)
+					self.assertIsNotNone(layer._header_format_cached)
+					bts_l_extracted.append(layer.header_bytes)
+
+				if len(paddings) > 0:
+					print("Got paddings: %r" % paddings)
+
+				paddings.reverse()
+				bts_l_extracted.append(pkt0.highest_layer.body_bytes)
+				bts_l_extracted.extend(paddings)
+				self.assertEqual(b"".join(bts_l_extracted), bts)
+
+				# Initiate layer after layer and check if unchanged
+				pkt0 = lowest_layer_clz(bts)
+
+				for layer in pkt0:
+					self.assertFalse(layer._changed())
+
 			print()
 
 class LazydictTestCase(unittest.TestCase):

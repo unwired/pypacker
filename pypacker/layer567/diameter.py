@@ -59,10 +59,11 @@ class Diameter(pypacker.Packet):
 	retransmit_flag = property(__get_t, __set_t)
 
 	def _dissect(self, buf):
-		self.avps(buf[20:], self._parse_avps)
+		self.avps(buf[20:], Diameter._parse_avps)
 		return len(buf)
 
-	def _parse_avps(self, buf):
+	@staticmethod
+	def _parse_avps(buf):
 		off = 0
 		avps = []
 		buflen = len(buf)
@@ -72,6 +73,7 @@ class Diameter(pypacker.Packet):
 			avplen = int.from_bytes(buf[off + 5: off + 8], "big")
 			# REAL length of AVP is multiple of 4 Bytes
 			mod_len = avplen % 4
+
 			if mod_len != 0:
 				avplen += 4 - mod_len
 			avp = AVP(buf[off: off + avplen])
@@ -87,23 +89,23 @@ class AVP(pypacker.Packet):
 		("len", "3s", b""),
 	)
 
-	def __get_v(self):
+	def _get_v(self):
 		return (self.flags >> 7) & 0x1
 
-	def __set_v(self, v):
+	def _set_v(self, v):
 		self.flags = (self.flags & ~0x80) | ((v & 0x1) << 7)
-	vendor_flag = property(__get_v, __set_v)
+	vendor_flag = property(_get_v, _set_v)
 
-	def __get_m(self):
+	def _get_m(self):
 		return (self.flags >> 6) & 0x1
 
-	def __set_m(self, m):
+	def _set_m(self, m):
 		self.flags = (self.flags & ~0x40) | ((m & 0x1) << 6)
-	mandatory_flag = property(__get_m, __set_m)
+	mandatory_flag = property(_get_m, _set_m)
 
-	def __get_p(self):
+	def _get_p(self):
 		return (self.flags >> 5) & 0x1
 
-	def __set_p(self, p):
+	def _set_p(self, p):
 		self.flags = (self.flags & ~0x20) | ((p & 0x1) << 5)
-	protected_flag = property(__get_p, __set_p)
+	protected_flag = property(_get_p, _set_p)

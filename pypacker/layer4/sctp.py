@@ -128,7 +128,12 @@ class SCTP(pypacker.Packet):
 			# No type found
 			#logger.warning("Invalid htypt? %r, %r" % (htype, ex))
 			pass
-		return hlen, htype, buf[hlen: -len(padding)]
+
+		#logger.debug("Full buffer: %s" % buf.tobytes())
+		#logger.debug("Padding: %s" % self.padding)
+		#logger.debug("Header bytes: %s" % buf[:hlen].tobytes())
+		#logger.debug("Body bytes: %r" % buf[hlen: -len(padding)].tobytes())
+		return hlen, htype, buf[hlen:] if len(padding) == 0 else buf[hlen: -len(padding)]
 
 	def bin(self, update_auto_fields=True):
 		# Padding needs to be placed at the end

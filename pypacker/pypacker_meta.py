@@ -79,7 +79,8 @@ def get_setter(t, header_idx, header_format_original, is_field_type_simple, is_f
 
 		# We are not in _dissect anymore, assign value
 		unshare_values(obj)
-		#logger.debug("Setting %s=%s (_header_format_cached=maybe None)" % (obj._headerfield_names[header_idx], value))
+		#logger.debug("Setting %s=%s in %r (_header_format_cached=maybe None)" % (
+		#	obj._headerfield_names[header_idx], value, obj.__class__))
 		obj._header_values[header_idx] = value
 		obj._header_cached = None
 		obj._notify_changelistener()
