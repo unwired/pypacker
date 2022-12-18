@@ -5,6 +5,7 @@ import random
 import struct
 import sys
 import pprint
+import glob
 import os
 
 from pypacker import pypacker, checksum, triggerlist
@@ -190,7 +191,7 @@ class GeneralTestCase(unittest.TestCase):
 		eth1 += ip1
 		eth1 += tcp1
 
-		self.assertEqual(eth1.highest_layer.__class__.__name__, "TCP")
+		self.assertEqual(eth1.highest_layer.__class__, tcp.TCP)
 
 	def test_len(self):
 		print_header("Length")
@@ -604,6 +605,30 @@ class GeneralTestCase(unittest.TestCase):
 		merged_bts = ppcap.Reader(filename=pcap_file_out).read()
 		self.assertTrue(len(merged_bts), cnt[0])
 		os.remove(pcap_file_out)
+
+	def test_dissect_all_captures(self):
+		pcapfiles = glob.glob(DIR_CURRENT + "/*.pcap")
+		pcaps_linuxcc = set([ DIR_CURRENT + pcapname for pcapname in
+			["dns4.pcap", "linuxcc.pcap", "mqtt_over_linuxcc.pcap", "mqtt_puback.pcap",
+			"mqtt_single_pub_msg.pcap", "single_pub_msg_failing.pcap"]
+			])
+
+		for pcapfile in pcapfiles:
+			print("> Reading %s" % pcapfile)
+			lowest_layer_clz = ethernet.Ethernet
+
+			if pcapfile in pcaps_linuxcc:
+				lowest_layer_clz = linuxcc.LinuxCC
+				print("Using linuxcc")
+
+			bts_l = get_pcap(pcapfile)
+
+			for bts in bts_l:
+				print(".", end="")
+				sys.stdout.flush()
+				pkt0 = lowest_layer_clz(bts)
+				summary = "%s" % pkt0
+			print()
 
 class LazydictTestCase(unittest.TestCase):
 	def test_dict(self):

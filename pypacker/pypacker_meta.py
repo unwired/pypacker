@@ -238,9 +238,9 @@ def configure_packet_header(t, hdrs):
 					field_flags |= FIELD_FLAG_AUTOUPDATE
 
 				if field_flags & FIELD_FLAG_AUTOUPDATE != 0:
-					# remember which fields are auto-update ones
+					# Remember which fields are auto-update ones
 					# xxx__au_active must be set: read by _update_higherlayer_id
-					# TODO: use lists?
+					# TODO: use sets?
 					setattr(t, headername + "_au_active", True)
 
 			# Setting/getting value is done via properties.

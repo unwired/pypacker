@@ -40,7 +40,7 @@ class TFTP(Packet):
 	)
 
 	def _dissect(self, buf):
-		hlen = 2
+		hlen = 4
 		opcode = unpack_H(buf[: 2])
 		# logger.debug("opcode: %d" % opcode)
 
@@ -52,7 +52,7 @@ class TFTP(Packet):
 			# logger.debug("file/ttype = %r / %r" % (file, ttype))
 			self.file = file + b"\x00"
 			self.ttype = ttype + b"\x00"
-			hlen = 2 + len(self.file) + len(self.ttype)
+			hlen = 2 + len(file) + len(ttype)
 		elif opcode == OP_ERR:
 			pass
 		return hlen

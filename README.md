@@ -331,7 +331,7 @@ by their respective RFCs/official standards.
 
 **A**:	Try the following workaround to be able to pickle Struct objects:
 ```python
-import copy, copyreg
+import struct, copyreg
 def pickle_struct(s):
 	return struct.Struct, (s.format,)
 

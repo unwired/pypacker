@@ -872,51 +872,6 @@ class Packet(object, metaclass=MetaPacket):
 		"""
 		pass
 
-	def bin_v0(self, update_auto_fields=True):
-		"""
-		Return this header and body (including all upper layers) as byte string
-		and reset changed-status.
-
-		update_auto_fields -- If True auto-update fields like checksums, else leave them be
-		"""
-		#logger.debug(self.__class__)
-		# Update all above already-instantiated layers if *something* has changed
-		if update_auto_fields and self._changed():
-			#logger.debug("Updating due to changes in %r" % str(self.__class__))
-			# Collect layers to be updated:
-			# Iterate update for A.B.C like C->B->A: A needs uptodate B and C,
-			# B needs uptodate C
-			layers = []
-			layer_it = self
-
-			while layer_it is not None:
-				layers.append(layer_it)
-				# Upper layer is not yet dissected but *could* need update.
-				# eg: IP:changed + TCP:notchanged/parsed -> TCP needs update
-				if layer_it._lazy_handler_data is not None:
-					# Next upper layer forces update in layer_it, eg IP->TCP (layer_it)
-					if layer_it._header_cached is None and\
-						layer_it._lazy_handler_data[0].__class__ in layer_it._update_dependants:
-						# Force dissecting
-						layer_it = layer_it.higher_layer
-					else:
-						layer_it = None
-				else:
-					layer_it = layer_it.higher_layer
-
-			# Start from the top
-			layers.reverse()
-
-			for layer in layers:
-				layer._update_fields()
-
-		header_tmp = self._pack_header()
-		bodybytes_tmp = self.body_bytes
-
-		# Now every layer got informed about our status, reset it
-		self._reset_changed()
-		return header_tmp + bodybytes_tmp
-
 	def bin(self, update_auto_fields=True):
 		"""
 		Return this header and body (including all upper layers) as byte string
@@ -980,9 +935,11 @@ class Packet(object, metaclass=MetaPacket):
 			if len(self._tlchanged) > 0:
 				# Update values and formats of tl in this packet
 				# _header_formats: should be already unshared (on/off, dynamic, tl init)
-				# _header_values: will be overwritten by _unpack, but that's ok (should be same value)
+				# _header_values: will be overwritten by _unpack after init,
+				# but that's ok (should be same value)
 				for name in self._tlchanged:
 					tlobj, idx = self._headername_tlobj[name]
+					# tl changed so calling to bin() is needed (instead of just __len__)
 					bts = tlobj.bin()
 					self._header_values[idx] = bts
 					self._header_formats[idx] = "%ds" % len(bts)
