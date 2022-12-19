@@ -66,6 +66,10 @@ class NotEnoughBytesException(Exception):
 	pass
 
 
+class DissectException(Exception):
+	pass
+
+
 class Packet(object, metaclass=MetaPacket):
 	"""
 	Base packet class, with metaclass magic to generate members from self.__hdr__ field.
@@ -200,14 +204,27 @@ class Packet(object, metaclass=MetaPacket):
 		"""
 
 		if args:
-			if len(args) > 1:
-				# Make lower layer accessible for _dissect. This won't change the body
-				self._lower_layer = args[1]
 			# args[0]: bytes or memoryview
 			mview_all = memoryview(args[0])
-			# Any exception will be forwarded (SomePkt(bytes) or lazy dissect)
-			# If this is the lowest layer the Exception has to be caught.
-			hlen_bodyid_bodybts = self._dissect(mview_all)
+
+			if len(args) == 2:
+				# Make lower layer accessible. This won't change the body
+				self._lower_layer = args[1]
+				# An exception on higher layer will lead to body bytes instead of heandler (see _lazy_init_handler)
+				# TODO: Should occur mostly on >layer4 protocols, eg TCP -> splitted packet. Checkout!
+				hlen_bodyid_bodybts = self._dissect(mview_all)
+			else:
+				# This is the lowest layer, handle exception to make it more user friendly
+				try:
+					hlen_bodyid_bodybts = self._dissect(mview_all)
+				except:
+					raise DissectException(
+						"Could not initiate class %r, not enough/wrong bytes given?"
+						" Got %d bytes: %r, std format needs %d" % (
+						self.__class__,
+						len(mview_all), mview_all.tobytes(),
+						self._header_format_cached.size))
+
 			hlen = hlen_bodyid_bodybts if hlen_bodyid_bodybts.__class__ == int else hlen_bodyid_bodybts[0]
 			# Not enough bytes means packet can't be unpacked.
 			# Check this here and not in _dissect() as it's always the same for all dissects.
@@ -1007,7 +1024,7 @@ class Packet(object, metaclass=MetaPacket):
 		self._body_value_changed = False
 		# "header_changed==true" = "_header_cached==None"
 
-	_header_value_changed = property(lambda obj: obj._header_cached == None)
+	_header_value_changed = property(lambda obj: obj._header_cached is None)
 
 	def _add_change_listener(self, listener_cb):
 		"""

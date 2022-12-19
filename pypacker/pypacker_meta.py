@@ -118,7 +118,7 @@ def get_getter(t, header_idx, tl_class=None):
 		Callflows:
 		dissect -> no changes to simple headers -> bin() -> update format and cached header
 		"""
-		if obj._unpacked == None:
+		if obj._unpacked is None:
 			obj_l = [obj]
 
 			# obj._unpacked = None means: dissect not yet finished

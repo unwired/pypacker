@@ -633,7 +633,7 @@ class GeneralTestCase(unittest.TestCase):
 				summary = "%s" % pkt0
 				self.assertEqual(pkt0.bin(), bts)
 
-				# Input = Output (reassembled)
+				# Input = Output (reassembled), caches not yet initated cache
 				bts_l_extracted = []
 				paddings = []
 
@@ -654,6 +654,14 @@ class GeneralTestCase(unittest.TestCase):
 				bts_l_extracted.append(pkt0.highest_layer.body_bytes)
 				bts_l_extracted.extend(paddings)
 				self.assertEqual(b"".join(bts_l_extracted), bts)
+				
+				# Handler not yet initiated, lazy handler data present
+				pkt0 = lowest_layer_clz(bts)
+				
+				for layer in pkt0:
+					if layer._body_bytes is None:
+						self.assertIsNotNone(layer._lazy_handler_data)
+						self.assertFalse(layer._unpacked)
 
 				# Initiate layer after layer and check if unchanged
 				pkt0 = lowest_layer_clz(bts)

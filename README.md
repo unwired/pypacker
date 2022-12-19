@@ -15,49 +15,65 @@ See below examples for what you can do with it.
 If you like this project you can [![Donate with PayPal](https://www.paypalobjects.com/en_US/i/btn/btn_donate_SM.gif)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=M6GGAXJQCUHVC&source=url) via PayPal.
 
 ## What you can do with Pypacker
-Create custom Packets (via keywords) or from raw bytes and change their data:
+Create custom Packets (via keywords) or from raw bytes and access/change their data:
 
 ```python
-from pypacker.layer3.ip import IP
-from pypacker.layer3.icmp import ICMP
+from pypacker.layer3 import ip
+from pypacker.layer3 import icmp
 
 # Packet via keywords
-ip0 = IP(src_s="127.0.0.1", dst_s="192.168.0.1", p=1) +\
-	ICMP(type=8) +\
-	ICMP.Echo(id=123, seq=1, body_bytes=b"foobar")
+ip0 = ip.IP(src_s="127.0.0.1", dst_s="192.168.0.1", p=1) +\
+	icmp.ICMP(type=8) +\
+	icmp.ICMP.Echo(id=123, seq=1, body_bytes=b"foobar")
 
 # Packet from raw bytes. ip1_bts can also be retrieved via ip0.bin()
 ip1_bts = b"E\x00\x00*\x00\x00\x00\x00@\x01;)\x7f\x00\x00\x01\xc0\xa8\x00\x01\x08\x00\xc0?\x00{\x00\x01\x00\x00\x00\x00\x00\x00\x00\x00foobar"
-ip1 = IP(ip1_bts) 
-# Change source IPv4 address
-ip1.src_s = "1.2.3.4"
-# Change ICMP payload
-ip1.highest_layer.body_bytes = b"foobar2"
+ip1 = ip.IP(ip1_bts) 
 
 # Output packet (similar result for ip1)
 print("%s" % ip0)
 layer3.ip.IP
-        v_hl        : 0x45 = 69 = 0b1000101
-        tos         : 0x0 = 0 = 0b0
-        len         : 0x2B = 43 = 0b101011
-        id          : 0x0 = 0 = 0b0
-        off         : 0x0 = 0 = 0b0
-        ttl         : 0x40 = 64 = 0b1000000
-        p           : 0x1 = 1 = 0b1
-        sum         : 0xB623 = 46627 = 0b1011011000100011
-        src         : b'\x01\x02\x03\x04' = 1.2.3.4
-        dst         : b'\xc0\xa8\x00\x01' = 192.168.0.1
-        opts        : []
+        v_hl         (B): 0x45 = 69 = 0b1000101
+        tos          (B): 0x0 = 0 = 0b0
+        len          (H): 0x22 = 34 = 0b100010
+        id           (H): 0x0 = 0 = 0b0
+        frag_off     (H): 0x0 = 0 = 0b0
+        ttl          (B): 0x40 = 64 = 0b1000000
+        p            (B): 0x1 = 1 = 0b1 = IP_PROTO_ICMP
+        sum          (H): 0x3B31 = 15153 = 0b11101100110001
+        src          (4): b'\x7f\x00\x00\x01' = 127.0.0.1
+        dst          (4): b'\xc0\xa8\x00\x01' = 192.168.0.1
+        opts            : []
 layer3.icmp.ICMP
-        type        : 0x8 = 8 = 0b1000
-        code        : 0x0 = 0 = 0b0
-        sum         : 0x8E3F = 36415 = 0b1000111000111111
+        type         (B): 0x8 = 8 = 0b1000 = ICMP_ECHO
+        code         (B): 0x0 = 0 = 0b0
+        sum          (H): 0xC03F = 49215 = 0b1100000000111111
 layer3.icmp.Echo
-        id          : 0x7B = 123 = 0b1111011
-        seq         : 0x1 = 1 = 0b1
-        ts          : 0x0 = 0 = 0b0
-        bodybytes   : b'foobar2'
+        id           (H): 0x7B = 123 = 0b1111011
+        seq          (H): 0x1 = 1 = 0b1
+        bodybytes    (6): b'foobar'
+
+# Access any header fields on any layer
+ip_dst = ip1.dst_s
+icmp_type = ip1.higher_layer.type
+
+# Access layers via advanced filter (e.g. on unknown packet structure)
+ip0_found, icmp0_found, echo0_found = pkt[
+	(None, lambda b: b.__class__ == ip.IP),
+	icmp.ICMP,
+	(icmp.ICMP.Echo, lambda b: b.id == 123)
+]
+
+if echo0_found is not None:
+	print(echo0_found)
+
+# Change source IPv4 address
+ip1.src_s = "1.2.3.4"
+
+# Change ICMP payload
+ip1.highest_layer.body_bytes = b"foobar2"
 ```
+
 
 Read/write packets from/to file (Support only for Wireshark/tcpdump pcap format):
 
@@ -75,16 +91,16 @@ for ts, buf in preader:
 	pkt = ethernet.Ethernet(buf)
 
 	# Filter specific packets
-	eth, ip, tcp, http = pkt[
+	eth0, ip0, tcp0, http0 = pkt[
 		None,
 		(None, lambda b: b.__class__ in [ip.IP, ip6.IP6]),
 		(tcp.TCP, lambda c: c.dport==80),
 		http.HTTP
 	]
 
-	if eth is not None:
-		print(f"{ts}: {ip.src_s}:{tcp.sport} -> {ip.dst_s}:{tcp.dport}")
-		pwriter.write(eth.bin())
+	if eth0 is not None:
+		print(f"{ts}: {ip0.src_s}:{tcp0.sport} -> {ip0.dst_s}:{tcp0.dport}")
+		pwriter.write(eth0.bin())
 
 pwriter.close()
 ```
