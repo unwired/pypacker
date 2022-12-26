@@ -17,8 +17,8 @@ from pypacker.structcbs import pack_mac, unpack_mac, pack_ipv4, unpack_ipv4, unp
 from pypacker.lazydict import LazyDict
 
 logger = logging.getLogger("pypacker")
-logger.setLevel(logging.DEBUG)
-# logger.setLevel(logging.WARNING)
+# logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.WARNING)
 
 
 class NiceFormatter(logging.Formatter):

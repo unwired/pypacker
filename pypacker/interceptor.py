@@ -334,18 +334,13 @@ class Interceptor(object):
 
 			len_recv, data = get_full_payload(nfa, packet_ptr)
 			hw_addr = None
+			packet_hw = get_packet_hw(nfa)
 
-			try:
-				packet_hw = get_packet_hw(nfa)
-
-				if packet_hw:
-					hw_info = packet_hw.contents
-					hw_addrlen = ntohs(hw_info.hw_addrlen)
-					hw_addr = ctypes.string_at(hw_info.hw_addr, size=hw_addrlen)
-			#except:
-			except Exception as ex:
+			if packet_hw:
 				# HW address not always present, eg DHCP discover -> offer...
-				logger.exception(ex)
+				hw_info = packet_hw.contents
+				hw_addrlen = ntohs(hw_info.hw_addrlen)
+				hw_addr = ctypes.string_at(hw_info.hw_addr, size=hw_addrlen)
 
 			if_idx_in = get_indev(nfa)
 			if_idx_out = get_outdev(nfa)
@@ -405,9 +400,10 @@ class Interceptor(object):
 
 	def start(self, verdict_callback, queue_ids, ctx=None):
 		"""
-		verdict_callback -- callback with this signature: callback(data, ctx): data, verdict
-		queue_id -- id of the que placed using iptables
-		ctx -- context object given to verdict callback
+		verdict_callback -- Signature: callback(hw_addr, linklayer_protoid, data, ctx, if_idx_in, if_idx_out): data, [NF_*]
+			Interface index to name via: socket.if_indextoname(if_idx_in)
+		queue_id --Que Ids placed using iptables/nftables like [id1, ...]
+		ctx -- Context object given to verdict callback
 		"""
 		if self._is_running:
 			return
@@ -434,7 +430,7 @@ class Interceptor(object):
 				destroy_queue(qconfig.queue)
 				close_queue(qconfig.nfq_handle)
 				qconfig.nfq_socket.close()
-				# logger.debug("joining verdict thread for queue %d", qconfig.queue_id)
+				logger.debug("Joining verdict thread for queue %d", qconfig.queue_id)
 				qconfig.verdictthread.join()
 			except:
 				# Don't mind, we can't do anything if something goes wrong here
