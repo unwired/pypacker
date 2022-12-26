@@ -1,3 +1,6 @@
+# Copyright 2013, Michael Stahn
+# Use of this source code is governed by a GPLv2-style license that can be
+# found in the LICENSE file.
 """
 Message Queuing Telemetry Transport (MQTT)
 https://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html

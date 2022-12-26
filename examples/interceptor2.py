@@ -1,3 +1,6 @@
+# Copyright 2013, Michael Stahn
+# Use of this source code is governed by a GPLv2-style license that can be
+# found in the LICENSE file.
 """
 Interceptor example via nftables
 
@@ -37,6 +40,7 @@ id_class = {
 
 
 def verdict_cb(hwaddr, ll_proto_id, data, ctx, if_idx_in, if_idx_out, *args):
+	print("verdict_cb...")
 	clz = id_class.get(ll_proto_id, None)
 	if_in, if_out = "", ""
 
@@ -50,16 +54,20 @@ def verdict_cb(hwaddr, ll_proto_id, data, ctx, if_idx_in, if_idx_out, *args):
 
 	if clz is not None:
 		pkt = clz(data)
+
+		layer_names = "->".join([layer.__class__.__name__ for layer in pkt])
+
 		if hwaddr is not None:
 			hwaddr = mac_bytes_to_str(hwaddr)
-		print("Got a packet: %s (hwaddr: %s, in: %s, out: %s)" % (
-			pkt.__class__.__name__, hwaddr, if_in, if_out))
+		print("Got a packet: %s (hwaddr: %s, in: %s, out: %s), layer: %s" % (
+			pkt.__class__.__name__, hwaddr, if_in, if_out, layer_names))
+		print(pkt)
 	else:
 		print("Unknown NW layer proto: %X" % ll_proto_id)
 
 	return data, interceptor.NF_ACCEPT
 
-
+print("Starting interceptor")
 ictor = interceptor.Interceptor()
 ictor.start(verdict_cb, queue_ids=[0, 1, 2, 3])
 

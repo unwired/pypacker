@@ -1,3 +1,6 @@
+# Copyright 2013, Michael Stahn
+# Use of this source code is governed by a GPLv2-style license that can be
+# found in the LICENSE file.
 """
 This script aims to find bugs by parsing arbitrary packets.
 Packets leading to errors will be dumped to file for later analyzis.

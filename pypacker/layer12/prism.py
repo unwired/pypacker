@@ -1,3 +1,6 @@
+# Copyright 2013, Michael Stahn
+# Use of this source code is governed by a GPLv2-style license that can be
+# found in the LICENSE file.
 """
 Prism header.
 This packet type exists just for convenience. Radiotap should be prefered over prism

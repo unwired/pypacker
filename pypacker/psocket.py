@@ -1,3 +1,6 @@
+# Copyright 2013, Michael Stahn
+# Use of this source code is governed by a GPLv2-style license that can be
+# found in the LICENSE file.
 """
 Simple socket wrapper for reading/writing on layer 2.
 For all other use cases standard python sockets

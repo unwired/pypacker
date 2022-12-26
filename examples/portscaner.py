@@ -1,3 +1,6 @@
+# Copyright 2013, Michael Stahn
+# Use of this source code is governed by a GPLv2-style license that can be
+# found in the LICENSE file.
 """
 Very simple TCP port scanner. Better use something like masscan or nmap for
 more performance/features :D

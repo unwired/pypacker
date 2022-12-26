@@ -1,3 +1,6 @@
+# Copyright 2013, Michael Stahn
+# Use of this source code is governed by a GPLv2-style license that can be
+# found in the LICENSE file.
 """
 Packet read and write routines for pcap format.
 See http://wiki.wireshark.org/Development/LibpcapFileFormat

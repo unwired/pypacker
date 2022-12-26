@@ -1,3 +1,6 @@
+# Copyright 2013, Michael Stahn
+# Use of this source code is governed by a GPLv2-style license that can be
+# found in the LICENSE file.
 """
 Simple packet creation and parsing logic.
 """
@@ -14,8 +17,8 @@ from pypacker.structcbs import pack_mac, unpack_mac, pack_ipv4, unpack_ipv4, unp
 from pypacker.lazydict import LazyDict
 
 logger = logging.getLogger("pypacker")
-# logger.setLevel(logging.DEBUG)
-logger.setLevel(logging.WARNING)
+logger.setLevel(logging.DEBUG)
+# logger.setLevel(logging.WARNING)
 
 
 class NiceFormatter(logging.Formatter):
@@ -219,7 +222,7 @@ class Packet(object, metaclass=MetaPacket):
 					hlen_bodyid_bodybts = self._dissect(mview_all)
 				except:
 					raise DissectException(
-						"Could not initiate class %r, not enough/wrong bytes given?"
+						"Could not initiate packet %r, not enough/wrong bytes given?"
 						" Got %d bytes: %r, std format needs %d" % (
 						self.__class__,
 						len(mview_all), mview_all.tobytes(),

@@ -1,3 +1,6 @@
+# Copyright 2013, Michael Stahn
+# Use of this source code is governed by a GPLv2-style license that can be
+# found in the LICENSE file.
 """
 Example definition of a new protocol called "NewProtocol" (RFC -1).
 New modules are placed into to appropriate layerXYZ-directory.

@@ -1,3 +1,6 @@
+# Copyright 2013, Michael Stahn
+# Use of this source code is governed by a GPLv2-style license that can be
+# found in the LICENSE file.
 """
 Packet interceptor using NFQueue
 
@@ -258,7 +261,12 @@ class Interceptor(object):
 	"""
 	Packet interceptor. Allows MITM and filtering.
 	Example config for iptables:
-	iptables -I INPUT 1 -p icmp -j NFQUEUE --queue-balance 0:2
+	$ iptables -I INPUT 1 -p icmp -j NFQUEUE --queue-balance 0:2
+	Alternatively add nftables rule:
+	$ nft add table inet pptable
+	$ nft add chain inet pptable filter { type filter hook input priority 0 \; policy accept\; }
+	$ nft add rule inet pptable filter counter queue num 0-2
+
 	"""
 	QueueConfig = namedtuple("QueueConfig",
 		["queue", "queue_id", "nfq_handle", "nfq_socket", "verdictthread", "handler"])
@@ -279,25 +287,34 @@ class Interceptor(object):
 		self._rcvbufsiz = rcvbufsiz
 
 	@staticmethod
-	def verdict_trigger_cycler(recv, nfq_handle, obj):
+	def verdict_trigger_cycler(recv_into, nfq_handle, obj):
+		# Max IP packet size = 65535 bytes
+		BUFSIZE = 70000
+		rw_buffer = bytearray(BUFSIZE)
+		rw_buffer_mview = memoryview(rw_buffer)
+
+		rw_buffer_ctype = ctypes.c_char * BUFSIZE
+		# Std python/ctype shared buffer
+		rw_buffer_ctype_shared = rw_buffer_ctype.from_buffer(rw_buffer)
+
 		try:
 			while obj._is_running:
-				# TODO: exception in outer loop?
+				bts_cnt = 0
+				# Shouldn't add much overhead if there is no Exception
 				try:
-					# Max IP packet size = 65535 bytes
-					# TODO: use recvmsg_into()?
-					bts = recv(65535)
+					bts_cnt = recv_into(rw_buffer_mview)
 				except socket_timeout:
+					#logger.debug("Socket timeout...")
 					continue
 				except OSError as e:
 					# Ignore ENOBUFS errors, we can't handle this anyway
 					# Alternative is to set NETLINK_NO_ENOBUFS socket option
 					if e.errno == errno.ENOBUFS:
-						#logger.debug("Droppin' a packet, consider increasing receive buffer")
+						logger.warning("Droppin' a packet, consider increasing receive buffer")
 						continue
 					raise e
 
-				handle_packet(nfq_handle, bts, len(bts))
+				handle_packet(nfq_handle, rw_buffer_ctype_shared, bts_cnt)
 		except OSError:
 			# Eg "Bad file descriptor": started and nothing read yet
 			#logger.error(ex)
@@ -311,22 +328,24 @@ class Interceptor(object):
 	def _setup_queue(self, queue_id, ctx, verdict_callback):
 		def verdict_callback_ind(queue_handle, nfmsg, nfa, _data):
 			packet_ptr = ctypes.c_void_p(0)
-
-			# logger.debug("verdict cb for queue %d", queue_id)
 			pkg_hdr = get_msg_packet_hdr(nfa)
 			packet_id = ntohl(pkg_hdr.contents.packet_id)
 			linklayer_protoid = htons(pkg_hdr.contents.hw_protocol)
 
 			len_recv, data = get_full_payload(nfa, packet_ptr)
+			hw_addr = None
 
 			try:
-				# TODO: avoid exception, check for hw_addrlen?
-				hw_info = get_packet_hw(nfa).contents
-				hw_addrlen = ntohs(hw_info.hw_addrlen)
-				hw_addr = ctypes.string_at(hw_info.hw_addr, size=hw_addrlen)
-			except:
-				# hw address not always present, eg DHCP discover -> offer...
-				hw_addr = None
+				packet_hw = get_packet_hw(nfa)
+
+				if packet_hw:
+					hw_info = packet_hw.contents
+					hw_addrlen = ntohs(hw_info.hw_addrlen)
+					hw_addr = ctypes.string_at(hw_info.hw_addr, size=hw_addrlen)
+			#except:
+			except Exception as ex:
+				# HW address not always present, eg DHCP discover -> offer...
+				logger.exception(ex)
 
 			if_idx_in = get_indev(nfa)
 			if_idx_out = get_outdev(nfa)
@@ -348,6 +367,7 @@ class Interceptor(object):
 
 		c_handler = HANDLER(verdict_callback_ind)
 		queue = create_queue(nfq_handle, queue_id, c_handler, None)  # 1
+
 		if not queue:
 			raise UnableToBindException(queue_id)
 
@@ -367,34 +387,30 @@ class Interceptor(object):
 			ret = nfnl_rcvbufsiz(nf, self._rcvbufsiz)
 			#logger.debug("Update rcvbufsiz: %d", ret)
 
-		# TODO: better solution to check for running state? close socket and raise exception does not work in stop()
+		# TODO: Better solution to check for running state? Close socket and raise exception does not work in stop()
 		nfq_socket.settimeout(1)
 
 		thread = threading.Thread(
 			target=Interceptor.verdict_trigger_cycler,
-			args=[nfq_socket.recv, nfq_handle, self]
+			args=[nfq_socket.recv_into, nfq_handle, self]
 		)
 
 		thread.start()
 
 		qconfig = Interceptor.QueueConfig(
-			queue=queue, queue_id=queue_id, nfq_handle=nfq_handle, nfq_socket=nfq_socket,
-			verdictthread=thread, handler=c_handler
+			queue=queue, queue_id=queue_id, nfq_handle=nfq_handle, nfq_socket=nfq_socket, verdictthread=thread,
+			handler=c_handler
 		)
 		self._netfilterqueue_configs.append(qconfig)
 
 	def start(self, verdict_callback, queue_ids, ctx=None):
 		"""
-		verdict_callback -- callback with this signature:
-			callback(data, ctx): data, verdict
+		verdict_callback -- callback with this signature: callback(data, ctx): data, verdict
 		queue_id -- id of the que placed using iptables
 		ctx -- context object given to verdict callback
 		"""
 		if self._is_running:
 			return
-
-		if queue_ids is None:
-			queue_ids = []
 
 		self._is_running = True
 
