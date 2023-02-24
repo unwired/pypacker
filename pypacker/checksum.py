@@ -8,6 +8,9 @@ import array
 import socket
 import logging
 import sys
+import ctypes
+from ctypes import util as ctypes_util
+import os
 
 from pypacker.structcbs import unpack_H_le, unpack_H
 
@@ -41,16 +44,35 @@ def in_cksum_add(s, buf):
 
 def in_cksum_done(s):
 	"""Complete checksum building."""
-	# add carry to sum itself
+	# Add carry to sum itself
 	s = (s >> 16) + (s & 0xFFFF)
 	s += (s >> 16)
-	# return complement of sums
+	# Return complement of sums
 	return ntohs((~s) & 0xFFFF)
 
 
-def in_cksum(buf):
-	"""Return computed Internet Protocol checksum."""
-	return in_cksum_done(in_cksum_add(0, buf))
+try:
+	#DIR_CHECKSUMPY = os.path.dirname(os.path.realpath(__file__))
+	CHECKSUM_NATIVE_LIB_NAME = "checksum_native"
+	print(ctypes_util.find_library(CHECKSUM_NATIVE_LIB_NAME))
+	logger.debug("Trying to load c based checksum implementation %s" % CHECKSUM_NATIVE_LIB_NAME)
+	#chksumlib = ctypes.cdll.LoadLibrary(DIR_CHECKSUMPY + "/checksum_native.so")
+	chksumlib = ctypes.cdll.LoadLibrary(CHECKSUM_NATIVE_LIB_NAME)
+
+	in_chksum_c = chksumlib.in_chksum
+	in_chksum_c.restype = ctypes.c_uint32
+	in_chksum_c.argtypes = ctypes.POINTER(ctypes.c_char), ctypes.c_uint32
+
+	def in_cksum(bts):
+		return in_chksum_c(bts, len(bts))
+#except Exception as ex:
+except:
+	logger.debug("Using Python checksum implementation")
+
+	# Python implementation
+	def in_cksum(bts):
+		"""Return computed Internet Protocol checksum."""
+		return in_cksum_done(in_cksum_add(0, bts))
 
 
 # CRC-32C Checksum

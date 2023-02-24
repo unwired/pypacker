@@ -1,12 +1,18 @@
 #!/usr/bin/env python
 
 try:
-	from setuptools import setup
+	from setuptools import setup, Extension
 except ImportError:
-	from distutils.core import setup
+	from distutils.core import setup, Extension
 
+"""
+module_checksum_native = Extension("checksum_native",
+	define_macros = [("MAJOR_VERSION", "1"), ("MINOR_VERSION", "0")],
+	sources = ["checksum_native.c"]
+)
+"""
 setup(name="pypacker",
-	version="5.2",
+	version="5.3",
 	author="Michael Stahn",
 	author_email="michael.stahn.42@gmail.com",
 	url="https://gitlab.com/mike01/pypacker",
@@ -40,5 +46,6 @@ setup(name="pypacker",
 	#install_requires=[
 	#	"netifaces",
 	#],
+	#ext_modules=[module_checksum_native],
 	python_requires=">=3.3"
 )

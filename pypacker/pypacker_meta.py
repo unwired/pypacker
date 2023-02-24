@@ -89,7 +89,7 @@ def get_setter(t, header_idx, header_format_original, is_field_type_simple, is_f
 		obj._notify_changelistener()
 
 	def setfield_triggerlist(obj, value):
-		# Triggerlist assigning is the same as appending
+		# Triggerlist assigning is the same as extending
 		headername = t._headerfield_names[header_idx]
 		# This will trigger init if not already done
 		tl = obj.__getattribute__(headername)

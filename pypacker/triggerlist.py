@@ -48,11 +48,12 @@ class TriggerList(list):
 
 		try:
 			initial_list_content = self._dissect_callback(self._cached_bin)
-		except:
-			#except Exception as ex:
+		#except:
+		except Exception as ex:
 			# If anything goes wrong: raw bytes will be accessible in any case
 			#logger.debug("Failed to dissect in TL")
 			#logger.exception(ex)
+
 			if type(self._cached_bin) == memoryview:
 				self._cached_bin = self._cached_bin.tobytes()
 
@@ -78,8 +79,10 @@ class TriggerList(list):
 					if needle(value):
 						idx_value.append((idx, value))
 				except:
+				#except Exception as ex:
 					# Don't care. Note: gets inperformant if too many exceptions
 					pass
+					#logger.exception(ex)
 			return idx_value
 
 	def __iadd__(self, v):
@@ -274,10 +277,11 @@ class TriggerList(list):
 			return "[" + ", ".join(tl_descr_l) + "]"
 		else:
 			# Multiline output
-			final_descr = ["(see below)\n" + "-" * 10 + "\n"]
+			# TODO: deeper output = more ">"
+			final_descr = ["(see below)\n" + ">" * 10 + "\n"]
 
 			for idx, val in enumerate(tl_descr_l):
 				idx_descr = "[%d]" % idx
 				final_descr.append("-> %s:\n%s\n" % (idx_descr, val))
-			final_descr.append("-" * 10)
+			final_descr.append("<" * 10)
 			return "".join(final_descr)

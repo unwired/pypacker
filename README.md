@@ -12,7 +12,7 @@
 This is Pypacker: The fastest and simplest low-level packet manipulation library for Python.
 See below examples for what you can do with it.
 
-If you like this project you can [![Donate with PayPal](https://www.paypalobjects.com/en_US/i/btn/btn_donate_SM.gif)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=M6GGAXJQCUHVC&source=url) via PayPal.
+If you want to support this project you can [![Donate with PayPal](https://www.paypalobjects.com/en_US/i/btn/btn_donate_SM.gif)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=M6GGAXJQCUHVC&source=url) via PayPal.
 
 ## What you can do with Pypacker
 Create custom Packets (via keywords) or from raw bytes and access/change their data:

@@ -21,7 +21,7 @@ from pypacker.layer12 import aoe, arp, btle, can, dtp, ethernet, ieee80211, lacp
 	flow_control, lldp, slac
 from pypacker.layer3 import ip, ip6, ipx, icmp, igmp, ospf, pim
 from pypacker.layer4 import tcp, udp, ssl, sctp
-from pypacker.layer567 import bgp, diameter, dhcp, dns, der, hsrp, http, mqtt, ntp, pmap, radius, rip, rtp, someip,\
+from pypacker.layer567 import bgp, diameter, dhcp, dns, der, hsrp, http, ipp, mqtt, ntp, pmap, radius, rip, rtp, someip,\
 	telnet, tpkt
 
 DIR_CURRENT = os.path.dirname(os.path.realpath(__file__)) + "/"
@@ -603,7 +603,7 @@ class GeneralTestCase(unittest.TestCase):
 			if accept:
 				cnt[0] += 1
 			return accept
-			
+
 		ppcap.merge_pcaps(pcap_files_in, pcap_file_out, filter_accept)
 		merged_bts = ppcap.Reader(filename=pcap_file_out).read()
 		self.assertTrue(len(merged_bts), cnt[0])
@@ -628,8 +628,8 @@ class GeneralTestCase(unittest.TestCase):
 
 			for idx, bts in enumerate(bts_l):
 				pkt_num = idx + 1
-				print("%d " % pkt_num, end="")
-				sys.stdout.flush()
+				#print("%d " % pkt_num, end="")
+				#sys.stdout.flush()
 
 				# Input = Output
 				pkt0 = lowest_layer_clz(bts)
@@ -657,10 +657,10 @@ class GeneralTestCase(unittest.TestCase):
 				bts_l_extracted.append(pkt0.highest_layer.body_bytes)
 				bts_l_extracted.extend(paddings)
 				self.assertEqual(b"".join(bts_l_extracted), bts)
-				
+
 				# Handler not yet initiated, lazy handler data present
 				pkt0 = lowest_layer_clz(bts)
-				
+
 				for layer in pkt0:
 					if layer._body_bytes is None:
 						self.assertIsNotNone(layer._lazy_handler_data)
@@ -672,7 +672,6 @@ class GeneralTestCase(unittest.TestCase):
 				for layer in pkt0:
 					self.assertFalse(layer._changed())
 
-			print()
 
 class LazydictTestCase(unittest.TestCase):
 	def test_dict(self):
@@ -1336,6 +1335,90 @@ class HTTPTestCase(unittest.TestCase):
 		pkt_tcp = pkt_ip.higher_layer
 		pkt_http = pkt_tcp.higher_layer
 
+	def test_update_contentlength(self):
+		body_bytes = b"0123456789"
+		hdrname = b"Content-Length"
+		http0_bts = b"POST / HTTP/1.1\r\nContent-Length: 123\r\nHeader2: value2\r\n\r\n" + body_bytes
+		http0 = http.HTTP(http0_bts)
+		print(http0)
+		self.assertEqual(http0.bin(), http0_bts)
+		# First finding -> value -> header name
+		self.assertEqual(http0.hdr[lambda h: h[0] == hdrname][0][1][1], b"123")
+		http0.update_content_length()
+		self.assertEqual(http0.hdr[lambda h: h[0] == hdrname][0][1][1], ("%d" % len(body_bytes)).encode())
+		http0.update_content_length(newlen=1)
+		self.assertEqual(http0.hdr[lambda h: h[0] == hdrname][0][1][1], b"1")
+
+
+
+class IPPTestCase(unittest.TestCase):
+	def test_IPP(self):
+		print_header("IPP")
+		packet_bytes = get_pcap(DIR_CURRENT + "/ipp_request.pcap")
+
+		print(">>> Request")
+		tcp_requests = []
+
+		for bts in packet_bytes:
+			eth0 = ethernet.Ethernet(bts)
+			eth0, ip0, tcp0 = eth0[
+				None,
+				None,
+				(tcp.TCP, lambda pkt: pkt.dport==631)
+			]
+
+			if tcp0 is not None:
+				tcp_requests.append(tcp0)
+				#print(tcp0)
+
+		# Should only be 2 packets
+		self.assertEqual(len(tcp_requests), 2)
+		# Assume TCP is in order
+		http0_bts = tcp_requests[0].body_bytes + tcp_requests[1].body_bytes
+		http0 = http.HTTP(http0_bts)
+		#print(http0)
+		ipp0 = ipp.IPPRequest(http0.body_bytes)
+		#print(ipp0)
+		self.assertEqual(len(ipp0.op_attr), 4)
+		self.assertEqual(len(ipp0.op_attr[0].parameter), 1)
+		self.assertEqual(len(ipp0.op_attr[3].parameter), 2)
+
+
+		"""
+		print(">>> Response")
+		# TODO: use def ra_collect(self, pkt_list), ra_bin()
+		tcp_bts = []
+
+		for bts in packet_bytes:
+			eth0 = ethernet.Ethernet(bts)
+			eth0, ip0, tcp0 = eth0[
+				None,
+				None,
+				(tcp.TCP, lambda pkt: pkt.sport==631)
+			]
+
+			if tcp0 is not None:
+				tcp_bts.append(tcp0.body_bytes)
+				#print(tcp0)
+
+		http1_bts = b"".join(tcp_bts)
+		http1 = http.HTTP(http1_bts)
+		http1_bts = http1.chunked
+		#print(http1_bts)
+		ipp1 = ipp.IPPResponse(http1_bts)
+		#print(len(ipp1.op_attr))
+		self.assertEqual(len(ipp1.op_attr), 2)
+		self.assertEqual(len(ipp1.printer_attr), 3697)
+		#print(ipp1)
+		#print(ipp1.printer_attr[28])
+
+		pjl_attrs = ipp1.printer_attr[
+			lambda pattr: len(pattr.parameter[
+				lambda tnc: b"JPEG" in tnc.body_bytes
+			]) != 0
+		]
+		self.assertEqual(len(pjl_attrs), 2)
+		"""
 
 class AccessConcatTestCase(unittest.TestCase):
 	def test_concat(self):

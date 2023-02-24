@@ -521,7 +521,8 @@ class Packet(object, metaclass=MetaPacket):
 	def __getitem__(self, pkt_clzs):
 		"""
 		Check every layer upwards (inclusive this layer) for the given criteria
-		and return the matched layers. Example:
+		and return the matched layers. Stops searching as soon as a layer doesn't match
+		or end of needle/haystack reached. Example:
 
 		a, b, c, d = pkt[
 			(A, lambda a: a.src="123"), # Type A and filter must match
@@ -536,7 +537,7 @@ class Packet(object, metaclass=MetaPacket):
 		is not known a priori).
 
 		pkt_clzs -- Packet classes to search for. Optional lambdas can be used for filtering each layer.
-		return -- All matching layers like ret=[a, b, None, d]
+		return -- All matching layers like ret=[a, b, None, None]
 			with len(ret) == len(len(input_list))
 		"""
 		#logger.debug(self.__class__)
@@ -573,8 +574,8 @@ class Packet(object, metaclass=MetaPacket):
 
 				layers.append(p_instance if gotmatch else None)
 
-				# Highest layer reached (no more layers or end of needle reached)
-				if p_instance.higher_layer is None or len(layers) == pkt_clzs_len:
+				# No match or highest layer reached (no more layers or end of needle reached)
+				if not gotmatch or p_instance.higher_layer is None or len(layers) == pkt_clzs_len:
 					break
 				# End of match sequence in pkt_clzs not reached, go higher
 				#logger.debug(p_instance.__class__)
@@ -746,7 +747,7 @@ class Packet(object, metaclass=MetaPacket):
 		if self.higher_layer is None:
 			# No upper layer present: describe body bytes
 			bts_cnt = "(%d)" % len(self.body_bytes)
-			layer_sums_l.append("%-9s %6s: " % ("bodybytes", bts_cnt) + "%s" % self.body_bytes)
+			layer_sums_l.append("%-9s %6s: " % ("body_bytes", bts_cnt) + "%s" % self.body_bytes)
 
 		layer_sums = "%s\n\t%s" % (
 			self.__module__[9:] + "." + self.__class__.__name__,
