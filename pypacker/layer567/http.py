@@ -37,7 +37,7 @@ PROG_SPLIT_HEADER_SPLIT		= PROG_SPLIT_HEADER.split
 PROG_SPLIT_KEYVAL		= re.compile(b": ")
 PROG_SPLIT_KEYVAL_SPLIT		= PROG_SPLIT_KEYVAL.split
 
-PROG_CHUNKSTART_HEADER_d_CRNL	= re.compile(b"^(\w+)\r\n")
+PROG_CHUNKSTART_HEADER_d_CRNL	= re.compile(rb"^(\w+)\r\n")
 
 HTTP_PROTO_IPP_REQ	= b"ipp_req"  # Via HTTP request
 HTTP_PROTO_IPP_RESP	= b"ipp_resp"  # Via HTTP response

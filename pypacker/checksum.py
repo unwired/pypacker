@@ -54,8 +54,8 @@ def in_cksum_done(s):
 try:
 	#DIR_CHECKSUMPY = os.path.dirname(os.path.realpath(__file__))
 	CHECKSUM_NATIVE_LIB_NAME = "checksum_native"
-	print(ctypes_util.find_library(CHECKSUM_NATIVE_LIB_NAME))
 	logger.debug("Trying to load c based checksum implementation %s" % CHECKSUM_NATIVE_LIB_NAME)
+	logger.debug(ctypes_util.find_library(CHECKSUM_NATIVE_LIB_NAME))
 	#chksumlib = ctypes.cdll.LoadLibrary(DIR_CHECKSUMPY + "/checksum_native.so")
 	chksumlib = ctypes.cdll.LoadLibrary(CHECKSUM_NATIVE_LIB_NAME)
 

@@ -162,16 +162,19 @@ class Ethernet(pypacker.Packet):
 
 		# Handle ethernet-padding: remove it but save for later use.
 		# Don't use headers for this because this is a rare situation.
-		dlen = len(buf) - hlen  # data length [+ padding?]
+		dlen = len(buf) - hlen  # data length, "may" include padding
 
-		# Assume padding only present if len(higher_layer.bin()) <= 46 (payload, w/o ethernet header/crc)
-		if dlen < 46:
+		# Ethernet packets with less than the minimum 64 bytes (header + all upper layer data + FCS) are padded to 64 bytes.
+		# Ethernet won't give us the real data vs. padding length so assume everything at "the border" of 60 bytes is padded
+		# and check this by analyzing the higher layer data-ength info.
+		# Note: creates unneeded checks if there is no padding (total data length is 60 "by accident").
+		if len(buf) <= 60:
 			try:
 				# This will only work on complete headers: Ethernet + IP + ...
 				# Handle padding using IPv4, IPv6 etc (min size "eth + ..." = 60 bytes)
 				#logger.debug("Checking for padding, dlen: %d < 46" % dlen)
 				if eth_type == ETH_TYPE_IP:
-					#logger.debug("ETH_TYPE_IP")
+					#logger.debug("Padding: ETH_TYPE_IP")
 					dlen_ip = unpack_H(buf[hlen + 2: hlen + 4])[0]  # Real data length
 
 					if dlen_ip < dlen:
@@ -183,8 +186,8 @@ class Ethernet(pypacker.Packet):
 				# IPv6 is a piece of sh$§! payloadlength (in header) = exclusive standard header
 				# but INCLUSIVE options!
 				elif eth_type == ETH_TYPE_IP6:
-					#logger.debug("ETH_TYPE_IP6")
-					dlen_ip = unpack_H(buf[hlen + 4: hlen + 6])[0]  # real data length
+					#logger.debug("Padding: ETH_TYPE_IP6")
+					dlen_ip = unpack_H(buf[hlen + 4: hlen + 6])[0]  # Real data length
 					# logger.debug("eth.hlen=%d, data length based on header: %d" % (hlen, dlen_ip))
 
 					if 40 + dlen_ip < dlen:
@@ -193,13 +196,13 @@ class Ethernet(pypacker.Packet):
 						#logger.debug("Got padding for IPv6: %r" % self._padding)
 						dlen = 40 + dlen_ip
 				elif eth_type == ETH_TYPE_LLDP:
-					#logger.debug("ETH_TYPE_LLDP")
+					#logger.debug("Padding: ETH_TYPE_LLDP")
 					# This is a bit redundant as we re-parse TLV when accessing the LLDP layer
 					dlen_lldp, _ = lldp.count_and_dissect_tlvs(buf[hlen:], onlylen=True)
 					self._padding = buf[hlen + dlen_lldp:].tobytes()
 					dlen = dlen_lldp
 				elif eth_type == ETH_TYPE_SP:
-					#logger.debug("ETH_TYPE_SP")
+					#logger.debug("Padding: ETH_TYPE_SP")
 					lacppdu_len = 110
 					self._padding = buf[hlen + lacppdu_len:].tobytes()
 					dlen = lacppdu_len
@@ -227,7 +230,7 @@ class Ethernet(pypacker.Packet):
 			# Consider packet to itself: can be DIR_REV
 			return pypacker.Packet.DIR_SAME | pypacker.Packet.DIR_REV
 		if (self.dst == other.src and self.src == other.dst) or\
-			(self.dst == b"\xff\xff\xff\xff\xff\xff" and other.dst == self.src):		# broadcast
+			(self.dst == b"\xff\xff\xff\xff\xff\xff" and other.dst == self.src):  # broadcast
 			return pypacker.Packet.DIR_REV
 		return pypacker.Packet.DIR_UNKNOWN
 

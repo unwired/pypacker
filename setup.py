@@ -12,7 +12,7 @@ module_checksum_native = Extension("checksum_native",
 )
 """
 setup(name="pypacker",
-	version="5.3",
+	version="5.4",
 	author="Michael Stahn",
 	author_email="michael.stahn.42@gmail.com",
 	url="https://gitlab.com/mike01/pypacker",

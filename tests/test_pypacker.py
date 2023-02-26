@@ -488,7 +488,7 @@ class GeneralTestCase(unittest.TestCase):
 		# No match on end
 		_, _, _, pkt1_none = pkt0[ethernet.Ethernet, ip.IP, tcp.TCP, telnet.Telnet]
 		self.assertEqual(pkt1_none, None)
-	
+
 	def test_multivalue_getitem_1(self):
 		print_header("Multi type __getitem__ 1")
 		pkt0 = ethernet.Ethernet(dst_s="00:11:22:33:44:55") + ip.IP(src_s="12.34.56.78") + udp.UDP(dport=80)
@@ -499,7 +499,7 @@ class GeneralTestCase(unittest.TestCase):
 			(tcp.TCP, lambda c: c.dport==80),
 			(None, lambda p: True)
 		]
-		
+
 		self.assertEqual(eth0.__class__, ethernet.Ethernet)
 		self.assertEqual(ip0.__class__, ip.IP)
 		self.assertIsNone(tcp0)
@@ -810,6 +810,19 @@ class EthTestCase(unittest.TestCase):
 		self.assertEqual(eth1.vlan[1].cfi, 0)
 		self.assertEqual(eth1.vlan[1].vid, 1)
 		self.assertEqual(type(eth1.higher_layer), ip.IP)
+
+	def test_padding(self):
+		print_header("Ethernet padding")
+		sample_packet = b"\xff\xff\xff\xff\xff\xff\x00\x11\"3DU\x08\x00E\x00\x00*\x00\x00\x00"\
+				b"\x00@\x11j\xb0\x01\x02\x03\x04\x05\x06\x07\x08\x04\xd2\x16.\x00\x16"\
+				b"\xcd\xa7\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x00"\
+				b"\x00\x00\x00"
+		eth0 = ethernet.Ethernet(sample_packet)
+		print(eth0)
+		print(len(eth0))
+		ip0 = eth0.upper_layer
+		self.assertEqual(ip0.len, 42)
+		self.assertEqual(len(ip0.header_bytes) + len(ip0.body_bytes), 42)
 
 
 class AOETestCase(unittest.TestCase):

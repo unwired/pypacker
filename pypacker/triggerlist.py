@@ -48,8 +48,8 @@ class TriggerList(list):
 
 		try:
 			initial_list_content = self._dissect_callback(self._cached_bin)
-		#except:
-		except Exception as ex:
+		except:
+			#except Exception as ex:
 			# If anything goes wrong: raw bytes will be accessible in any case
 			#logger.debug("Failed to dissect in TL")
 			#logger.exception(ex)
@@ -79,7 +79,7 @@ class TriggerList(list):
 					if needle(value):
 						idx_value.append((idx, value))
 				except:
-				#except Exception as ex:
+					#except Exception as ex:
 					# Don't care. Note: gets inperformant if too many exceptions
 					pass
 					#logger.exception(ex)

@@ -224,9 +224,10 @@ class Packet(object, metaclass=MetaPacket):
 					raise DissectException(
 						"Could not initiate packet %r, not enough/wrong bytes given?"
 						" Got %d bytes: %r, std format needs %d" % (
-						self.__class__,
-						len(mview_all), mview_all.tobytes(),
-						self._header_format_cached.size))
+							self.__class__,
+							len(mview_all), mview_all.tobytes(),
+							self._header_format_cached.size)
+					)
 
 			hlen = hlen_bodyid_bodybts if hlen_bodyid_bodybts.__class__ == int else hlen_bodyid_bodybts[0]
 			# Not enough bytes means packet can't be unpacked.
@@ -538,7 +539,7 @@ class Packet(object, metaclass=MetaPacket):
 
 		pkt_clzs -- Packet classes to search for. Optional lambdas can be used for filtering each layer.
 		return -- All matching layers like ret=[a, b, None, None]
-			with len(ret) == len(len(input_list))
+			with len(ret) == len(input_list)
 		"""
 		#logger.debug(self.__class__)
 		p_instance = self

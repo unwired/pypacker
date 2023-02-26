@@ -1,11 +1,11 @@
 [pep8]
 # E101: autoformat on pycharm creates spaces
 ignore = W191,E128,E223,E265,E101,E731,E721
-max-line-length = 120
+max-line-length = 125
 [flake8]
 indent-string=\t
 ignore = W191,E128,E223,E265,F403,E722,F405,E305,F401,F821,E731,E117,W504,E721,F723
-max-line-length = 120
+max-line-length = 125
 [pylint]
 [FORMAT]
 indent-string=\t
