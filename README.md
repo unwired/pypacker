@@ -123,11 +123,13 @@ Send/receive layer 2 (and higher)  packets:
 ```python
 from pypacker import psocket
 from pypacker.layer12 import ethernet
+from pypacker.layer3 import ip
+from pypacker.layer4 import tcp
 
 psock = psocket.SocketHndl(timeout=10)
 
 def filter_pkt(pkt):
-	return pkt.ip.tcp.sport == 80
+	return pkt[None, ip.IP, (tcp.TCP, lambda p: p.sport == 80)][2] is not None
 
 # Receive raw bytes
 for raw_bytes in psock:

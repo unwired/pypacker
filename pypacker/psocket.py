@@ -265,12 +265,15 @@ for _sock in [sock_server, sock_client]:
 """
 # ncat 127.0.0.1 80 -u
 # Needs to be re-recreated for every new client
-def get_udpsock():
+def get_udpsock(port):
 	udpsock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # IPv6: AF_INET6
 	udpsock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-	udpsock.setsockopt(socket.SOL_SOCKET, socket.SO_BINDTODEVICE, b"lo\0")
-	#udpsock.bind(("", 80))
-	udpsock.bind(("127.0.0.1", 80))
+	#udpsock.setsockopt(socket.SOL_SOCKET, socket.SO_BINDTODEVICE, b"lo\0")
+
+	# Also needed for client
+	#udpsock.bind(("", port))
+	udpsock.bind(("127.0.0.1", port))
+
 	# Multicast
 	#iface_index = socket.if_nametoindex(INTERFACE)
 	#mcopt = ipaddress.ip_address(MCAST_GRP).packed + struct.pack("i", intf_index)
@@ -279,20 +282,22 @@ def get_udpsock():
 	##sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
 	return udpsock
 
-sock_server = get_udpsock()
+sock_server = get_udpsock(80)
 # On multicast this will keep on receiving bytes from client sockets although we will call connect() in the next steps
 # -> Explicit mapping of "server-packet/addr <-> client socket" needed
 data1, addr = sock_server.recvfrom(1024)
-sock_client = get_udpsock()
+sock_client = get_udpsock(80)
 sock_client.connect(addr)
 
 sock_client.send(data1)
 data2 = sock_client.recv(1024)
 sock_client.send(data2)
 
-for _sock in [sock_server, sock_client]:
-	_sock.shutdown(socket.SHUT_RDWR)
-	_sock.close()
+sock_client.close()
+sock_client.shutdown(socket.SHUT_RDWR)
+
+sock_server.close()
+
 """
 
 # Client (TCP, UDP)

@@ -171,13 +171,13 @@ def fletcher32(data_to_checksum, amount_words):
 
 		while tlen > 0:
 			# sum1 += unpack_word_be(data_to_checksum[datapos:datapos+2])[0]
-			# print("%d" % sum1)
+			# logger.debug("%d" % sum1)
 			sum1 += unpack_H(data_to_checksum[datapos: datapos + 2])[0]
 			datapos += 2
 			sum2 += sum1
-			# print("%d" % sum1)
-			# print("%d" % sum2)
-			# print("--")
+			# logger.debug("%d" % sum1)
+			# logger.debug("%d" % sum2)
+			# logger.debug("--")
 			tlen -= 1
 		sum1 = (sum1 & 0xFFFF) + (sum1 >> 16)
 		sum2 = (sum2 & 0xFFFF) + (sum2 >> 16)

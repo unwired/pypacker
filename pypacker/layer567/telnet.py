@@ -83,14 +83,14 @@ def strip_options(buf):
 			continue
 		o = w[0]
 		if o > SB:
-			# print("WILL/WONT/DO/DONT/IAC", "w")
+			# logger.debug("WILL/WONT/DO/DONT/IAC", "w")
 			w = w[2:]
 		elif o == SE:
-			# print("SE", "w")
+			# logger.debug("SE", "w")
 			w = w[1:]
 			subopt = False
 		elif o == SB:
-			# print("SB", "w")
+			# logger.debug("SB", "w")
 			subopt = True
 			for opt in (b"USER", b"DISPLAY", b"TERM"):
 				p = w.find(opt + b"\x01")

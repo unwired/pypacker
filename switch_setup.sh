@@ -1,32 +1,40 @@
 # set this to the NEXT (not yet published) version
 VERSION="5.4"
 
+if [ -z "$1" ]; then
+	echo "Usage: $0 [stable | dev]"
+	exit 1
+fi
+
 function msg {
 	echo ""
 	echo ">>> $1"
 }
 
-if [ -z "$1" ]; then
-	echo "Usage: $0 [stable | dev]"
-exit 1
-fi
-
 case "$1" in
 "stable")
 	pyfiles=$(find . -name "*.py")
-	msg "Any TODOs open?"
-	for f in $pyfiles; do
-		grep -H "TODO" $f
-	done
 
 	msg "Changing debug level to WARNING"
-	sed -r -i "s/# (logger.setLevel\(logging.WARNING\))/\1/g;s/^(logger.setLevel\(logging.DEBUG\))/# \1/g" pypacker/pypacker.py
+	sed -i -r "s/# *(logger.setLevel\(logging.WARNING\))/\1/g;s/^(logger.setLevel\(logging.DEBUG\))/# \1/g" pypacker/pypacker.py
 
 	msg "Replacing version numbers"
-	sed -r -i "s/version=\".+\"/version=\"$VERSION\"/g" setup.py
+	sed -i -r "s/version=\".*\"/version=\"$VERSION\"/g" setup.py
 
-	msg "Searching for not disabled debug output"
-	grep -ir -R "^[^#]*logger.debug" *
+	msg "Searching untracked NOT ignored files... did you forget to add anything?"
+	git ls-files --others --exclude-from=.gitignore
+
+	msg "Any TODOs open?"
+	for pyfile in $pyfiles; do
+		grep --color=auto -H "TODO" "$pyfile"
+	done
+
+	msg "Non disabled debug output"
+	grep --color=auto -ir "^[^#]*logger.debug" *
+
+	msg "Raw print calls"
+	grep --color=auto -r "print(" --exclude "test_pypacker.py" --exclude "README.md" --exclude "switch_setup.sh"\
+		--exclude "sniff_n_dump.py" --exclude "list_packet_classes.py" --exclude-dir "examples"
 
 	#msg "doing style checks"
 	#msg "PEP8"
@@ -38,45 +46,33 @@ case "$1" in
 	#msg "Pylint"
 	#pylint --rcfile=./.pylintrc $pydir/*.py
 
-	if [ "$2" = "rebuilddoc" ]; then
-		msg "regenerating doc"
-		export PYTHONPATH=$PYTHONPATH:$(pwd)
-		rm -rf ./doc
-		cd ./doc_sphinx_generated
-		make clean html
-		cd ..
-		cp -r ./doc_sphinx_generated/_build/html/ ./doc
-		git add doc
-	fi
-
-	msg "Searching untracked NOT ignored files... did you forget to add anything?"
-	# Show untracked files
-	#git ls-files --others --exclude-from=.git/.gitignore
-	# Show only ignored files
-	#git ls-files --ignored  --exclude-from=.git/.gitignore
-	# --exclude-standard:
-	# Add the standard Git exclusions: .git/info/exclude, .gitignore in each directory, and the user’s global exclusion file.
-	#git ls-files --others --exclude-standard | grep -v -P ".pyc|doc_sphinx_generated|.idea|dist"
-	git ls-files --others --exclude-from=.gitignore
+	#if [ "$2" = "rebuilddoc" ]; then
+	#	msg "regenerating doc"
+	#	export PYTHONPATH=$PYTHONPATH:$(pwd)
+	#	rm -rf ./doc
+	#	cd ./doc_sphinx_generated
+	#	make clean html
+	#	cd ..
+	#	cp -r ./doc_sphinx_generated/_build/html/ ./doc
+	#	git add doc
+	#fi
 
 	msg "Header definition: string instead of bytes?"
-	grep -ir -Po "\"\ds\", *\".+"
+	grep --color=auto -ir -Po "\"\ds\", *\".+"
 
 	msg "set(...) instead of {...}? (still needed for list which need to be made unique)"
-	grep -ir -Po " set\([^)]" | grep ".py:" | uniq
-	# show set usages of form {...}
-	#grep -ir -Po " {[^\:]+}" | grep ".py:" | uniq
+	grep --color=auto -ir -Po " set\([^\)]"
 
 	msg "Lower case hex numbers/upper case hex strings?"
 	for f in $pyfiles; do
 		# Hex numbers in uppercase
-		grep -H -P "0x[0-9]{0,1}[a-f]{1,2}" $f
+		grep --color=auto -H -P "0x[0-9]{0,1}[a-f]{1,2}" $f
 		# Hex bytes in lowercase
-		grep -H -P "\\\\x[0-9]{0,1}[A-F]{1,2}" $f
+		grep --color=auto -H -P "\\\\x[0-9]{0,1}[A-F]{1,2}" $f
 	done
 
 	msg "Old style unpack like unpack('H', value)? (non precompiled structs)"
-	grep -ir -P "unpack\([\"\']" | grep  -P ".py:"
+	grep --color=auto -ir -P "unpack\([\"\']" | grep --color=auto  -P ".py:"
 
 
 	if [ "$2" == "v" ]; then
@@ -88,15 +84,15 @@ case "$1" in
 	fi
 
 	msg "If everything is OK call: git push -u origin master --tags"
-	# PyPi
+	# PyPi upload
 	# Source: https://packaging.python.org/tutorials/packaging-projects/#uploading-your-project-to-pypi
-	# Create package in dist/
+	# # Create package in dist/
 	# python setup.py sdist
 	# # Upload. Chose correct version in dist/
 	# python3 -m twine upload --repository-url  https://upload.pypi.org/legacy/ dist/pypacker-...
 ;;
 "dev")
 	msg "Changing debug level to DEBUG"
-	sed -r -i "s/# (logger.setLevel\(logging.DEBUG\))/\1/;s/^(logger.setLevel\(logging.WARNING\))/# \1/g" pypacker/pypacker.py
+	sed -i -r "s/# *(logger.setLevel\(logging.DEBUG\))/\1/;s/^(logger.setLevel\(logging.WARNING\))/# \1/g" pypacker/pypacker.py
 ;;
 esac

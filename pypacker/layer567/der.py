@@ -174,7 +174,7 @@ def decode_der(der_bts, rw_cb=None):
 			der_bts[off + taglen: off + taglen + lenlen],
 			der_sub]
 		)
-		#print(ltlv)
+		#logger.debug(ltlv)
 		result.append(ltlv)
 		off += (taglen + lenlen + vlen)
 

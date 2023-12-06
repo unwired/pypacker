@@ -185,7 +185,7 @@ def _convert():
 				hex_vendor = PROG_MACVENDOR.findall(line)
 
 				if len(hex_vendor) > 0:
-					# print(hex_vendor)
+					# logger.debug(hex_vendor)
 					MAC_VENDOR[hex_vendor[0][0].replace("-", "")] = hex_vendor[0][1]
 	except:
 		# logger.debug("no oui file present -> nothing to convert")
@@ -223,7 +223,7 @@ def _load_mac_vendor():
 				hex_vendor = PROG_MACVENDOR_STRIPPED.findall(line)
 
 				if len(hex_vendor) > 0:
-					# print(hex_vendor)
+					# logger.debug(hex_vendor)
 					MAC_VENDOR[hex_vendor[0][0]] = hex_vendor[0][1]
 		# logger.debug("got %d vendor entries", len(MAC_VENDOR))
 	except Exception as ex:
@@ -296,11 +296,11 @@ def calculate_entropy(elements, granularity_bytes=0, blocksize_bytes=64, log_bas
 
 		for off1 in range(0, len(elements), blocksize_bytes):
 			block = elements[off1: off1 + blocksize_bytes]
-			#print(block)
+			#logger.debug(block)
 			tokens = [block[off2: off2 + granularity_bytes] for off2 in range(0, len(block), granularity_bytes)]
-			#print(tokens)
+			#logger.debug(tokens)
 			entropy_block = calculate_entropy(tokens)
-			#print(entropy_block)
+			#logger.debug(entropy_block)
 			entropies.append(entropy_block)
 			#time.sleep(60)
 		return entropies
@@ -324,7 +324,7 @@ def calculate_entropy(elements, granularity_bytes=0, blocksize_bytes=64, log_bas
 		# Faster than using exceptions
 		symbol_count[element] += 1
 
-	#print(symbol_count)
+	#logger.debug(symbol_count)
 	entropy = 0
 	symbols_total = sum(val for _, val in symbol_count.items())
 

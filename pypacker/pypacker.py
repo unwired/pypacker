@@ -34,8 +34,6 @@ class NiceFormatter(logging.Formatter):
 
 	def format(self, record):
 		format_orig = self._style._fmt
-
-		#print(f"Logging via: {record.levelno}, {logging.DEBUG} {logging.INFO} {logging.WARNING}")
 		self._style._fmt = self.FORMATS.get(record.levelno, self.FORMATS["DEFAULT"])
 		result = logging.Formatter.format(self, record)
 
@@ -533,7 +531,7 @@ class Packet(object, metaclass=MetaPacket):
 		]
 
 		All layers have to match starting from A (explicit is better than implicit).
-		Comparing starts from first layer otherwise ALL layers have to
+		Comparing starts from first layer otherwise ALL layers would have to
 		be parsed all the time until a matching layer (to A) appears (starting layer
 		is not known a priori).
 

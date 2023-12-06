@@ -197,7 +197,7 @@ class TuntapInterface(object):
 			os.close(self._fileno_iface_fd)
 			self._fileno_iface_fd = None
 		except Exception as ex:
-			print(ex)
+			logger.exception(ex)
 
 		if self._is_local_tunnel:
 			exec_syscmd("ip rule del iif %s lookup %d" % (self._iface_name, 13))

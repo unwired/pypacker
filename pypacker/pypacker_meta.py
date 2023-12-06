@@ -353,7 +353,7 @@ class MetaPacket(type):
 
 		if handler is not None and len(handler) > 0:
 			if handler.__class__ is not dict:
-				print("Invalid format of __handler__: not a dictionary! %r", handler)
+				logger.warning("Invalid format of __handler__: not a dictionary! %r", handler)
 			else:
 				t.load_handler(t, handler)
 
