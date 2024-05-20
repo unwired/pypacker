@@ -43,7 +43,6 @@ import os
 from os import read as os_read
 from os import write as os_write
 import struct
-import time
 import threading
 import subprocess
 import logging
@@ -83,8 +82,8 @@ def exec_syscmd(cmd):
 	logger.info(output)
 
 
-class TuntapInterface(object):
-	def __init__(self,
+class TuntapInterface():
+	def __init__(self, # pylint: disable=too-many-arguments
 		iface_name,
 		devnode="/dev/net/tunA",
 		ifacetype=TYPE_TUN,
@@ -111,7 +110,7 @@ class TuntapInterface(object):
 		TuntapInterface.create_devnode(devnode)
 
 		# Open TUN or TAP device file
-		self._iface_fd = open(devnode, "r+b", buffering=0)
+		self._iface_fd = open(devnode, "r+b", buffering=0) # pylint: disable=consider-using-with
 		tuntap_opt = IFF_TUN if ifacetype == TYPE_TUN else IFF_TAP
 		self._ifr = struct.pack("16sH", iface_name.encode("UTF-8"), tuntap_opt | IFF_NO_PI)
 		# Connect interface name with file descriptor. Creates the actual network interface.
@@ -203,57 +202,58 @@ class TuntapInterface(object):
 			exec_syscmd("ip rule del iif %s lookup %d" % (self._iface_name, 13))
 
 
-class LocalTunnel(object):
+class LocalTunnel():
 	"""
 	Local Back-to-back tunnel based on tun interfaces: local <-> ip:tun1:dev <-> dev:tun2:ip <-> local
 	"""
-	def __init__(self, ip_iface_A="192.168.2.1", ip_iface_B="192.168.3.1"):
+	def __init__(self, ip_iface_a="192.168.2.1", ip_iface_b="192.168.3.1"):
 		self._ifacetype = TYPE_TAP
 		islocaltunnel = True
 		ifacetype_str = TYPE_STR_DCT[self._ifacetype]
 		self._state_active = False
 
-		iface_name_A = ifacetype_str + "A0"
-		self._dev_A = TuntapInterface(
-			iface_name=iface_name_A,
+		iface_name_a = ifacetype_str + "A0"
+		self._dev_a = TuntapInterface(
+			iface_name=iface_name_a,
 			devnode="/dev/net/" + ifacetype_str + "A",
 			ifacetype=self._ifacetype,
-			ip_src=ip_iface_A,
+			ip_src=ip_iface_a,
 			is_local_tunnel=islocaltunnel
 		)
-		iface_name_B = ifacetype_str + "B0"
-		self._dev_B = TuntapInterface(
-			iface_name=iface_name_B,
+		iface_name_b = ifacetype_str + "B0"
+		self._dev_b = TuntapInterface(
+			iface_name=iface_name_b,
 			devnode="/dev/net/" + ifacetype_str + "B",
 			ifacetype=self._ifacetype,
-			ip_src=ip_iface_B,
+			ip_src=ip_iface_b,
 			is_local_tunnel=islocaltunnel
 		)
 
 		utils.flush_arp_cache()
-		#mac_A = utils.get_mac_for_iface(iface_name_A)
-		#mac_B = utils.get_mac_for_iface(iface_name_B)
-		#utils.add_arp_entry(ip_iface_A, mac_A, iface_name_B)
-		#utils.add_arp_entry(ip_iface_B, mac_B, iface_name_A)
+		#mac_A = utils.get_mac_for_iface(iface_name_a)
+		#mac_B = utils.get_mac_for_iface(iface_name_b)
+		#utils.add_arp_entry(ip_iface_a, mac_A, iface_name_b)
+		#utils.add_arp_entry(ip_iface_b, mac_B, iface_name_a)
 
-		self._rs_thread_A = None
-		self._rs_thread_B = None
+		self._rs_thread_a = None
+		self._rs_thread_b = None
 
 	def _start_cycler_threads(self):
-		self._rs_thread_A = threading.Thread(target=LocalTunnel.read_write_cycler,
-			args=[self, self._dev_A, self._dev_B, "1to2"])
-		self._rs_thread_B = threading.Thread(target=LocalTunnel.read_write_cycler,
-			args=[self, self._dev_B, self._dev_A, "2to1"])
-		self._rs_thread_A.start()
-		self._rs_thread_B.start()
+		self._rs_thread_a = threading.Thread(target=LocalTunnel.read_write_cycler,
+			args=[self, self._dev_a, self._dev_b, "1to2"])
+		self._rs_thread_b = threading.Thread(target=LocalTunnel.read_write_cycler,
+			args=[self, self._dev_b, self._dev_a, "2to1"])
+		self._rs_thread_a.start()
+		self._rs_thread_b.start()
 
 	@staticmethod
-	def read_write_cycler(obj, iface_in, iface_out, name):
+	def read_write_cycler(obj, iface_in, iface_out, name): # pylint: disable=unused-argument
 		while obj._state_active:
 			try:
 				bts = iface_in.read()
 				try:
-					ip.IP(bts) if obj._ifacetype == TYPE_TUN else ethernet.Ethernet(bts)
+					# Make sure this is parsable
+					_ = ip.IP(bts) if obj._ifacetype == TYPE_TUN else ethernet.Ethernet(bts)
 					#logger.debug("Sending in cycler %s (%s -> %s):\n%s\n%s" %
 					#	(name, iface_in._iface_name, iface_out._iface_name, bts, pkt))
 					iface_out.write(bts)
@@ -281,10 +281,10 @@ class LocalTunnel(object):
 		if state_active:
 			self._start_cycler_threads()
 		else:
-			self._dev_A.close()
-			self._dev_B.close()
+			self._dev_a.close()
+			self._dev_b.close()
 
-			for th in [self._rs_thread_A, self._rs_thread_B]:
+			for th in [self._rs_thread_a, self._rs_thread_b]:
 				try:
 					th.join()
 				except:

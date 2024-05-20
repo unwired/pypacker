@@ -12,7 +12,7 @@ for importer, modname, ispkg in pkgutil.walk_packages(path=module_pypacker.__pat
 	onerror=lambda x: None):
 
 	if ispkg:
-		#print(">>> found package: %s" % modname)
+		#print(">>> Found package: %s" % modname)
 		pass
 	else:
 		mod = importlib.import_module(modname)

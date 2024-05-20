@@ -9,17 +9,16 @@ import socket
 import logging
 import sys
 import ctypes
-from ctypes import util as ctypes_util
 import os
 
 from pypacker.structcbs import unpack_H_le, unpack_H
 
 logger = logging.getLogger("pypacker")
 
-# avoid references for performance reasons
-array_array = array.array
+# Avoid references for performance reasons
+array_array = array.array # pylint: disable=invalid-name
 ntohs = socket.ntohs
-ENDIANNES_IS_BIG = True if sys.byteorder == "big" else False
+ENDIANNES_IS_BIG = sys.byteorder == "big"
 
 # TCP (RFC 793) and UDP (RFC 768) checksum
 
@@ -52,21 +51,34 @@ def in_cksum_done(s):
 
 
 try:
-	#DIR_CHECKSUMPY = os.path.dirname(os.path.realpath(__file__))
-	CHECKSUM_NATIVE_LIB_NAME = "checksum_native"
-	logger.debug("Trying to load c based checksum implementation %s" % CHECKSUM_NATIVE_LIB_NAME)
-	logger.debug(ctypes_util.find_library(CHECKSUM_NATIVE_LIB_NAME))
-	#chksumlib = ctypes.cdll.LoadLibrary(DIR_CHECKSUMPY + "/checksum_native.so")
-	chksumlib = ctypes.cdll.LoadLibrary(CHECKSUM_NATIVE_LIB_NAME)
+	in_chksum_c = None # pylint: disable=invalid-name
 
-	in_chksum_c = chksumlib.in_chksum
-	in_chksum_c.restype = ctypes.c_uint32
-	in_chksum_c.argtypes = ctypes.POINTER(ctypes.c_char), ctypes.c_uint32
+	# Find correct library by trying them through
+	for libname in ["checksum_native_x86_64", "checksum_native_arm_32", "checksum_native_arm_64"]:
+		logger.debug("Trying to load c based checksum implementation %s", libname)
+		#libpath = ctypes_util.find_library(libname)
+		libpath = os.path.dirname(os.path.realpath(__file__)) + "/native/" + libname + ".so"
+		logger.debug("Trying custom path: %s", libpath)
+
+		try:
+			chksumlib = ctypes.cdll.LoadLibrary(libpath)
+			in_chksum_c = chksumlib.in_chksum
+			in_chksum_c.restype = ctypes.c_uint32
+			in_chksum_c.argtypes = ctypes.POINTER(ctypes.c_char), ctypes.c_uint32
+			in_chksum_c(b"0123", 4)
+			break
+		except:
+			# Try next one
+			in_chksum_c = None # pylint: disable=invalid-name
+
+	if in_chksum_c is None:
+		raise Exception()
 
 	def in_cksum(bts):
 		return in_chksum_c(bts, len(bts))
-#except Exception as ex:
-except:
+	logger.debug("Using native checksum implementation")
+except Exception as ex:
+	logger.debug(ex)
 	logger.debug("Using Python checksum implementation")
 
 	# Python implementation

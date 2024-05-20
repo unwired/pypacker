@@ -9,9 +9,9 @@ from pypacker.layer3 import ip, icmp
 from pypacker.layer4 import udp, tcp
 
 eth0 = ethernet.Ethernet() + ip.IP() + tcp.TCP(sport=12345, dport=65535) + b"Test123AAAAAAAAAAAAAa"
-psock = psocket.SocketHndl(iface_name="wlp3s0", timeout=10)
+psock = psocket.SocketHndl(iface_name="lo", timeout=10)
 
-while True:
+for i in range(10):
 	print("Sending")
 	psock.send(eth0.bin())
 	time.sleep(1)

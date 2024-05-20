@@ -5,7 +5,7 @@ gcc -shared -o checksum_native.so checksum_native.o
 */
 #include <stdint.h>
 //#include <Python.h>
-#include <python3.10/Python.h>
+//#include <python3.10/Python.h>
 
 // TODO remove
 //#include <string.h>
@@ -45,9 +45,8 @@ uint32_t in_chksum(uint8_t* buf, uint32_t buf_len) {
 	return chksum;
 }
 
+/* Example calls */
 /*
-Example calls
-*/
 int main() {
 	//char* buf = "\x00\x01\x00\x01\x04"; // 0x0000fbfd
 	//uint32_t buf_len = 5;
@@ -61,6 +60,7 @@ int main() {
 
 	printf("Checksum: %d\n", chksum);
 }
+*/
 /*
 PyMODINIT_FUNC PyInit_checksum_native(void) {
     Py_Initialize();

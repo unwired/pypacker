@@ -5,14 +5,8 @@ try:
 except ImportError:
 	from distutils.core import setup, Extension
 
-"""
-module_checksum_native = Extension("checksum_native",
-	define_macros = [("MAJOR_VERSION", "1"), ("MINOR_VERSION", "0")],
-	sources = ["checksum_native.c"]
-)
-"""
 setup(name="pypacker",
-	version="5.4",
+	version="5.5",
 	author="Michael Stahn",
 	author_email="michael.stahn.42@gmail.com",
 	url="https://gitlab.com/mike01/pypacker",
@@ -25,7 +19,7 @@ setup(name="pypacker",
 		"pypacker.layer4",
 		"pypacker.layer567"
 	],
-	package_data={"pypacker": ["oui_stripped.txt"]},
+	package_data={"pypacker": ["oui_stripped.txt", "native/*.so"]},
 	classifiers=[
 		"Development Status :: 6 - Mature",
 		"Intended Audience :: Developers",
@@ -46,6 +40,5 @@ setup(name="pypacker",
 	#install_requires=[
 	#	"netifaces",
 	#],
-	#ext_modules=[module_checksum_native],
 	python_requires=">=3.3"
 )

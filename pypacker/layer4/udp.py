@@ -15,11 +15,11 @@ import struct
 
 from pypacker import pypacker, checksum
 from pypacker.pypacker import FIELD_FLAG_AUTOUPDATE, FIELD_FLAG_IS_TYPEFIELD
-# handler
+
 from pypacker.layer567 import telnet, tftp, dns, dhcp, iso15118, ntp, rtp, sip, pmap, radius, stun
 from pypacker.structcbs import unpack_H, pack_ipv4_header, pack_ipv6_header
 
-# avoid references for performance reasons
+# Avoid references for performance reasons
 in_cksum = checksum.in_cksum
 
 logger = logging.getLogger("pypacker")
@@ -105,7 +105,7 @@ class UDP(pypacker.Packet):
 		# TCP and underwriting are freaky bitches: we need the IP pseudoheader to calculate their checksum
 		# logger.debug("UDP sum recalc, sport=%s/dport=%s" % (self.sport, self.dport))
 		try:
-			# we need src/dst for checksum-calculation
+			# We need src/dst for checksum-calculation
 			src, dst = self._lower_layer.src, self._lower_layer.dst
 			#logger.debug(src + b" / "+ dst)
 			self.sum = 0
@@ -122,11 +122,11 @@ class UDP(pypacker.Packet):
 			if csum == 0:
 				csum = 0xFFFF    # RFC 768, p2
 
-			# get the checksum of concatenated pseudoheader+TCP packet
-			# assign via non-shadowed variable to trigger re-packing
+			# Get the checksum of concatenated pseudoheader+TCP packet.
+			# Assign via non-shadowed variable to trigger re-packing
 			self.sum = csum
 		except (AttributeError, struct.error):
-			# not an IP packet as lower layer (src, dst not present) or invalid src/dst
+			# Not an IP packet as lower layer (src, dst not present) or invalid src/dst
 			pass
 
 	def direction(self, other):

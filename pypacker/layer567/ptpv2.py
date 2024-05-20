@@ -10,18 +10,18 @@ from pypacker.structcbs import pack_Q, unpack_Q
 logger = logging.getLogger("pypacker")
 
 
-PTPv2_TYPE_SYNC				= 0x0  # Flags: PTP_TWO_STEP = True
-PTPv2_TYPE_DELAY_REQ			= 0x1
+PTPV2_TYPE_SYNC				= 0x0  # Flags: PTP_TWO_STEP = True
+PTPV2_TYPE_DELAY_REQ			= 0x1
 # IEEE802.1AS is the Audio-Visual Bridging (AVB) profile of the IEEE1588 Precision Time Protocol
-PTPv2_TYPE_PATH_DELAY_REQ		= 0x2
-PTPv2_TYPE_PATH_DELAY_RESP		= 0x3
+PTPV2_TYPE_PATH_DELAY_REQ		= 0x2
+PTPV2_TYPE_PATH_DELAY_RESP		= 0x3
 
-PTPv2_TYPE_FOLLOW_UP			= 0x8
-PTPv2_TYPE_DELAY_RESP			= 0x9
-PTPv2_TYPE_PATH_DELAY_RESP_FOLLOWUP	= 0xA
-PTPv2_TYPE_ANNOUNCE			= 0xB  # Flags: PTP_TIMESCALE = True
-PTPv2_TYPE_SIGNALLING			= 0xC
-PTPv2_TYPE_MGMT				= 0xD
+PTPV2_TYPE_FOLLOW_UP			= 0x8
+PTPV2_TYPE_DELAY_RESP			= 0x9
+PTPV2_TYPE_PATH_DELAY_RESP_FOLLOWUP	= 0xA
+PTPV2_TYPE_ANNOUNCE			= 0xB  # Flags: PTP_TIMESCALE = True
+PTPV2_TYPE_SIGNALLING			= 0xC
+PTPV2_TYPE_MGMT				= 0xD
 
 CTRL_TYPE_SYNC				= 0x0
 CTRL_TYPE_DELAY_REQ			= 0x1
@@ -31,14 +31,14 @@ CTRL_TYPE_MGMT				= 0x4
 CTRL_TYPE_OTHER				= 0x5
 
 
-TYPES_TS_ACTIVATE = {PTPv2_TYPE_SYNC, PTPv2_TYPE_FOLLOW_UP, PTPv2_TYPE_ANNOUNCE,
-		PTPv2_TYPE_PATH_DELAY_RESP}
-TYPES_REQ_PORT_ACTIVATE = {PTPv2_TYPE_PATH_DELAY_RESP, PTPv2_TYPE_PATH_DELAY_RESP_FOLLOWUP}
+TYPES_TS_ACTIVATE = {PTPV2_TYPE_SYNC, PTPV2_TYPE_FOLLOW_UP, PTPV2_TYPE_ANNOUNCE,
+		PTPV2_TYPE_PATH_DELAY_RESP}
+TYPES_REQ_PORT_ACTIVATE = {PTPV2_TYPE_PATH_DELAY_RESP, PTPV2_TYPE_PATH_DELAY_RESP_FOLLOWUP}
 
 
 class PTPv2(pypacker.Packet):
 	__hdr__ = (
-		("transport_id", "B", PTPv2_TYPE_DELAY_REQ),
+		("transport_id", "B", PTPV2_TYPE_DELAY_REQ),
 		("version", "B", 2),
 		("msglen", "H", 0),
 		("subdomains", "B", 0),
@@ -96,7 +96,7 @@ class PTPv2(pypacker.Packet):
 		)
 
 	__handler__ = {
-		PTPv2_TYPE_ANNOUNCE: Announce
+		PTPV2_TYPE_ANNOUNCE: Announce
 	}
 
 	def _dissect(self, buf):
@@ -115,7 +115,7 @@ class PTPv2(pypacker.Packet):
 			self.reqclockid = 0
 			self.reqportid = 0
 			header_len += 10
-		elif ptpv2_type == PTPv2_TYPE_ANNOUNCE:
+		elif ptpv2_type == PTPV2_TYPE_ANNOUNCE:
 			#logger.debug("Got announce")
 			hndl_id = ptpv2_type
 

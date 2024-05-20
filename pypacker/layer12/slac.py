@@ -134,264 +134,6 @@ for msgid, name in MMTYPE_MSB_DESCRIPTION.items():
 	setattr(module_this, name, msgid)
 
 
-class CMSetKeyReq(Packet):
-	__hdr__ = (
-		("keytype", "B", 0),
-		("mynonce", "I", 0),
-		("yournonce", "I", 0),
-		("pid", "B", 0),
-		("prn", "H", 0),
-		("pwm", "B", 0),
-		("ccocapa", "B", 0),
-		("nid", "7s", b"\x00" * 7),
-		("neweks", "B", 0),
-		# length = 0, 16
-		("newkey", None, None),
-	)
-
-
-class CMSetKeyICnf(Packet):
-	__hdr__ = (
-		("result", "B", 0),
-		("mynonce", "I", 0),
-		("yournonce", "I", 0),
-		("pid", "B", 0),
-		("prn", "H", 0),
-		("pwm", "B", 0),
-		("ccocapa", "B", 0)
-	)
-
-
-class CMAttenCharInd(Packet):
-	__hdr__ = (
-		("apptype", "B", 0),
-		("sectype", "B", 0),
-		("sourceaddr", "6s", b"\x00" * 6),
-		("runid", "Q", 0),
-		("sourceid", "17s", b"\x00" * 17),
-		("respid", "17s", b"\x00" * 17),
-		("numsounds", "B", 0)
-	)
-
-	sourceaddr_s = pypacker.get_property_mac("sourceaddr")
-
-
-class CMAttenCharRsp(Packet):
-	__hdr__ = (
-		("apptype", "B", 0),
-		("sectype", "B", 0),
-		("sourceaddr", "6s", b"\x00" * 6),
-		("runid", "Q", 0),
-		("sourceid", "17s", b"\x00" * 17),
-		("respid", "17s", b"\x00" * 17),
-		("result", "B", 0)
-	)
-
-	sourceaddr_s = pypacker.get_property_mac("sourceaddr")
-
-
-class CMSlacParmReq(Packet):
-	__hdr__ = (
-		("apptype", "B", 0),
-		("sectype", "B", 0),
-		("runid", "Q", 0),
-		# Only present if security type is 1
-		("ciphersuitesize", "B", None),
-		("ciphersuites", None, TriggerList)
-	)
-
-
-class CMSlacParmCnf(Packet):
-	__hdr__ = (
-		("msoundtarget", "6s", b"\x00" * 6),
-		("numsounds", "B", 0),
-		("timeout", "B", 0),
-		("resptype", "B", 0),
-		("forwardingsta", "6s", b"\x00" * 6),
-		("apptype", "B", 0),
-		("sectype", "B", 0),
-		("runid", "Q", 0),
-		# Only present if security type is 1
-		("ciphersuite", "H", None)
-	)
-
-	msoundtarget_s = pypacker.get_property_mac("msoundtarget")
-	forwardingsta_s = pypacker.get_property_mac("forwardingsta")
-
-
-class CMStartAttenCharInd(Packet):
-	__hdr__ = (
-		("apptype", "B", 0),
-		("sectype", "B", 0),
-		("numsounds", "B", 0),
-		("timeout", "B", 0),
-		("resptype", "B", 0),
-		("forwardingsta", "6s", b"\x00" * 6),
-		("runid", "Q", 0),
-	)
-
-	forwardingsta_s = pypacker.get_property_mac("forwardingsta")
-
-
-class CMMnbcSoundInd(Packet):
-	__hdr__ = (
-		("apptype", "B", 0),
-		("sectype", "B", 0),
-		("senderid", "17s", b"\x00" * 17),
-		("cnt", "B", 0),
-		("runid", "Q", 0),
-		("rsvd", "8s", b"\x00" * 8),
-		("rnd", "16s", b"\x00" * 16)
-	)
-
-
-class CMSlacMatchReq(Packet):
-	__hdr__ = (
-		("apptype", "B", 0),
-		("sectype", "B", 0),
-		("mvflen", "H", 0),
-		("pevid", "17s", b"\x00" * 17),
-		("pevmac", "6s", b"\x00" * 6),
-		("evseid", "17s", b"\x00" * 17),
-		("evsemac", "6s", b"\x00" * 6),
-		("runid", "Q", 0),
-		("rsvd", "8s", b"\x00" * 8)
-	)
-
-	def _get_mvflen_be(self):
-		return unpack_H(pack_H_le(self.mvflen))[0]
-
-	def _set_mvflen_be(self, val):
-		self.mvflen = unpack_H(pack_H_le(val))[0]
-
-	mvflen_be = property(_get_mvflen_be, _set_mvflen_be)
-
-	pevmac_s = pypacker.get_property_mac("pevmac")
-	evsemac_s = pypacker.get_property_mac("evsemac")
-
-
-class CMSlacMatchCnf(Packet):
-	__hdr__ = (
-		("apptype", "B", 0),
-		("sectype", "B", 0),
-		("mvflen", "H", 0),
-		("pevid", "17s", b"\x00" * 17),
-		("pevmac", "6s", b"\x00" * 6),
-		("evseid", "17s", b"\x00" * 17),
-		("evsemac", "6s", b"\x00" * 6),
-		("runid", "Q", 0),
-		("rsvd1", "8s", b"\x00" * 8),
-		("nid", "7s", b"\x00" * 7),
-		("rsvd2", "B", 0),
-		("nmk", "16s", b"\x00" * 16),
-	)
-
-	pevmac_s = pypacker.get_property_mac("pevmac")
-	evsemac_s = pypacker.get_property_mac("evsemac")
-
-
-class CMLinkStatsReq(Packet):
-	__hdr__ = (
-		("reqtype", "B", 0),
-		("reqid", "B", 0),
-		("nid", "7s", b"\x00" * 7),
-		("lid", "B", 0),
-		("tlflag", "B", 0),
-		("mgmtflag", "B", 0),
-		("dasa", "6s", b"\x00" * 6)
-	)
-
-	dasa_s = pypacker.get_property_mac("dasa")
-
-
-# TODO: LinkStats payload as handler for CMLinkStatsCnf, how to differentiate?
-
-class CMLinkStatsCnf(Packet):
-	__hdr__ = (
-		("reqid", "B", 0),
-		("restype", "B", 0),
-		("linkstats", "H", 0)
-	)
-
-
-class VSPLLinkStatusReq(Packet):
-	__hdr__ = (
-		("oui", "3s", b"\x00" * 3),
-	)
-
-
-class VSPLLinkStatusCnf(Packet):
-	__hdr__ = (
-		("oui", "3s", b"\x00" * 3),
-		("link", "H", 0),
-	)
-
-
-class AMPMapReq(Packet):
-	__hdr__ = (
-		("amlen", "H", 0),
-	)
-
-
-class AMPMapCnf(Packet):
-	__hdr__ = (
-		("restype", "B", 0),
-	)
-
-
-class CMPKCSCertReq(Packet):
-	__hdr__ = (
-		("targetmac", "6s", b"\x00" * 6),
-		("ciphersuitesize", "B", 0),
-		("cipersuite", None, TriggerList)
-	)
-
-	targetmac_s = pypacker.get_property_mac("targetmac")
-
-
-class CMPKCSCertCnf(Packet):
-	__hdr__ = (
-		("targetmac", "6s", b"\x00" * 6),
-		("status", "B", 0),
-		("cipersuite", "H", 0),
-		("certlen", "H", 0),
-		("certpackage", None, TriggerList)
-	)
-
-	targetmac_s = pypacker.get_property_mac("targetmac")
-
-
-class CMPKCSCertInd(Packet):
-	"""
-	When the CM_SLAC_PARM.CNF indicates that Secure SLAC is required, the PEV-HLE
-	shall send a CM_PKCS_CERT.IND message. The Target MAC address for this message
-	shall be set to MAC address of the PEV Green PHY station. To ensure reliable
-	reception of this message at all EVSEs, it is recommended that this message be
-	transmitted at least three times by the PEV-HLE. If the CM_PKCS_CERT.IND message is
-	larger than 502 Octets, the message shall be fragmented by the HLE (refer to
-	Section 11.1.7).
-	"""
-	__hdr__ = (
-		("targetmac", "6s", b"\x00" * 6),
-		("cipersuite", "H", 0),
-		("certlen", "H", 0),
-		("certpackage", None, TriggerList)
-	)
-
-	targetmac_s = pypacker.get_property_mac("targetmac")
-
-
-class CMPKCSCertRsp(Packet):
-	__hdr__ = (
-		("targetmac", "6s", b"\x00" * 6),
-		("status", "B", 0),
-		("ciphersuitesize", "B", 0),  # optional
-		("cipersuite", None, TriggerList)
-	)
-
-	targetmac_s = pypacker.get_property_mac("targetmac")
-
-
 MASK_FRAGINDEX = 0xF0
 MASK_FRAGCOUNT = 0x0F
 
@@ -399,34 +141,10 @@ MASK_FRAGCOUNT = 0x0F
 class Slac(Packet):
 	__hdr__ = (
 		("version", "B", 1),
-		("typeinfo", "H", 0),  #
+		("typeinfo", "H", 0),
 		("frag_info", "B", 0),
 		("frag_seq", "B", 0)
 	)
-
-	__handler__ = {
-		CM_SET_KEY | MMTYPELSB_REQUEST: CMSetKeyReq,
-		CM_SET_KEY | MMTYPELSB_CONFIRM: CMSetKeyICnf,
-		CM_SLAC_MATCH | MMTYPELSB_REQUEST: CMSlacMatchReq,
-		CM_SLAC_MATCH | MMTYPELSB_CONFIRM: CMSlacMatchCnf,
-		CM_ATTEN_CHAR | MMTYPELSB_INDICATION: CMAttenCharInd,
-		CM_ATTEN_CHAR | MMTYPELSB_RESPONSE: CMAttenCharRsp,
-		CM_SLAC_PARM | MMTYPELSB_REQUEST: CMSlacParmReq,
-		CM_SLAC_PARM | MMTYPELSB_CONFIRM: CMSlacParmCnf,
-		# MS:new
-		CM_START_ATTEN_CHAR | MMTYPELSB_INDICATION: CMStartAttenCharInd,
-		CM_MNBC_SOUND | MMTYPELSB_INDICATION: CMMnbcSoundInd,
-		CM_LINK_STATS | MMTYPELSB_REQUEST: CMLinkStatsReq,
-		CM_LINK_STATS | MMTYPELSB_CONFIRM: CMLinkStatsCnf,
-		VS_PL_LNK_STATUS | MMTYPELSB_REQUEST: VSPLLinkStatusReq,
-		VS_PL_LNK_STATUS | MMTYPELSB_CONFIRM: VSPLLinkStatusCnf,
-		CM_AMP_MAP | MMTYPELSB_REQUEST: AMPMapReq,
-		CM_AMP_MAP | MMTYPELSB_CONFIRM: AMPMapCnf,
-		CM_PKCS_CERT | MMTYPELSB_REQUEST: CMPKCSCertReq,
-		CM_PKCS_CERT | MMTYPELSB_CONFIRM: CMPKCSCertCnf,
-		CM_PKCS_CERT | MMTYPELSB_INDICATION: CMPKCSCertInd,
-		CM_PKCS_CERT | MMTYPELSB_RESPONSE: CMPKCSCertRsp
-	}
 
 	def _dissect(self, buf):
 		typeinfo_be = unpack_H_le(buf[1: 3])[0]
@@ -442,7 +160,7 @@ class Slac(Packet):
 		return hlen, typeinfo_be
 
 	def _get_fragcount(self):
-		return (self.frag_info & MASK_FRAGCOUNT)
+		return self.frag_info & MASK_FRAGCOUNT
 
 	def _set_fragcount(self, fragcount):
 		self.frag_info = (self.frag_info & ~MASK_FRAGCOUNT) | (fragcount & MASK_FRAGCOUNT)
@@ -486,7 +204,7 @@ class Slac(Packet):
 		return (self.typeinfo & MASK_MMTYPELSB_LE) >> 8
 
 	def _set_mmtypelsb(self, msgtype):
-		typetmp = (self.typeinfo & ~MASK_MMTYPELSB_LE)
+		typetmp = self.typeinfo & ~MASK_MMTYPELSB_LE
 		self.typeinfo = typetmp | (msgtype << 8)
 
 	# REQ->CNF, IND->RSP
@@ -501,7 +219,7 @@ class Slac(Packet):
 		return (self.typeinfo & MASK_MMTYPEMSB_LE) >> 1
 
 	def _set_mmtypemsb(self, msgtype):
-		typetmp = (self.typeinfo & ~MASK_MMTYPEMSB_LE)
+		typetmp = self.typeinfo & ~MASK_MMTYPEMSB_LE
 		self.typeinfo = typetmp | (msgtype << 1)
 
 	mmtypemsb = property(_get_mmtypemsb, _set_mmtypemsb)
@@ -510,3 +228,265 @@ class Slac(Packet):
 		return MMTYPE_MSB_DESCRIPTION.get(self.mmtypemsb, None)
 
 	mmtypemsb_s = property(_get_mmtypemsb_s, None)
+
+	class CMSetKeyReq(Packet):
+		__hdr__ = (
+			("keytype", "B", 0),
+			("mynonce", "I", 0),
+			("yournonce", "I", 0),
+			("pid", "B", 0),
+			("prn", "H", 0),
+			("pwm", "B", 0),
+			("ccocapa", "B", 0),
+			("nid", "7s", b"\x00" * 7),
+			("neweks", "B", 0),
+			# length = 0, 16
+			("newkey", None, None),
+		)
+
+	class CMSetKeyICnf(Packet):
+		__hdr__ = (
+			("result", "B", 0),
+			("mynonce", "I", 0),
+			("yournonce", "I", 0),
+			("pid", "B", 0),
+			("prn", "H", 0),
+			("pwm", "B", 0),
+			("ccocapa", "B", 0)
+		)
+
+	class CMAttenCharInd(Packet):
+		__hdr__ = (
+			("apptype", "B", 0),
+			("sectype", "B", 0),
+			("sourceaddr", "6s", b"\x00" * 6),
+			("runid", "Q", 0),
+			("sourceid", "17s", b"\x00" * 17),
+			("respid", "17s", b"\x00" * 17),
+			("numsounds", "B", 0)
+		)
+
+		sourceaddr_s = pypacker.get_property_mac("sourceaddr")
+
+	class CMAttenCharRsp(Packet):
+		__hdr__ = (
+			("apptype", "B", 0),
+			("sectype", "B", 0),
+			("sourceaddr", "6s", b"\x00" * 6),
+			("runid", "Q", 0),
+			("sourceid", "17s", b"\x00" * 17),
+			("respid", "17s", b"\x00" * 17),
+			("result", "B", 0)
+		)
+
+		sourceaddr_s = pypacker.get_property_mac("sourceaddr")
+
+	class CMSlacParmReq(Packet):
+		__hdr__ = (
+			("apptype", "B", 0),
+			("sectype", "B", 0),
+			("runid", "Q", 0),
+			# Only present if security type is 1
+			("ciphersuitesize", "B", None),
+			("ciphersuites", None, TriggerList)
+		)
+
+	class CMSlacParmCnf(Packet):
+		__hdr__ = (
+			("msoundtarget", "6s", b"\x00" * 6),
+			("numsounds", "B", 0),
+			("timeout", "B", 0),
+			("resptype", "B", 0),
+			("forwardingsta", "6s", b"\x00" * 6),
+			("apptype", "B", 0),
+			("sectype", "B", 0),
+			("runid", "Q", 0),
+			# Only present if security type is 1
+			("ciphersuite", "H", None)
+		)
+
+		msoundtarget_s = pypacker.get_property_mac("msoundtarget")
+		forwardingsta_s = pypacker.get_property_mac("forwardingsta")
+
+	class CMStartAttenCharInd(Packet):
+		__hdr__ = (
+			("apptype", "B", 0),
+			("sectype", "B", 0),
+			("numsounds", "B", 0),
+			("timeout", "B", 0),
+			("resptype", "B", 0),
+			("forwardingsta", "6s", b"\x00" * 6),
+			("runid", "Q", 0),
+		)
+
+		forwardingsta_s = pypacker.get_property_mac("forwardingsta")
+
+	class CMMnbcSoundInd(Packet):
+		__hdr__ = (
+			("apptype", "B", 0),
+			("sectype", "B", 0),
+			("senderid", "17s", b"\x00" * 17),
+			("cnt", "B", 0),
+			("runid", "Q", 0),
+			("rsvd", "8s", b"\x00" * 8),
+			("rnd", "16s", b"\x00" * 16)
+		)
+
+	class CMSlacMatchReq(Packet):
+		__hdr__ = (
+			("apptype", "B", 0),
+			("sectype", "B", 0),
+			("mvflen", "H", 0),
+			("pevid", "17s", b"\x00" * 17),
+			("pevmac", "6s", b"\x00" * 6),
+			("evseid", "17s", b"\x00" * 17),
+			("evsemac", "6s", b"\x00" * 6),
+			("runid", "Q", 0),
+			("rsvd", "8s", b"\x00" * 8)
+		)
+
+		def _get_mvflen_be(self):
+			return unpack_H(pack_H_le(self.mvflen))[0]
+
+		def _set_mvflen_be(self, val):
+			self.mvflen = unpack_H(pack_H_le(val))[0]
+
+		mvflen_be = property(_get_mvflen_be, _set_mvflen_be)
+
+		pevmac_s = pypacker.get_property_mac("pevmac")
+		evsemac_s = pypacker.get_property_mac("evsemac")
+
+	class CMSlacMatchCnf(Packet):
+		__hdr__ = (
+			("apptype", "B", 0),
+			("sectype", "B", 0),
+			("mvflen", "H", 0),
+			("pevid", "17s", b"\x00" * 17),
+			("pevmac", "6s", b"\x00" * 6),
+			("evseid", "17s", b"\x00" * 17),
+			("evsemac", "6s", b"\x00" * 6),
+			("runid", "Q", 0),
+			("rsvd1", "8s", b"\x00" * 8),
+			("nid", "7s", b"\x00" * 7),
+			("rsvd2", "B", 0),
+			("nmk", "16s", b"\x00" * 16),
+		)
+
+		pevmac_s = pypacker.get_property_mac("pevmac")
+		evsemac_s = pypacker.get_property_mac("evsemac")
+
+	class CMLinkStatsReq(Packet):
+		__hdr__ = (
+			("reqtype", "B", 0),
+			("reqid", "B", 0),
+			("nid", "7s", b"\x00" * 7),
+			("lid", "B", 0),
+			("tlflag", "B", 0),
+			("mgmtflag", "B", 0),
+			("dasa", "6s", b"\x00" * 6)
+		)
+
+		dasa_s = pypacker.get_property_mac("dasa")
+
+	# TODO: LinkStats payload as handler for CMLinkStatsCnf, how to differentiate?
+
+	class CMLinkStatsCnf(Packet):
+		__hdr__ = (
+			("reqid", "B", 0),
+			("restype", "B", 0),
+			("linkstats", "H", 0)
+		)
+
+	class VSPLLinkStatusReq(Packet):
+		__hdr__ = (
+			("oui", "3s", b"\x00" * 3),
+		)
+
+	class VSPLLinkStatusCnf(Packet):
+		__hdr__ = (
+			("oui", "3s", b"\x00" * 3),
+			("link", "H", 0),
+		)
+
+	class AMPMapReq(Packet):
+		__hdr__ = (
+			("amlen", "H", 0),
+		)
+
+	class AMPMapCnf(Packet):
+		__hdr__ = (
+			("restype", "B", 0),
+		)
+
+	class CMPKCSCertReq(Packet):
+		__hdr__ = (
+			("targetmac", "6s", b"\x00" * 6),
+			("ciphersuitesize", "B", 0),
+			("cipersuite", None, TriggerList)
+		)
+
+		targetmac_s = pypacker.get_property_mac("targetmac")
+
+	class CMPKCSCertCnf(Packet):
+		__hdr__ = (
+			("targetmac", "6s", b"\x00" * 6),
+			("status", "B", 0),
+			("cipersuite", "H", 0),
+			("certlen", "H", 0),
+			("certpackage", None, TriggerList)
+		)
+
+		targetmac_s = pypacker.get_property_mac("targetmac")
+
+	class CMPKCSCertInd(Packet):
+		"""
+		When the CM_SLAC_PARM.CNF indicates that Secure SLAC is required, the PEV-HLE
+		shall send a CM_PKCS_CERT.IND message. The Target MAC address for this message
+		shall be set to MAC address of the PEV Green PHY station. To ensure reliable
+		reception of this message at all EVSEs, it is recommended that this message be
+		transmitted at least three times by the PEV-HLE. If the CM_PKCS_CERT.IND message is
+		larger than 502 Octets, the message shall be fragmented by the HLE (refer to
+		Section 11.1.7).
+		"""
+		__hdr__ = (
+			("targetmac", "6s", b"\x00" * 6),
+			("cipersuite", "H", 0),
+			("certlen", "H", 0),
+			("certpackage", None, TriggerList)
+		)
+
+		targetmac_s = pypacker.get_property_mac("targetmac")
+
+	class CMPKCSCertRsp(Packet):
+		__hdr__ = (
+			("targetmac", "6s", b"\x00" * 6),
+			("status", "B", 0),
+			("ciphersuitesize", "B", 0),  # optional
+			("cipersuite", None, TriggerList)
+		)
+
+		targetmac_s = pypacker.get_property_mac("targetmac")
+
+	__handler__ = {
+		CM_SET_KEY | MMTYPELSB_REQUEST: CMSetKeyReq,
+		CM_SET_KEY | MMTYPELSB_CONFIRM: CMSetKeyICnf,
+		CM_SLAC_MATCH | MMTYPELSB_REQUEST: CMSlacMatchReq,
+		CM_SLAC_MATCH | MMTYPELSB_CONFIRM: CMSlacMatchCnf,
+		CM_ATTEN_CHAR | MMTYPELSB_INDICATION: CMAttenCharInd,
+		CM_ATTEN_CHAR | MMTYPELSB_RESPONSE: CMAttenCharRsp,
+		CM_SLAC_PARM | MMTYPELSB_REQUEST: CMSlacParmReq,
+		CM_SLAC_PARM | MMTYPELSB_CONFIRM: CMSlacParmCnf,
+		# MS:new
+		CM_START_ATTEN_CHAR | MMTYPELSB_INDICATION: CMStartAttenCharInd,
+		CM_MNBC_SOUND | MMTYPELSB_INDICATION: CMMnbcSoundInd,
+		CM_LINK_STATS | MMTYPELSB_REQUEST: CMLinkStatsReq,
+		CM_LINK_STATS | MMTYPELSB_CONFIRM: CMLinkStatsCnf,
+		VS_PL_LNK_STATUS | MMTYPELSB_REQUEST: VSPLLinkStatusReq,
+		VS_PL_LNK_STATUS | MMTYPELSB_CONFIRM: VSPLLinkStatusCnf,
+		CM_AMP_MAP | MMTYPELSB_REQUEST: AMPMapReq,
+		CM_AMP_MAP | MMTYPELSB_CONFIRM: AMPMapCnf,
+		CM_PKCS_CERT | MMTYPELSB_REQUEST: CMPKCSCertReq,
+		CM_PKCS_CERT | MMTYPELSB_CONFIRM: CMPKCSCertCnf,
+		CM_PKCS_CERT | MMTYPELSB_INDICATION: CMPKCSCertInd,
+		CM_PKCS_CERT | MMTYPELSB_RESPONSE: CMPKCSCertRsp
+	}

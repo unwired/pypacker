@@ -133,6 +133,15 @@ class DHCP(pypacker.Packet):
 		# logger.debug("amount of options after parsing: %d" % len(self.opts))
 		return len(buf)
 
+	class DHCPOpt(pypacker.Packet):
+		__hdr__ = (
+			("type", "B", 0),
+			("len", "B", 0),
+		)
+
+	class Padding(pypacker.Packet):
+		pass
+
 	@staticmethod
 	def __get_opts(buf):
 		# logger.debug("DHCP: parsing options from: %s" % buf)
@@ -144,13 +153,13 @@ class DHCP(pypacker.Packet):
 			p = None
 			# logger.debug("DHCP: adding option type %d" % t)
 
-			# last option
+			# Last option
 			if t in [0, 0xFF]:
-				p = DHCPOpt(type=t, len=0)
+				p = DHCP.DHCPOpt(type=t, len=None)
 				i += 1
 			else:
 				dlen = buf[i + 1]
-				p = DHCPOpt(type=t, len=dlen, body_bytes=buf[i + 2: i + 2 + dlen])
+				p = DHCP.DHCPOpt(type=t, len=dlen, body_bytes=buf[i + 2: i + 2 + dlen])
 				i += 2 + dlen
 
 			# logger.debug("new option: %s" % p)
@@ -159,18 +168,7 @@ class DHCP(pypacker.Packet):
 			if t == 0xFF:
 				if i < len(buf):
 					# padding is part of the options
-					opts.append(Padding(buf[i:]))
+					opts.append(DHCP.Padding(buf[i:]))
 				break
 
 		return opts
-
-
-class DHCPOpt(pypacker.Packet):
-	__hdr__ = (
-		("type", "B", 0),
-		("len", "B", 0),
-	)
-
-
-class Padding(pypacker.Packet):
-	pass

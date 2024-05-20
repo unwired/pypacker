@@ -1,6 +1,19 @@
+Development process
+===================
+1) Add new code. See directory examples/ for examples, eg on creating new protocols.
+2) For new protocols:
+   - Add packet class to one of the layer directories layerXYZ
+     - Add reference code from lower to upper (new) layer (see ip.IP.__handler__)
+     - Example code: examples/new_protocol.py
+   - Tests
+     - Add pcap containing example packets to ./tests. Execute all tests, no test must fail.
+     - Add tests to tests/test_pypacker.py. Each Packet-class has its own test-class.
+3) Quality Assurance via "./switch_setup.sh stable": Improve until no (additional) errors are shown anymore
+4) Send PR
+
+
 pypacker directory structure
 ============================
-
 pypacker
 	examples		# usage examples for pypacker
 	pypacker		# pypacker core logic, routines for handling packet-data, protocols sorted by layers
@@ -12,43 +25,11 @@ pypacker
 	tests			# tests for pypacker logic and protocols
 
 
-Development process
-===================
-Add new code -> add Tests -> QA via "./switch_setup.sh stable" -> PR
-
-
-Styleguide
-==========
-
-- All official Python style-guidelines *should* be applied except the
-  preference of space-characters. Tabs must be used throughout
-  the code:
-
-	GLOBAL_XYZ[tab]= 123  # some comment
-
-	class someclass()
-	# some comment
-		[tab]def xyz(self):
-			[tab][tab]# Some comment
-			[tab][tab]var1 = 123  # some comment
-			[tab][tab]pass
-
-- QA config (pep8, flake8, pylint): see qa_config.txt
-Explanation:
-	W191: Spaces enforced? -> We use TABS!
-	E128: continuation line under-indented for visual indent -> Looks sh$§
-	E223: tab before operator -> yep, we use tabs
-	E265: "#some comment" is ok -> it's readable
-
-- Auto-update header should only be recalculated if VARNAME_au_active is True
+General Styleguide
+==================
+- QA rules from qa_config.txt must be applied
+- Tabs must be used throughout the code:
 - Strings are written using double quotes like "string_xyz"
 - Constant names are written in the format [High level: Class/Topic]_[Low level: Descriptive name] like ICMP_ECHO_REPLY (see layer3/icmp.py)
-- Readability is more important than performance
 - Avoid overwriting "__getattribute__"
-
-
-Adding new protocols
-====================
-
-See examples/examples_new_protocol.py and pypacker/pypacker.Packet for more informations on creating new protocols.
-Every Protocol needs a testcase in tests/test_pypacker.py
+- Readability is more important than performance

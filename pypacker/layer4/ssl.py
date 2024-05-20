@@ -5,12 +5,6 @@
 Secure Sockets Layer / Transport Layer Security.
 """
 import logging
-#
-# Note from April 2011: cde...@gmail.com added code that parses SSL3/TLS messages
-# more in depth.
-#
-# Jul 2012: afleenor@google.com modified and extended SSL support further.
-#
 
 from pypacker import pypacker, triggerlist
 from pypacker.structcbs import unpack_H, unpack_I
@@ -41,29 +35,29 @@ alert_level_str = {
 
 # SSL3 alert descriptions
 SSL3_AD_CLOSE_NOTIFY			= 0
-SSL3_AD_UNEXPECTED_MESSAGE		= 10		# fatal
-SSL3_AD_BAD_RECORD_MAC			= 20		# fatal
-SSL3_AD_DECOMPRESSION_FAILURE		= 30		# fatal
-SSL3_AD_HANDSHAKE_FAILURE		= 40		# fatal
+SSL3_AD_UNEXPECTED_MESSAGE		= 10	# Fatal
+SSL3_AD_BAD_RECORD_MAC			= 20	# Fatal
+SSL3_AD_DECOMPRESSION_FAILURE		= 30	# Fatal
+SSL3_AD_HANDSHAKE_FAILURE		= 40	# Fatal
 SSL3_AD_NO_CERTIFICATE			= 41
 SSL3_AD_BAD_CERTIFICATE			= 42
 SSL3_AD_UNSUPPORTED_CERTIFICATE		= 43
 SSL3_AD_CERTIFICATE_REVOKED		= 44
 SSL3_AD_CERTIFICATE_EXPIRED		= 45
 SSL3_AD_CERTIFICATE_UNKNOWN		= 46
-SSL3_AD_ILLEGAL_PARAMETER		= 47		# fatal
+SSL3_AD_ILLEGAL_PARAMETER		= 47	# Fatal
 
 # TLS1 alert descriptions
 TLS1_AD_DECRYPTION_FAILED		= 21
 TLS1_AD_RECORD_OVERFLOW			= 22
-TLS1_AD_UNKNOWN_CA			= 48		# fatal
-TLS1_AD_ACCESS_DENIED			= 49		# fatal
-TLS1_AD_DECODE_ERROR			= 50		# fatal
+TLS1_AD_UNKNOWN_CA			= 48	# Fatal
+TLS1_AD_ACCESS_DENIED			= 49	# Fatal
+TLS1_AD_DECODE_ERROR			= 50	# Fatal
 TLS1_AD_DECRYPT_ERROR			= 51
-TLS1_AD_EXPORT_RESTRICTION		= 60		# fatal
-TLS1_AD_PROTOCOL_VERSION		= 70		# fatal
-TLS1_AD_INSUFFICIENT_SECURITY		= 71		# fatal
-TLS1_AD_INTERNAL_ERROR			= 80		# fatal
+TLS1_AD_EXPORT_RESTRICTION		= 60	# Fatal
+TLS1_AD_PROTOCOL_VERSION		= 70	# Fatal
+TLS1_AD_INSUFFICIENT_SECURITY		= 71	# Fatal
+TLS1_AD_INTERNAL_ERROR			= 80	# Fatal
 TLS1_AD_USER_CANCELLED			= 90
 TLS1_AD_NO_RENEGOTIATION		= 100
 # /* codes 110-114 are from RFC3546 */
@@ -72,7 +66,7 @@ TLS1_AD_CERTIFICATE_UNOBTAINABLE	= 111
 TLS1_AD_UNRECOGNIZED_NAME		= 112
 TLS1_AD_BAD_CERTIFICATE_STATUS_RESPONSE = 113
 TLS1_AD_BAD_CERTIFICATE_HASH_VALUE 	= 114
-TLS1_AD_UNKNOWN_PSK_IDENTITY		= 115		# fatal
+TLS1_AD_UNKNOWN_PSK_IDENTITY		= 115	# Fatal
 
 
 # Mapping alert types to strings
@@ -146,7 +140,7 @@ class SSL(pypacker.Packet):
 
 		while offset < dlen:
 			record_len = unpack_H(buf[offset + 3: offset + 5])[0]
-			record = Record(buf[offset: offset + 5 + record_len])
+			record = SSL.Record(buf[offset: offset + 5 + record_len])
 			records.append(record)
 			offset += 5 + record_len
 		return records
@@ -158,7 +152,7 @@ class SSL(pypacker.Packet):
 
 	def get_cert_length(self):
 		"""
-		return -- length of certificate content if this is a certificate handshake or 0 if not
+		return -- Length of certificate content if this is a certificate handshake or 0 if not
 		"""
 		for record in self.records:
 			try:
@@ -170,136 +164,125 @@ class SSL(pypacker.Packet):
 					return record.higher_layer.len_i - 3
 			except Exception as ex:
 				logger.exception(ex)
-				pass
 		return 0
 
-
-class Extension(pypacker.Packet):
-	"""
-	Handshake protocol extension
-	"""
-	__hdr__ = (
-		("type", "H", 0),
-		("len", "H", 0)
-	)
-
-
-#
-# Record contents
-#
-class Handshake(pypacker.Packet):
-
-	__hdr__ = (
-		("type", "B", 0),
-		("len", "3s", b"\x00" * 3)
-	)
-
-	len_i = pypacker.get_property_bytes_num("len")
-
-	def extract_certificates(self):
+	class Record(pypacker.Packet):
 		"""
-		Extracts certificates from a Handshake packet
-		Workflow:
-			find 1# cert segment(SSL.get_cert_length()) -> collect/assemble until
-			cert length collected -> create SSL(tcp_bytes) -> ssl.handshake.extract_certs()
-		return -- [cert1, cert2, ...]
+		SSLv3 or TLSv1+ Record layer.
 		"""
-		ret = []
 
-		if self.type != HNDS_CERTIFICATE:
-			logger.warning("Not a certificate handshake: %r", self)
-			return ret
+		__hdr__ = (
+			("type", "B", 0),
+			("version", "H", 0),
+			("len", "H", 0),
+		)
 
-		bts_body = self.body_bytes
-		certs_len = self.len_i - 3
-		#logger.debug("total cert length: %d", certs_len)
-		# skip total cert length
-		off = 3
+		def _dissect(self, buf):
+			# TODO: check for other handshakes
+			#if buf[0] == RECORD_TLS_HANDSHAKE:
+			#	logger.debug("got a handshake")
+			return 5, buf[0]
 
-		while off < certs_len:
-			cert_len = unpack_I(b"\x00" + bts_body[off: off + 3])[0]
-			#logger.debug("cert length: %d", cert_len)
-			cert_bytes = bts_body[off + 3: off + 3 + cert_len]
-			off += 3 + cert_len
-			ret.append(cert_bytes)
+		class ChangeCipherSpec(pypacker.Packet):
+			pass
 
-		return ret
+		class Handshake(pypacker.Packet):
 
+			__hdr__ = (
+				("type", "B", 0),
+				("len", "3s", b"\x00" * 3)
+			)
 
-class HandshakeHello(pypacker.Packet):
+			len_i = pypacker.get_property_bytes_num("len")
 
-	__hdr__ = (
-		("type", "B", 0),
-		# can't use struct here but:
-		# int.from_bytes(len, "big")
-		("len", "3s", b"\x00" * 3),
-		("tlsversion", "H", 0x0301),
-		("random", "32s", b"\x00" * 32),
-		("sid_len", "B", 32),
-		# variable length
-		("sid", None, b"A" * 32),
-		("ciphersuite", "H", 0x0035),
-		("compression", "B", 0),
-		("ext_len", "H", 0x0000),
-		("extensions", None, triggerlist.TriggerList),
-	)
+			def extract_certificates(self):
+				"""
+				Extracts certificates from a Handshake packet
+				Workflow:
+					find 1# cert segment(SSL.get_cert_length()) -> collect/assemble until
+					cert length collected -> create SSL(tcp_bytes) -> ssl.handshake.extract_certs()
+				return -- [cert1, cert2, ...]
+				"""
+				ret = []
 
-	len_i = pypacker.get_property_bytes_num("len")
+				if self.type != HNDS_CERTIFICATE:
+					logger.warning("Not a certificate handshake: %r", self)
+					return ret
 
-	@staticmethod
-	def __parse_extension(buf):
-		extensions = []
-		offset = 0
-		buflen = len(buf)
+				bts_body = self.body_bytes
+				certs_len = self.len_i - 3
+				#logger.debug("total cert length: %d", certs_len)
+				# skip total cert length
+				off = 3
 
-		while offset < buflen:
-			ext_content_len = unpack_H(buf[offset + 2: offset + 4])[0]
-			ext_len = 4 + ext_content_len
-			extensions.append(Extension(buf[offset: offset + ext_len]))
-			offset += ext_len
+				while off < certs_len:
+					cert_len = unpack_I(b"\x00" + bts_body[off: off + 3])[0]
+					#logger.debug("cert length: %d", cert_len)
+					cert_bytes = bts_body[off + 3: off + 3 + cert_len]
+					off += 3 + cert_len
+					ret.append(cert_bytes)
 
-		return extensions
+				return ret
 
-	def _dissect(self, buf):
-		sid_len = buf[38]
-		offset_extlen = 38 + sid_len + 3
-		# ext_len = unpack_H(buf[offset_extlen: offset_extlen+2])
-		self.extensions(buf[offset_extlen + 2:], self.__parse_extension)
+		class HandshakeHello(pypacker.Packet):
 
+			__hdr__ = (
+				("type", "B", 0),
+				# can't use struct here but:
+				# int.from_bytes(len, "big")
+				("len", "3s", b"\x00" * 3),
+				("tlsversion", "H", 0x0301),
+				("random", "32s", b"\x00" * 32),
+				("sid_len", "B", 32),
+				# variable length
+				("sid", None, b"A" * 32),
+				("ciphersuite", "H", 0x0035),
+				("compression", "B", 0),
+				("ext_len", "H", 0x0000),
+				("extensions", None, triggerlist.TriggerList),
+			)
 
-class HandshakeData(pypacker.Packet):
-	pass
+			len_i = pypacker.get_property_bytes_num("len")
 
+			@staticmethod
+			def __parse_extension(buf):
+				extensions = []
+				offset = 0
+				buflen = len(buf)
 
-class ChangeCipherSpec(pypacker.Packet):
-	pass
+				while offset < buflen:
+					ext_content_len = unpack_H(buf[offset + 2: offset + 4])[0]
+					ext_len = 4 + ext_content_len
+					extensions.append(SSL.HandshakeHello.Extension(buf[offset: offset + ext_len]))
+					offset += ext_len
 
+				return extensions
 
-class ApplicationData(pypacker.Packet):
-	pass
+			def _dissect(self, buf):
+				sid_len = buf[38]
+				offset_extlen = 38 + sid_len + 3
+				# ext_len = unpack_H(buf[offset_extlen: offset_extlen+2])
+				self.extensions(buf[offset_extlen + 2:], self.__parse_extension)
 
+			class Extension(pypacker.Packet):
+				"""
+				Handshake protocol extension
+				"""
+				__hdr__ = (
+					("type", "H", 0),
+					("len", "H", 0)
+				)
 
-class Record(pypacker.Packet):
-	"""
-	SSLv3 or TLSv1+ Record layer.
-	"""
+		class HandshakeData(pypacker.Packet):
+			pass
 
-	__hdr__ = (
-		("type", "B", 0),
-		("version", "H", 0),
-		("len", "H", 0),
-	)
+		class ApplicationData(pypacker.Packet):
+			pass
 
-	__handler__ = {
-		RECORD_TLS_CHG_CIPHERSPEC: ChangeCipherSpec,
-		RECORD_TLS_HANDSHAKE: Handshake,
-		RECORD_TLS_HANDSHAKE_HELLO: HandshakeHello,
-		RECORD_TLS_HANDSHAKE_DATA: HandshakeData,
-		RECORD_TLS_APPDATA: ApplicationData
-	}
-
-	def _dissect(self, buf):
-		# TODO: check for other handshakes
-		#if buf[0] == RECORD_TLS_HANDSHAKE:
-		#	logger.debug("got a handshake")
-		return 5, buf[0]
+		__handler__ = {
+			RECORD_TLS_CHG_CIPHERSPEC: ChangeCipherSpec,
+			RECORD_TLS_HANDSHAKE: Handshake,
+			RECORD_TLS_HANDSHAKE_HELLO: HandshakeHello,
+			RECORD_TLS_HANDSHAKE_DATA: HandshakeData,
+			RECORD_TLS_APPDATA: ApplicationData
+		}

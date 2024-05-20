@@ -15,7 +15,7 @@ See below examples for what you can do with it.
 If you want to support this project you can [![Donate with PayPal](https://www.paypalobjects.com/en_US/i/btn/btn_donate_SM.gif)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=M6GGAXJQCUHVC&source=url) via PayPal.
 
 ## What you can do with Pypacker
-Create custom Packets (via keywords) or from raw bytes and access/change their data:
+Create custom Packets via keywords or from raw bytes and access/change their data:
 
 ```python
 from pypacker.layer3 import ip
@@ -139,7 +139,7 @@ for raw_bytes in psock:
 	eth.higher_layer.reverse_address()
 	# Send bytes
 	psock.send(eth.bin())
-	# Receive raw bytes
+	# Receive (any) raw bytes
 	bts = psock.recv()
 	# Send/receive based on source/destination data in packet
 	pkts = psock.sr(eth)
@@ -151,7 +151,7 @@ for raw_bytes in psock:
 psock.close()
 ```
 
-Intercept (and modificate) Packets eg for MITM:
+Intercept (and modificate) Packets e.g. for MITM:
 
 ```python
 # Add iptables rule:
@@ -211,13 +211,16 @@ Some examples:
 - Use pip (synched to master on major version changes)
   - pip install pypacker
 
-## Usage examples
-See examples/ and tests/test_pypacker.py.
+## Usage examples and documentation
+See:
 
-```
-python tests/test_pypacker.py
-python examples/python [example]
-```
+- Above examples
+- Examples in directory ./examples
+- Gitlab Wiki: https://gitlab.com/mike01/pypacker/-/wikis/home
+
+Protocols itself (see layerXYZ) generally don't have much documentation because those are documented
+by their respective RFCs/official standards.
+
 ## Testing
 Tests are executed as follows:
 
@@ -230,90 +233,66 @@ Tests are executed as follows:
 
 - `python tests/test_pypacker.py`
 
-**Performance test results: pypacker**
+**Performance test results:**
 ```
-nr = Intel CPU, 4 Cores @ 2.5 GHz, CPython v3.6
+Hardware: Intel CPU, 4 Cores @ 3.2 GHz
+Python: CPython v3.10.13
 
+nr = new results on this machine
 rounds per test: 10000
 =====================================
 >>> Packet parsing (Ethernet + IP + UDP + DNS): Search UDP port
-Time diff: 0.41541337966918945s
-nr = 24072 p/s
+Time diff: 0.3220548629760742s
+nr = 31050 p/s
 >>> Packet parsing (Ethernet + IP + TCP + HTTP): Search TCP port
-Time diff: 0.788198709487915s
-nr = 12687 p/s
+Time diff: 0.5902166366577148s
+nr = 16942 p/s
 >>> Packet parsing (Ethernet + IP + TCP + HTTP): Reading all header
-Time diff: 1.32124924659729s
-nr = 7568 p/s
+Time diff: 0.9773461818695068s
+nr = 10231 p/s
 >>> Parsing first layer (IP + ICMP)
-Time diff: 0.05343985557556152s
-nr = 187126 p/s
+Time diff: 0.04322528839111328s
+nr = 231346 p/s
 >>> Creating/direct assigning (IP only header)
-Time diff: 0.11874556541442871s
-nr = 84213 p/s
+Time diff: 0.06982040405273438s
+nr = 143224 p/s
 >>> bin() without change (IP)
-Time diff: 0.028677940368652344s
-nr = 348700 p/s
+Time diff: 0.02322697639465332s
+nr = 430533 p/s
 >>> Output with change/checksum recalculation (IP)
-Time diff: 0.2695651054382324s
-nr = 37096 p/s
+Time diff: 0.18998193740844727s
+nr = 52636 p/s
 >>> Basic/first layer parsing (Ethernet + IP + TCP + HTTP)
-Time diff: 0.062027692794799805s
-nr = 161218 p/s
+Time diff: 0.048027992248535156s
+nr = 208211 p/s
 >>> Changing Triggerlist element value (Ethernet + IP + TCP + HTTP)
-Time diff: 0.061231374740600586s
-nr = 163314 p/s
+Time diff: 0.04828596115112305s
+nr = 207099 p/s
 >>> Changing dynamic field (Ethernet + IP + TCP + HTTP)
-Time diff: 0.02509450912475586s
-nr = 398493 p/s
+Time diff: 0.016223669052124023s
+nr = 616383 p/s
 >>> Direct assigning and concatination (Ethernet + IP + TCP + HTTP)
-Time diff: 0.5904519557952881s
-nr = 16936 p/s
-
-```
-
-**Performance test results: pypacker vs. dpkt vs. scapy**
-```
+Time diff: 0.3817322254180908s
+nr = 26196 p/s
+>>> Performance test pypacker vs. dpkt vs. scapy
 Comparing pypacker, dpkt and scapy performance (parsing Ethernet + IP + TCP + HTTP)
-orC = Intel CPU, 4 Cores @ 3GHz, CPython v3.6
+nr = new results on this machine
 rounds per test: 10000
-=====================================
 >>> testing pypacker parsing speed
-nr = 55374 p/s
->>> testing dpkt parsing speed
-(Not working anymore)
+nr = 74695 p/s
+Could not execute dpkt tests: ModuleNotFoundError("No module named 'dpkt'")
 >>> testing scapy parsing speed
-orC = 2213 p/s
+nr = 1732 p/s
 ```
 
 # FAQ
 
-If you have any questions: please first read the following point "Is there any documentation?".
 For any questions left please file a bug (will be tagged as "questions").
-
-**Q**:	Where should I start learn to use Pypacker?
-
-**A**:	If you allready know Scapy starting by reading the examples should be OK. Otherwise there
-	is a general introduction to pypacker included at the doc's/wiki which shows the usage and concepts
-	of pypacker.
 
 **Q**:	How fast is pypacker?
 
 **A**:	See results above. For detailed results on your machine execute tests:
 	`python tests/test_pypacker.py PerfTestCase`
-
-**Q**:	Is there any documentation?
-
-**A**:	Pypacker is based on code of dpkt, which in turn didn't have any official and very little
-	internal code documentation. This made understanding of the internal behaviour tricky.
-	After all the code documentation was pretty much extended for Pypacker. Documentation can
-	be found in these directories and files:
-- examples/ (many examples showing the usage of Pypacker)
-- wiki (general intro into pypacker)
-- pypacker.py (general Packet structure)
-
-Protocols itself (see layerXYZ) generally don't have much documentation because those are documented
-by their respective RFCs/official standards.
 
 **Q**:	Which protocols are supported?
 
@@ -321,29 +300,24 @@ by their respective RFCs/official standards.
 	Ethernet, Radiotap, IEEE80211, ARP, DNS, STP, PPP, OSPF, VRRP, DTP, IP, ICMP, PIM, IGMP, IPX,
 	TCP, UDP, SCTP, HTTP, NTP, RTP, DHCP, RIP, SIP, Telnet, HSRP, Diameter, SSL, TPKT, Pmap, Radius, BGP
 
-**Q**:	How are protocols added?
+**Q**:	Are there any plans to support [xyz]?
 
-**A**:  Short answer: Extend Packet class and add the class variable `__hdr__` to define header fields.
-        Long answer: See examples/new_protocol.py for a very complete example.
+**A**:	New features are added to Pypacker as a result of me needing them or people contributing
+	them - no formal plans for adding support for particular features in future releases exist.
+	A general guideline for contribution can be found in the file HACKING.
 
-**Q**: How can I contribute to this project?
+**Q**:	How can I contribute to this project?
 
-**A**: Please use the Gitlab bug-tracker for bugs/feature request. Please read the bugtracker for
-     already known bugs before filing a new one. Patches can be send via pull request.
-
-**Q**:	Under which license Pypacker is issued?
-
-**A**:	It's the GPLv2 License (see LICENSE file for more information).
-
-**Q**:	Are there any plans to support [protocol xyz]?
-
-**A**:	Support for particular protocols is added to Pypacker as a result of me needing this feature or people contributing
-	that support - no formal plans for adding support for particular protocols in particular
-	future releases exist. 
+**A**:	Please use the Gitlab bug-tracker for bugs/feature request. Please read the bugtracker for
+	already known bugs before filing a new one. Patches can be send via pull request.
 
 **Q**:	There is problem xyz with Pypacker using Windows 3.11/XP/7/8/mobile etc. Can you fix that?
 
 **A**:	The basic features should work with any OS. Optional ones may make trouble (eg interceptor).
+
+**Q**:	Under which license Pypacker is issued?
+
+**A**:	It's the GPLv2 License (see LICENSE file for more information).
 
 **Q**:	Calling copy.deepcopy(some_packet) raises an exception "TypeError: can't pickle Struct objects".
 

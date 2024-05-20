@@ -30,9 +30,11 @@ RET_CODE_E_WRONG_MESSAGE_TYPE		= 0x0A
 
 class SomeIP(Packet):
 	__hdr__ = (
-		("messageid", "I", 1),
+		("serviceid", "H", 0),
+		("methodid", "H", 0),
 		("length", "I", 8, FIELD_FLAG_AUTOUPDATE),  # in bytes, inclusive 8 bytes of header
-		("reqid", "I", 0),
+		("clientid", "H", 0),
+		("sessionid", "H", 0),
 		("protoversion", "B", 0),
 		("ifaceversion", "B", 0),
 		("msgtype", "B", 0),

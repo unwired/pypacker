@@ -12,7 +12,8 @@ import math
 import ipaddress
 import collections
 
-from pypacker import pypacker as pypacker
+#from pypacker import pypacker as pypacker
+from pypacker import pypacker
 
 
 logger = logging.getLogger("pypacker")
@@ -74,12 +75,54 @@ def get_wlan_mode(iface):
 
 def is_interface_up(iface):
 	"""
+	Requirements: ifconfig
+
 	return -- [True | False]
 	"""
 	cmd_call = ["ifconfig"]
 	pattern_up = re.compile(b"^" + bytes(iface, "UTF-8") + b": flags=", re.MULTILINE)
 	output = subprocess.check_output(cmd_call)
 	return pattern_up.search(output) is not None
+
+
+PATTERN_MODE = re.compile(br"wiphy (\d+)")
+
+
+def get_phy_name(iface_wifi):
+	"""
+	Requirements: iw
+
+	return -- phy_name
+	"""
+	cmd_call = ["iw", "dev", iface_wifi, "info"]
+	output = subprocess.check_output(cmd_call)
+	match = PATTERN_MODE.search(output)
+	phy_dev = "phy" + match.group(1).decode("UTF-8")
+	#logger.debug(f"Phy dev translation: {iface_wifi}={phy_dev}")
+	return phy_dev
+
+
+def set_wifi_monitor_config(iface_wifi):
+	"""
+	Try various settings to improve monitor mode. Might not always work.
+	Requirements: iw
+
+	Additional manual configs:
+	iw dev | grep -P 'phy|Interface'
+	iw phy phy3 set retry short 1 long 1
+	iw phy phy3 set rts off
+	"""
+	phy_dev = get_phy_name(iface_wifi)
+
+	# Alternative via iwconfig
+	# cmd_call = ["iwconfig", iface, "retry", "0"]
+
+	for cmd_str in [f"iw phy {phy_dev} set retry short 1 long 1", f"iw phy {phy_dev} set rts off"]:
+		try:
+			subprocess.check_call(cmd_str.split(" "))
+		except:
+			# Ignore, depends on driver capabilities
+			pass
 
 
 def set_interface_mode(iface, monitor_active=None, mtu=None, state_active=None):
@@ -98,18 +141,11 @@ def set_interface_mode(iface, monitor_active=None, mtu=None, state_active=None):
 		mode = "monitor" if monitor_active else "managed"
 		cmd_call = ["iwconfig", iface, "mode", mode]
 		subprocess.check_call(cmd_call)
+		set_wifi_monitor_config(iface)
 
 	if type(mtu) is int:
 		cmd_call = ["ifconfig", iface, "mtu", "%d" % mtu]
 		subprocess.check_call(cmd_call)
-
-	# try:
-	#	cmd_call = ["iwconfig", iface, "retry", "0"]
-	#	subprocess.check_call(cmd_call)
-	#	# we don't need retry but this can improve performance
-	# except:
-	#	# not implemented: don't care
-	#	pass
 
 	if state_active or initial_state_up:
 		cmd_call = ["ifconfig", iface, "up"]
@@ -126,6 +162,9 @@ def is_interface_present(iface_name):
 
 
 def set_interface_state(iface_name, state_active=True):
+	"""
+	Requirements: ip
+	"""
 	state_str = "up" if state_active else "down"
 	output = subprocess.getoutput("ip link set dev %s %s" % (iface_name, state_str))
 	logger.info(output)
@@ -162,14 +201,13 @@ def set_ethernet_address(iface, ethernet_addr):
 		cmd_call = ["ifconfig", iface, "up"]
 		subprocess.check_call(cmd_call)
 
+
 MAC_VENDOR = {}
 PROG_MACVENDOR = re.compile(r"([\w\-]{8,8})   \(hex\)\t\t(.+)")
 PROG_MACVENDOR_STRIPPED = re.compile(r"(.{6,6}) (.+)")
-
-current_dir = os.path.dirname(os.path.realpath(__file__)) + "/"
-
-FILE_OUI = current_dir + "oui.txt"
-FILE_OUI_STRIPPED = current_dir + "oui_stripped.txt"
+DIR_CURRENT = os.path.dirname(os.path.realpath(__file__)) + "/"
+FILE_OUI = DIR_CURRENT + "oui.txt"
+FILE_OUI_STRIPPED = DIR_CURRENT + "oui_stripped.txt"
 
 
 def _convert():
@@ -180,7 +218,7 @@ def _convert():
 	# logger.debug("loading oui file %s", FILE_OUI)
 
 	try:
-		with open(FILE_OUI, "r") as fh_read:
+		with open(FILE_OUI, "r", encoding="utf-8") as fh_read:
 			for line in fh_read:
 				hex_vendor = PROG_MACVENDOR.findall(line)
 
@@ -192,7 +230,7 @@ def _convert():
 		return False
 
 	try:
-		with open(FILE_OUI_STRIPPED, "w") as fh_write:
+		with open(FILE_OUI_STRIPPED, "w", encoding="utf-8") as fh_write:
 			for mac, descr in MAC_VENDOR.items():
 				fh_write.write("%s %s\n" % (mac, descr))
 	except Exception as ex:
@@ -218,7 +256,7 @@ def _load_mac_vendor():
 	# logger.debug("loading stripped oui file %s", FILE_OUI_STRIPPED)
 
 	try:
-		with open(FILE_OUI_STRIPPED, "r") as fh_read:
+		with open(FILE_OUI_STRIPPED, "r", encoding="utf-8") as fh_read:
 			for line in fh_read:
 				hex_vendor = PROG_MACVENDOR_STRIPPED.findall(line)
 
@@ -241,7 +279,7 @@ def get_vendor_for_mac(mac):
 
 	if len(MAC_VENDOR) == 0:
 		_load_mac_vendor()
-		# avoid loading next time
+		# Avoid loading next time
 		if len(MAC_VENDOR) == 0:
 			MAC_VENDOR["test"] = "test"
 
@@ -266,18 +304,16 @@ def is_special_mac(mac_str):
 	return len(get_vendor_for_mac(mac_str)) == 0
 
 
-ENTROPY_GRANULARITY_QUADRUPLE	= 0
-
-
-def calculate_entropy(elements, granularity_bytes=0, blocksize_bytes=64, log_base=2):
+def calculate_entropy(elements, granularity_bytes=0, blocksize_bytes=64, log_base=2): # pylint: disable=too-many-locals
 	"""
 	Calcualte entropy of elements
 
-	elements -- list of elements (each of same length) or a string
-	granularity_bytes -- amount of bytes from which entropy has to be calculated
-	blocksize_bytes -- if elements is a string: size of the block which is splittet in granularity_bytes
+	elements -- List of elements (each of same length) or a string
+	granularity_bytes -- Amount of bytes from which entropy has to be calculated if > 0
+		(Entropy per "column", 2nd dimension)
+	blocksize_bytes -- If elements is a string: size of the block which is splittet in granularity_bytes
 		long strings to calculate the entropy
-	return -- entropy or None on error
+	return -- Entropy, Entropies (granularity_bytes > 0) or None on error
 	"""
 	if len(elements) == 0:
 		return None
@@ -304,7 +340,8 @@ def calculate_entropy(elements, granularity_bytes=0, blocksize_bytes=64, log_bas
 			entropies.append(entropy_block)
 			#time.sleep(60)
 		return entropies
-	elif granularity_bytes != 0:
+
+	if granularity_bytes != 0:
 		# Get Entropy of subsets of bytes of elements: ["1234", "5678"] -> [E("1", "5", ...), ...]
 		element_len = len(elements[0])
 		entropies = []
@@ -346,27 +383,47 @@ def get_mac_for_iface(iface_name):
 		return None
 
 
-def get_ip_addressinfo(iface_name, version=4, idx=0):
-	"""
-	iface_name -- Name of the interface to get the information from
-	version -- 4 for IPv4, 6 for IPv6
-	idx -- Index to the n'th element in the address-info list (useful if multiple IP addresses are assigned)
-	return -- Adressinfo (IP address, mask, broadcast address) for the given interface name
-		like ("1.2.3.4", "255.255.255.0", "192.168.0.255") or None on error
-	"""
-	version_id = netifaces.AF_INET if version == 4 else netifaces.AF_INET6
+PROG_MAC_AP = re.compile(br"Access Point: (.+)")
 
+
+def get_mac_of_connected_ap(wifi_interface):
+	"""
+	return -- MAC address of connected AP on wifi interface, otherweise None
+	"""
 	try:
-		addressinfo = netifaces.ifaddresses(iface_name)[version_id][idx]
-		# Honor no broadcast for IPv6
-		return addressinfo["addr"], addressinfo["netmask"], addressinfo.get("broadcast", None)
+		cmd_call = ["iwconfig", wifi_interface]
+		output = subprocess.check_output(cmd_call)
+		return PROG_MAC_AP.findall(output)[0].strip()
 	except:
 		return None
 
 
+def get_ip_addressinfo(iface_name, version=4):
+	"""
+	iface_name -- Name of the interface to get the information from
+	version -- 4 for IPv4, 6 for IPv6
+	return -- Adressinfo (ip_address, ip_mask|None, ip_broadcast|None) for the given interface name
+		like ("1.2.3.4", "255.255.255.0", "192.168.0.255")
+	"""
+	version_id = netifaces.AF_INET if version == 4 else netifaces.AF_INET6
+	addr_netmask_broadcast = []
+
+	try:
+		for addressinfo in netifaces.ifaddresses(iface_name)[version_id]:
+			# Honor no broadcast for IPv6
+			addr_netmask_broadcast.append(
+				(addressinfo.get("addr", None),
+				addressinfo.get("netmask", None),
+				addressinfo.get("broadcast", None))
+			)
+	except Exception as ex:
+		logger.exception(ex)
+
+	return addr_netmask_broadcast
+
+
 def nwmask_to_cidr(nmask):
 	"""
-	TODO: Detect if IPv4 or IPv6
 	nmask -- An IPv4 network mask like "255.255.255.0"
 	return -- The amount of network bits in CIDR format like 24
 	"""
@@ -393,15 +450,27 @@ def get_gwip_for_iface(iface_name, version=4):
 	return gw_result
 
 
-def get_arp_cache_entry(ipaddr):
+def get_arp_cache_entry(ipaddr, version=4):
 	"""
 	return -- MAC address for IP addess like "1.2.3.4"
 	"""
 	mac = None
-	pattern_mac = re.compile("([0-9A-Fa-f]{2}[:]){5}([0-9A-Fa-f]{2})")
 
-	with open("/proc/net/arp", "r") as fd:
-		for line in fd:
+	if version == 4:
+		pattern_mac = re.compile("([0-9A-Fa-f]{2}[:]){5}([0-9A-Fa-f]{2})")
+
+		with open("/proc/net/arp", "r", encoding="utf-8") as fd:
+			for line in fd:
+				if line.startswith(ipaddr + " "):
+					mac = pattern_mac.search(line).group(0)
+					break
+	else:
+		cmd_call = "ip -6 neigh".split(" ")
+		lines = subprocess.check_output(cmd_call).decode("UTF-8").split("\n")
+		prefix = "lladdr "
+		pattern_mac = re.compile(prefix + "([0-9A-Fa-f]{2}[:]){5}([0-9A-Fa-f]{2})")
+
+		for line in lines:
 			if line.startswith(ipaddr + " "):
 				mac = pattern_mac.search(line).group(0)
 				break

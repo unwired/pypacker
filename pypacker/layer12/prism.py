@@ -20,15 +20,6 @@ PRISM_TYPE_80211	= 0
 PRISM_DID_RSSI		= 0x41400000
 
 
-class Did(pypacker.Packet):
-	__hdr__ = (
-		("id", "I", 0),
-		("status", "H", 0),
-		("len", "H", 0),
-		("value", "I", 0),
-	)
-
-
 class Prism(pypacker.Packet):
 	__hdr__ = (
 		("code", "I", 0),
@@ -41,6 +32,14 @@ class Prism(pypacker.Packet):
 		PRISM_TYPE_80211: ieee80211.IEEE80211
 	}
 
+	class Did(pypacker.Packet):
+		__hdr__ = (
+			("id", "I", 0),
+			("status", "H", 0),
+			("len", "H", 0),
+			("value", "I", 0),
+		)
+
 	@staticmethod
 	def _dissect_dids(buf, collect_dids=True):
 		off = 0
@@ -50,7 +49,7 @@ class Prism(pypacker.Packet):
 
 		while off < end:
 			if collect_dids:
-				did = Did(buf[off:off + 12])
+				did = Prism.Did(buf[off:off + 12])
 				dids.append(did)
 			off += 12
 

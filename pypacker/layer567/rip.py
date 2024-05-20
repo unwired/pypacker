@@ -33,29 +33,27 @@ class RIP(pypacker.Packet):
 
 		while off + 20 <= len(buf):
 			if buf[off: off + 2] == b"\xff\xff":
-				auth_rte = Auth(buf[off: off + 20])
+				auth_rte = RIP.Auth(buf[off: off + 20])
 			else:
-				auth_rte = RTE(buf[off: off + 20])
+				auth_rte = RIP.RTE(buf[off: off + 20])
 			# logger.debug("RIP: adding auth/rte: %s" % auth_rte)
 			auths.append(auth_rte)
 			off += 20
 		return auths
 
+	class RTE(pypacker.Packet):
+		__hdr__ = (
+			("family", "H", 2),
+			("route_tag", "H", 0),
+			("addr", "I", 0),
+			("subnet", "I", 0),
+			("next_hop", "I", 0),
+			("metric", "I", 1)
+		)
 
-class RTE(pypacker.Packet):
-	__hdr__ = (
-		("family", "H", 2),
-		("route_tag", "H", 0),
-		("addr", "I", 0),
-		("subnet", "I", 0),
-		("next_hop", "I", 0),
-		("metric", "I", 1)
-	)
-
-
-class Auth(pypacker.Packet):
-	__hdr__ = (
-		("rsvd", "H", 0xFFFF),
-		("type", "H", 2),
-		("auth", "16s", b"\x00" * 16)
-	)
+	class Auth(pypacker.Packet):
+		__hdr__ = (
+			("rsvd", "H", 0xFFFF),
+			("type", "H", 2),
+			("auth", "16s", b"\x00" * 16)
+		)

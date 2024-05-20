@@ -26,14 +26,14 @@ https://en.wikipedia.org/wiki/X.690#DER_encoding
 def encode_length_definitive(num):
 	if num < 0x80:
 		return pack_B(num)
-	else:
-		len_len_inbytes = math_ceil(math_log(num + 1, 256))
 
-		if len_len_inbytes > 0x7F:
-			logger.warning("Number too big for encoding")
+	len_len_inbytes = math_ceil(math_log(num + 1, 256))
 
-		len_bytesencoded = num.to_bytes(len_len_inbytes, "big")
-		return pack_B(0x80 + len_len_inbytes) + len_bytesencoded
+	if len_len_inbytes > 0x7F:
+		logger.warning("Number too big for encoding")
+
+	len_bytesencoded = num.to_bytes(len_len_inbytes, "big")
+	return pack_B(0x80 + len_len_inbytes) + len_bytesencoded
 
 
 def decode_length_definitive(bts):
@@ -110,34 +110,36 @@ class LinkedTLVList(list):
 		if len(self) == 3:
 			if self.is_primitive():
 				return self[2]
-			else:
-				return b"".join(v.bin() for v in self[2])
-		elif len(self) == 1:
+
+			return b"".join(v.bin() for v in self[2])
+
+		if len(self) == 1:
 			# Assume list in list
 			return self[0].bin()
-		else:
-			raise Exception("%s" % self)
+
+		raise Exception("%s" % self)
 
 	def bin(self):
 		if len(self) == 3:
 			if self.is_primitive():
 				return self[0] + self[1] + self[2]
-			else:
-				type_len = self[0] + self[1]
-				value = b"".join(v.bin() for v in self[2])
-				return type_len + value
-		elif len(self) == 1:
+
+			type_len = self[0] + self[1]
+			value = b"".join(v.bin() for v in self[2])
+			return type_len + value
+
+		if len(self) == 1:
 			# Assume list in list
 			return self[0].bin()
-		else:
-			raise Exception("%s" % self)
+
+		raise Exception("%s" % self)
 
 	def update_len_uptoroot(self):
 		self[1] = encode_length_definitive(self.get_value_bin())
 		self.get_parent().update_len_uptoroot()
 
 	def __setitem__(self, idx, val):
-		if not is_primitive():
+		if not self.is_primitive():
 			raise Exception("Can't change non-primitive values!")
 
 		# Update lengths if primitive value changed
@@ -181,6 +183,7 @@ def decode_der(der_bts, rw_cb=None):
 	rw_cb(result)
 
 	return result
+
 
 """
 >>> X.509

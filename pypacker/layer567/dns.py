@@ -45,51 +45,51 @@ DNS_RCODE_NOTAUTH	= 9
 DNS_RCODE_NOTZONE	= 10
 
 # RR types
-DNS_A			= 1
-DNS_NS			= 2
-DNS_CNAME		= 5
-DNS_SOA			= 6
-DNS_WKS			= 11
-DNS_PTR			= 12
-DNS_HINFO		= 13
-DNS_MINFO		= 14
-DNS_MX			= 15
-DNS_TXT			= 16
-DNS_RP			= 17
-DNS_SIG			= 24
-DNS_GPOS		= 27
-DNS_AAAA		= 28
-DNS_LOC			= 29
-DNS_SRV			= 33
-DNS_NAPTR		= 35
-DNS_KX			= 36
-DNS_CERT		= 37
-DNS_DNAME		= 39
-DNS_DS			= 43
-DNS_SSHFP		= 44
-DNS_IPSECKEY		= 45
-DNS_RRSIG		= 46
-DNS_NSEC		= 47
-DNS_DNSKEY		= 48
-DNS_DHCID		= 49
-DNS_NSEC3		= 50
-DNS_NSEC3PARAM		= 51
-DNS_TLSA		= 52
-DNS_SPF			= 99
-DNS_TKEY		= 249
-DNS_TSIG		= 250
-DNS_IXFR		= 251
-DNS_AXFR		= 252
-DNS_CAA			= 257
-DNS_TA			= 32768
-DNS_DLV			= 32769
+DNS_TYPE_A		= 1
+DNS_TYPE_NS		= 2
+DNS_TYPE_CNAME		= 5
+DNS_TYPE_SOA		= 6
+DNS_TYPE_WKS		= 11
+DNS_TYPE_PTR		= 12
+DNS_TYPE_HINFO		= 13
+DNS_TYPE_MINFO		= 14
+DNS_TYPE_MX		= 15
+DNS_TYPE_TXT		= 16
+DNS_TYPE_RP		= 17
+DNS_TYPE_SIG		= 24
+DNS_TYPE_GPOS		= 27
+DNS_TYPE_AAAA		= 28
+DNS_TYPE_LOC		= 29
+DNS_TYPE_SRV		= 33
+DNS_TYPE_NAPTR		= 35
+DNS_TYPE_KX		= 36
+DNS_TYPE_CERT		= 37
+DNS_TYPE_DNAME		= 39
+DNS_TYPE_DS		= 43
+DNS_TYPE_SSHFP		= 44
+DNS_TYPE_IPSECKE	= 45
+DNS_TYPE_RRSIG		= 46
+DNS_TYPE_NSEC		= 47
+DNS_TYPE_DNSKEY		= 48
+DNS_TYPE_DHCID		= 49
+DNS_TYPE_NSEC3		= 50
+DNS_TYPE_NSEC3PARAM	= 51
+DNS_TYPE_TLSA		= 52
+DNS_TYPE_SPF		= 99
+DNS_TYPE_TKEY		= 249
+DNS_TYPE_TSIG		= 250
+DNS_TYPE_IXFR		= 251
+DNS_TYPE_AXFR		= 252
+DNS_TYPE_CAA		= 257
+DNS_TYPE_TA		= 32768
+DNS_TYPE_DLV		= 32769
 
 
 # RR classes
-DNS_IN			= 1
-DNS_CHAOS		= 3
-DNS_HESIOD		= 4
-DNS_ANY			= 255
+DNS_CLASS_IN		= 1
+DNS_CLASS_CHAOS		= 3
+DNS_CLASS_HESIOD	= 4
+DNS_CLASS_ANY		= 255
 
 
 def get_bts_for_msg_compression(tl_packet):
@@ -120,48 +120,73 @@ class DNS(pypacker.Packet):
 		"""DNS question."""
 		__hdr__ = (
 			("name", None, b"\x03www\x04test\x03com\x00"),
-			("type", "H", DNS_A),
-			("cls", "H", DNS_IN)
+			("type", "H", DNS_TYPE_A),
+			("cls", "H", DNS_CLASS_IN)
 		)
 
 		name_s = pypacker.get_property_dnsname("name", cb_mc_bytes=get_bts_for_msg_compression)
 
+		def compress(self, ref_bts):
+			name_compressed = pypacker.compress_dns(self.name, ref_bts)
+
+			if name_compressed is not None:
+				self.name = name_compressed
+
+		type_t = pypacker.get_property_translator("type", "DNS_TYPE_")
+		cls_t = pypacker.get_property_translator("type", "DNS_CLASS_")
+		# TODO: Compression for queries
+
 		def _dissect(self, buf):
 			q_end = DNS.get_dns_length(buf)
 			self.name = buf[:q_end]
-			#logger.debug("val / format: %s %s" % (self._name, self._name_format))
 			return len(buf)  # name (including 0) + type + cls
 
 	class Answer(pypacker.Packet):
 		"""DNS resource record."""
 		__hdr__ = (
 			("name", None, b"\xc0\x0c"),
-			("type", "H", DNS_A),
-			("cls", "H", DNS_IN),
+			("type", "H", DNS_TYPE_A),
+			("cls", "H", DNS_CLASS_IN),
 			("ttl", "I", 180),
-			("dlen", "H", 4),			# length of the next field
-			("address", None, b"1234")		# eg IPv4
+			("dlen", "H", 4), # Length of the next field
+			("address", None, b"1234") # eg IPv4
 		)
 
 		name_s = pypacker.get_property_dnsname("name", cb_mc_bytes=get_bts_for_msg_compression)
 
-		def _get_address_readable(self):
-			if self.type == DNS_A:
-				return pypacker.ip4_bytes_to_str(self.address)
-			elif self.type == DNS_AAAA:
-				return pypacker.ip6_bytes_to_str(self.address)
-			elif self.type == DNS_CNAME:
-				return pypacker.dns_name_decode(self.address)
-			else:
-				# Unknown type
-				return ""
+		def compress(self, ref_bts):
+			name_compressed = pypacker.compress_dns(self.name, ref_bts)
 
-		address_s = property(_get_address_readable)
+			if name_compressed is not None:
+				self.name = name_compressed
+
+		type_t = pypacker.get_property_translator("type", "DNS_TYPE_")
+		cls_t = pypacker.get_property_translator("type", "DNS_CLASS_")
+
+		def _get_address_readable(self):
+			if self.type == DNS_TYPE_A:
+				return pypacker.ip4_bytes_to_str(self.address)
+			if self.type == DNS_TYPE_AAAA:
+				return pypacker.ip6_bytes_to_str(self.address)
+			if self.type == DNS_TYPE_CNAME:
+				return pypacker.dns_name_decode(self.address)
+			# Unknown type
+			return ""
+
+		def _set_address_readable(self, address):
+			if self.type == DNS_TYPE_A:
+				self.address = pypacker.ip4_str_to_bytes(address)
+			elif self.type == DNS_TYPE_AAAA:
+				self.address = pypacker.ip6_str_to_bytes(address)
+			elif self.type == DNS_TYPE_CNAME:
+				self.address = pypacker.dns_name_encode(address)
+
+		address_s = property(_get_address_readable, _set_address_readable)
 
 		def _dissect(self, buf):
 			name_end = DNS.get_dns_length(buf)
 			self.name = buf[:name_end]
-			# needed set format
+			# Needed to set format
 			start = name_end + 8
 			addr_len = unpack_H(buf[start:start + 2])[0]
 			self.address = buf[start + 2:start + 2 + addr_len]
@@ -171,40 +196,42 @@ class DNS(pypacker.Packet):
 	class Auth(pypacker.Packet):
 		"""Auth, generic type."""
 		__hdr__ = (
-			("name", "H", 0),
-			("type", "H", 0),
-			("cls", "H", 0),
+			("name", None, b"\xc0\x0c"),
+			("type", "H", DNS_TYPE_A),
+			("cls", "H", DNS_CLASS_IN),
 			("ttl", "I", 0),
-			("dlen", "H", 0),		# length of the rest of header: server + x, x becmoes body content
+			("dlen", "H", 0), # length of the rest of header: server + x, x becmoes body content
 			("server", None, b"\x03www\x04test\x03com\x00")
 		)
 
+		name_s = pypacker.get_property_dnsname("name", cb_mc_bytes=get_bts_for_msg_compression)
+		type_t = pypacker.get_property_translator("type", "DNS_TYPE_")
+		cls_t = pypacker.get_property_translator("type", "DNS_CLASS_")
 		server_s = pypacker.get_property_dnsname("server", cb_mc_bytes=get_bts_for_msg_compression)
 
+		def compress(self, ref_bts):
+			name_compressed = pypacker.compress_dns(self.server, ref_bts)
+
+			if name_compressed is not None:
+				self.server = name_compressed
+
 		def _dissect(self, buf):
-			# Needed set format
-			# Find server name by 0-termination
-			buf_bts = buf.tobytes()
-			off_end = buf_bts.find(b"\x00", 12)
+			# Needed to set format
+			name_end = DNS.get_dns_length(buf)
+			self.name = buf[:name_end]
+			start = name_end + 8
+			addr_len = unpack_H(buf[start:start + 2])[0]
+			self.server = buf[start + 2: start + 2 + addr_len]
+			#logger.debug("address: %s" % self.address)
+			return start + 2 + addr_len
 
-			if off_end == -1:
-				off_end = len(buf)
-			else:
-				off_end += 1
-			self.server = buf[12: off_end]
-			#logger.debug("server: %s" % self.server)
-
-			return off_end
-
+	"""
+	# TODO: needed?
 	class AuthSOA(pypacker.Packet):
-		"""
-		Auth type SOA.
-		Not used atm
-		"""
 		__hdr__ = (
-			("name", "H", 0),
-			("type", "H", 0),
-			("cls", "H", 0),
+			("name", None, b"\xc0\x0c"),
+			("type", "H", DNS_TYPE_A),
+			("cls", "H", DNS_CLASS_IN),
 			("ttl", "I", 0),
 			("dlen", "H", 0),
 			("name2", None, b"\x03www\x04test\x03com\x00"),
@@ -219,48 +246,50 @@ class DNS(pypacker.Packet):
 		)
 
 		name_s = pypacker.get_property_dnsname("name", get_bts_for_msg_compression)
+		type_t = pypacker.get_property_translator("type", "DNS_TYPE_")
+		cls_t = pypacker.get_property_translator("type", "DNS_CLASS_")
 		mailbox_s = pypacker.get_property_dnsname("mailbox", get_bts_for_msg_compression)
 
 		def _dissect(self, buf):
-			# Set format
-			# Find server name by 0-termination
-			buf_bts = buf.tobytes()
-			idx = buf_bts.find(b"\x00", 12)
-			#logger.debug(buf[12: idx+1])
-			# Don't add trailing \0
-			self.name = buf[12: idx + 1]
-			#logger.debug("name: %s" % buf[idx + 1: -14])
-			self.mailbox = buf[idx + 1: -14]
-			return len(buf)
+			# Needed to set format
+			name_end = DNS.get_dns_length(buf)
+			self.name = buf[:name_end]
+			start = name_end + 8
+			addr_len = unpack_H(buf[start:start + 2])[0]
+			self.server = buf[start + 2: start + 2 + addr_len]
+			#logger.debug("address: %s" % self.address)
+			return start + 2 + addr_len
+	"""
 
 	class AddRecord(pypacker.Packet):
 		"""DNS additional records."""
 		__hdr__ = (
-			("name", "H", 0),
-			("type", "H", 0x0001),
-			("clz", "H", 0x0001),
-			("ts", "I", 0),
+			("name", None, b"\xc0\x0c"),
+			("type", "H", DNS_TYPE_A),
+			("clz", "H", DNS_CLASS_IN),
+			("ttl", "I", 0),
 			("dlen", "H", 0),
 			("addr", None, b"\x01\x02\x03\x04")
 		)
 
-		def _dissect(self, buf):
-			#logger.debug(buf[0: idx+1])
-			self.addr = buf[12:]
-			#logger.debug("addr: %s" % self.addr)
-			return len(buf)
+		name_s = pypacker.get_property_dnsname("name", get_bts_for_msg_compression)
+		type_t = pypacker.get_property_translator("type", "DNS_TYPE_")
 
-	class AddRecordRoot(pypacker.Packet):
-		"""DNS additional records."""
-		__hdr__ = (
-			("name", "B", 0),
-			("type", "H", 0x0001),
-			("udpsize", "H", 0x0001),
-			("rcode", "B", 0),
-			("v", "B", 0),
-			("z", "H", 0),
-			("dlen", "H", 0)
-		)
+		def compress(self, ref_bts):
+			name_compressed = pypacker.compress_dns(self.name, ref_bts)
+
+			if name_compressed is not None:
+				self.name = name_compressed
+
+		def _dissect(self, buf):
+			# Needed to set format
+			name_end = DNS.get_dns_length(buf)
+			self.name = buf[:name_end]
+			start = name_end + 8
+			addr_len = unpack_H(buf[start: start + 2])[0]
+			self.addr = buf[start + 2: start + 2 + addr_len]
+			#logger.debug("address: %s" % self.address)
+			return start + 2 + addr_len
 
 	@staticmethod
 	def get_dns_length(bts):
@@ -275,7 +304,7 @@ class DNS(pypacker.Packet):
 				#logger.debug("Found pointer at %d", off)
 				return off + 2
 			# Found terminating 0
-			elif bts[off] == 0x00:
+			if bts[off] == 0x00:
 				#logger.debug("Found 0 byte at %d", off)
 				return off + 1
 			off += bts[off] + 1
@@ -287,7 +316,7 @@ class DNS(pypacker.Packet):
 		amount_collect = [amount, collect_queries]
 
 		def _dissect_queries_sub(buf):
-			#logger.debug(">> Dissecting questions: %r" % amount_collect)
+			#logger.debug(">> Dissecting queries: %r" % amount_collect)
 			queries = []
 			off = 0
 			while amount_collect[0] > 0 and off < len(buf):
@@ -337,13 +366,18 @@ class DNS(pypacker.Packet):
 			off = 0
 
 			while amount_collect[0] > 0 and off < len(buf):
-				dlen = unpack_H(buf[off + 10: off + 12])[0]
-				authlen = 12 + dlen
+				#logger.debug("off=%d, buf=%r" % (off, buf[:15].tobytes()))
+				# DNS name:x + type:2 + class:2 + ttl:4
+				a_end = off + DNS.get_dns_length(buf[off:]) + 2 + 2 + 4
+				#logger.debug("a_end=%d" % a_end)
+				dlen = unpack_H(buf[a_end: a_end + 2])[0]
+				#logger.debug("dlen=%d, bts=%r" % (dlen, buf[a_end: a_end + 2].tobytes()))
+				a_end += (2 + dlen)
 
 				if amount_collect[1]:
-					a = DNS.Auth(buf[off: off + authlen])
+					a = DNS.Auth(buf[off: a_end])
 					authserver.append(a)
-				off += authlen
+				off = a_end
 				amount_collect[0] -= 1
 			return authserver if amount_collect[1] else off
 		return _dissect_authserver_sub
@@ -376,30 +410,39 @@ class DNS(pypacker.Packet):
 		return _dissect_addreq_sub
 
 	def _dissect(self, buf):
+		#logger.debug(self.__class__)
+		#logger.debug("Dissect start")
 		# Unpack basic data to get things done
 		quests_amount, ans_amount, authserver_amount, addreq_amount = unpack_HHHH(buf[4: 12])
+		#logger.debug("quests_amount=%d, ans_amount=%d, authserver_amount=%d, addreq_amount=%d" % (
+		#	quests_amount, ans_amount, authserver_amount, addreq_amount))
 		# Sanity check: assume max amount of 50 addresses
 		if quests_amount > 50 or ans_amount > 50 or authserver_amount > 50 or addreq_amount > 50:
 			raise Exception("Address count too high, invalid packet")
 		off = 12
-		#logger.debug(self.__class__)
 		addlen = DNS._dissect_queries(quests_amount, collect_queries=False)(buf[off:])
 		self.queries(buf[off: off + addlen], DNS._dissect_queries(quests_amount))
 		off += addlen
+		#logger.debug("Off: %d" % off)
 
 		addlen = DNS._dissect_answers(ans_amount, collect_answers=False)(buf[off:])
 		self.answers(buf[off: off + addlen], DNS._dissect_answers(ans_amount))
 		off += addlen
+		#logger.debug("Off: %d" % off)
 
 		addlen = DNS._dissect_authserver(authserver_amount, collect_authserver=False)(buf[off:])
 		self.auths(buf[off: off + addlen], DNS._dissect_authserver(authserver_amount))
 		off += addlen
+		#logger.debug("Off: %d" % off)
 
 		addlen = DNS._dissect_addreq(addreq_amount, collect_addreq=False)(buf[off:])
 		self.addrecords(buf[off: off + addlen], DNS._dissect_addreq(addreq_amount))
 		off += addlen
+		#logger.debug("Dissect finished, off: %d" % off)
 
 		return off
+
+	TYPES_COMPRESSABLE = {Query, Answer, Auth, AddRecord}
 
 	def _update_fields(self):
 		if self._header_value_changed:
@@ -415,7 +458,27 @@ class DNS(pypacker.Packet):
 				self.addrr_amount = len(self.addrecords)
 			#logger.debug("finished updating lengths")
 
+			# Compress by default
+			if self.queries._cached_bin is None or\
+				self.answers._cached_bin is None or\
+				self.authrr._cached_bin is None or\
+				self.addrr._cached_bin is None:
+				# Something has changed in tl (element or in packet in tl) -> re-compress
+				# Start at 2nd element, avoids self-referencing of 1st to itself
+				ref_bts = self.header_bytes[:12]
+
+				for tl in [self.queries, self.answers, self.auths, self.addrecords]:
+					for idx, tl_element in enumerate(tl):
+						if type(tl_element) in DNS.TYPES_COMPRESSABLE:
+							tl_element.compress(ref_bts)
+
+						entry_bts = tl.entry_to_bytes(idx)
+						ref_bts = ref_bts + entry_bts
+
 	def get_resolved_addresses(self):
+		"""
+		return -- {"1.2.3.4": "test.com"}
+		"""
 		ret = {}
 
 		if self.answers_amount == 0 or self.questions_amount == 0:
@@ -430,7 +493,7 @@ class DNS(pypacker.Packet):
 
 		for answer in self.answers:
 			# Assume answer for first query
-			if answer.type in [DNS_A, DNS_AAAA]:
-				ret[answer.address_s] = question_dns[:-1]
+			if answer.type in [DNS_TYPE_A, DNS_TYPE_AAAA]:
+				ret[answer.address_s] = question_dns
 
 		return ret

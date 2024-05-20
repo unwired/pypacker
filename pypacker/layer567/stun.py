@@ -36,13 +36,6 @@ UNKNOWN_ATTRIBUTES = 0x000A
 REFLECTED_FROM = 0x000B
 
 
-class StunAttr(Packet):
-	__hdr__ = (
-		("type", "H", 0),
-		("len", "H", 0),
-	)
-
-
 class STUN(Packet):
 	# 20 byte header followed by 0 or more attribute TLVs.
 	__hdr__ = (
@@ -52,6 +45,12 @@ class STUN(Packet):
 		("xid", "12s", b"\x00" * 14),
 		("attrs", None, triggerlist.TriggerList)
 	)
+
+	class StunAttr(Packet):
+		__hdr__ = (
+			("type", "H", 0),
+			("len", "H", 0),
+		)
 
 	@staticmethod
 	def _parse_attrs(buf):
@@ -65,7 +64,7 @@ class STUN(Packet):
 			l_total = l_content + padding + 2 + 2
 			#logger.debug("STUN attr l_content: %d, padding: %d, value: %s" %
 			#	 (l_content, padding, buf[off : off + l_total]))
-			attributes.append(StunAttr(buf[off: off + l_total]))
+			attributes.append(STUN.StunAttr(buf[off: off + l_total]))
 			off += l_total
 		return attributes
 

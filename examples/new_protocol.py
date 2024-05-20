@@ -19,12 +19,6 @@ logger = logging.getLogger("pypacker")
 TYPE_VALUE_IP = 0x66
 
 
-class Option(pypacker.Packet):
-	"""Packet used for options field. See NewProtocol below."""
-	__hdr__ = (
-		("some_value", "B", 0x00),
-	)
-
 
 class NewProtocol(pypacker.Packet):
 	"""
@@ -41,7 +35,7 @@ class NewProtocol(pypacker.Packet):
 	# deeper information.
 	__hdr__ = (
 		# Simple constant fields: fixed format, not changing length
-		# marked as type field: defines type of next upper layer, here: IP. See __handler__
+		# Marked as type field: defines type of next upper layer, here: IP. See __handler__
 		("type", "B", TYPE_VALUE_IP, FIELD_FLAG_IS_TYPEFIELD),
 		("src", "4s", b"\xff" * 4),
 		("dst", "4s", b"\xff" * 4),
@@ -78,6 +72,15 @@ class NewProtocol(pypacker.Packet):
 
 	flag_fluxcapacitor = property(__get_flag_fluxcapacitor, __set_flag_fluxcapacitor)
 
+
+	class Option(pypacker.Packet):
+		"""Packet used for options field."""
+		__hdr__ = (
+			("some_value", "B", 0x00),
+		)
+		# Body is 1 byte
+
+
 	@staticmethod
 	def _parse_options(buf):
 		"""
@@ -95,14 +98,15 @@ class NewProtocol(pypacker.Packet):
 
 	def _dissect(self, buf):
 		"""
-		_dissect(...) must be overwritten if the header format can change
-		from its original format. This is generally the case when
+		_dissect(...) must be overwritten if the header format (length of fields) can change
+		from its original format or there can be higher layers (higher layer has to be identified).
+		This is generally the case when
 		- using TriggerLists (see layer3/ip.py)
 		- a simple field could get deactivated (see layer12/ethernet.py -> vlan)
 		- using dynamic fields (see layer567/dns.py -> Query -> name)
 
-		In NewProtocol idk can get deactivated, options is a TriggerList
-		and yolo is a dynamic field so _dissect(...) needs to be defined.
+		In NewProtocol idk can get deactivated, options is a TriggerList, yolo is a dynamic field
+		and there can be higher layer (ip.IP) so _dissect(...) needs to be defined.
 		"""
 		# Header fields are not yet accessible in _dissect(...) so basic information
 		# (type info, header length, bytes of dynamic content etc) has to be parsed manually.
@@ -133,14 +137,19 @@ class NewProtocol(pypacker.Packet):
 	# Add the "FIELD_FLAG_IS_TYPEFIELD" to the corresponding type field in __hdr__.
 	__handler__ = {TYPE_VALUE_IP: ip.IP}  # just 1 possible upper layer
 
+	# These higher layer Packet types need to be forced to be parsed if any changes happen in NewProtocol.
+	# Here: ip.IP calculcates the checksum based on values from NewProtocol: change in NewProtocol => Update in ip.IP needed
+	__update_dependants__ = {ip.IP}
+
 	def _update_fields(self):
 		"""
 		_update_fields(...) should be overwritten to update fields which depend on the state
 		of the packet like lengths, checksums etc (see layer3/ip.py -> len, sum)
-		aka auto-update fields.	The variable XXX_au_active indicates
-		if the field XXX should be updated (True) or not
-		(see layer3/ip.py -> bin() -> len_au_active). XXX_au_active is
-		available if the field has the flag "FIELD_FLAG_AUTOUPDATE" in __hdr__,
+		aka auto-update fields.	The variable VARNAME_au_active indicates
+		if the field VARNAME should be updated (True) or not
+		(see layer3/ip.py -> bin() -> len_au_active).
+		Auto-update header should only be recalculated if VARNAME_au_active is True.
+		VARNAME_au_active is available if the field has the flag "FIELD_FLAG_AUTOUPDATE" in __hdr__,
 		default value is True. _update_fields(...) is implicitly called by bin(...).
 		"""
 		if self._changed() and self.hlen_au_active:
@@ -187,12 +196,7 @@ ip_bytes = ip.IP().bin()
 tcp_bytes = tcp.TCP().bin()
 newproto_pkt = NewProtocol(newproto_bytes + ip_bytes + tcp_bytes)
 
-print()
-print(">>> Layers of packet:")
-print("Output all layers: %s" % newproto_pkt)
 print("Access some fields: 0x%X %s %s" % (newproto_pkt.type, newproto_pkt.src, newproto_pkt.dst))
-print("Access next upper layer (IP): %s" % newproto_pkt[ip.IP])
-print("A layer above IP (TCP): %s" % newproto_pkt[tcp.TCP])
 
 
 # Create new Packet by defining every single header and adding higher layers
@@ -201,9 +205,4 @@ newproto_pkt = NewProtocol(
 	ip.IP() +\
 	tcp.TCP()
 
-print()
-print(">>> Layers of packet:")
-print("Output all layers: %s" % newproto_pkt)
 print("Access some fields: 0x%X %s %s" % (newproto_pkt.type, newproto_pkt.src, newproto_pkt.dst))
-print("Access next upper layer (IP): %s" % newproto_pkt[ip.IP])
-print("A layer above IP (TCP): %s" % newproto_pkt[tcp.TCP])

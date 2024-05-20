@@ -17,7 +17,6 @@ RFC 6298 - Computing TCP's Retransmission Timer
 RFC 6824 - TCP Extensions for Multipath Operation with Multiple Addresses
 """
 import logging
-import struct
 
 from pypacker import pypacker, triggerlist, checksum
 from pypacker.pypacker import FIELD_FLAG_AUTOUPDATE, FIELD_FLAG_IS_TYPEFIELD
@@ -73,30 +72,6 @@ TCP_OPT_SNAP		= 24		# SNAP
 TCP_OPT_TCPCOMP		= 26		# TCP compression filter
 TCP_OPT_MAX		= 27
 
-
-class TCPOptSingle(pypacker.Packet):
-	__hdr__ = (
-		("type", "B", 0),
-	)
-
-	type_t = pypacker.get_property_translator("type", "TCP_OPT_")
-
-
-class TCPOptMulti(pypacker.Packet):
-	"""
-	len = total length (header + data)
-	"""
-	__hdr__ = (
-		("type", "B", 0),
-		("len", "B", 2, FIELD_FLAG_AUTOUPDATE)
-	)
-
-	type_t = pypacker.get_property_translator("type", "TCP_OPT_")
-
-	def _update_fields(self):
-		if self.len_au_active:
-			self.len = len(self)
-
 TCP_PROTO_TELNET	= 23
 TCP_PROTO_TPKT		= 102
 TCP_PROTO_PMAP		= 111
@@ -110,11 +85,6 @@ TCP_PROTO_SIP		= (5060, 5061)
 TCP_OFF_BTS_OPTS	= 20
 
 
-def cb_get_flag_description(value, value_name):
-	descr = [name_d for value_d, name_d in value_name.items() if value_d & value != 0]
-	return " | ".join(descr)
-
-
 class TCP(pypacker.Packet):
 	__hdr__ = (
 		("sport", "H", 0xDEAD),
@@ -122,12 +92,60 @@ class TCP(pypacker.Packet):
 		("seq", "I", 0xDEADBEEF),
 		("ack", "I", 0),
 		("off_x2", "B", ((5 << 4) | 0), FIELD_FLAG_AUTOUPDATE),  # off=# 4-byte words, 10*4 Byte
+		# TODO: add subbyte infos
 		("flags", "B", TH_SYN),  # acces via (obj.flags & TH_XYZ)
 		("win", "H", TCP_WIN_MAX),
 		("sum", "H", 0, FIELD_FLAG_AUTOUPDATE),
 		("urp", "H", 0),
 		("opts", None, triggerlist.TriggerList)
 	)
+
+	def _dissect(self, buf):
+		# Header length: 20 + len(opts)
+		# XXXX???? (headerlen:4 reserved:4) -zero out-> 0000XXXX -*4-> 00XXXX00 (0x3C)
+		olen = ((buf[12] >> 2) & 0x3C) - TCP_OFF_BTS_OPTS  # optlen = dataoffset - fixedlen
+
+		if olen > 0:
+			# Parse options, add offset-length to standard-length
+			opts_bytes = buf[TCP_OFF_BTS_OPTS: TCP_OFF_BTS_OPTS + olen]
+			self.opts(opts_bytes, TCP._dissect_opts)
+		elif olen < 0:
+			raise Exception("TCP length is invalid: %d" % olen)
+
+		htype = None
+
+		try:
+			# Source or destination port should match
+			ports = [unpack_H(buf[0:2])[0], unpack_H(buf[2:4])[0]]
+			htype = [x for x in ports if x in self._id_handlerclass_dct[TCP]][0]
+			#logger.debug("TCP: trying to set handler, type: %d = %s" %
+			#(type, self._id_handlerclass_dct[TCP][type]))
+		except:
+			# No type found
+			pass
+		return 20 + olen, htype
+
+	class TCPOptSingle(pypacker.Packet):
+		__hdr__ = (
+			("type", "B", 0),
+		)
+
+		type_t = pypacker.get_property_translator("type", "TCP_OPT_")
+
+	class TCPOptMulti(pypacker.Packet):
+		"""
+		len = total length (header + data)
+		"""
+		__hdr__ = (
+			("type", "B", 0),
+			("len", "B", 2, FIELD_FLAG_AUTOUPDATE)
+		)
+
+		type_t = pypacker.get_property_translator("type", "TCP_OPT_")
+
+		def _update_fields(self):
+			if self.len_au_active:
+				self.len = len(self)
 
 	# 4 bits | 4 bits
 	# offset | reserved
@@ -139,15 +157,27 @@ class TCP(pypacker.Packet):
 		self.off_x2 = (value << 4) | (self.off_x2 & 0xF)
 	off = property(__get_off, __set_off)
 
-	# return real header length based on header info
+	# Real header length based on header info (should be n*4)
 	def __get_hlen(self):
 		return self.off * 4
 
-	# set real header length based on header info (should be n*4)
+	# Teal header length based on header info (should be n*4)
 	def __set_hlen(self, value):
 		self.off = int(value / 4)
 
 	hlen = property(__get_hlen, __set_hlen)
+
+	@staticmethod
+	def cb_get_flag_description(self_obj, value, value__pmcv):
+		pmcv_l = [pmcv for value_d, pmcv in value__pmcv.items() if value_d & value != 0]
+		descriptions = []
+
+		for pmcv in pmcv_l:
+			description = ".".join(filter(None, pmcv[1:])) # module.[class.]var
+			descriptions.append(description)
+
+		return " | ".join(descriptions), pmcv_l
+
 	flags_t = pypacker.get_property_translator("flags", "TH_", cb_get_description=cb_get_flag_description)
 
 	__handler__ = {
@@ -193,31 +223,6 @@ class TCP(pypacker.Packet):
 		if update and self.sum_au_active:
 			self._calc_sum()
 
-	def _dissect(self, buf):
-		# Header length: 20 + len(opts)
-		# XXXX???? (headerlen:4 reserved:4) -zero out-> 0000XXXX -*4-> 00XXXX00 (0x3C)
-		olen = ((buf[12] >> 2) & 0x3C) - TCP_OFF_BTS_OPTS  # optlen = dataoffset - fixedlen
-
-		if olen > 0:
-			# Parse options, add offset-length to standard-length
-			opts_bytes = buf[TCP_OFF_BTS_OPTS: TCP_OFF_BTS_OPTS + olen]
-			self.opts(opts_bytes, TCP._dissect_opts)
-		elif olen < 0:
-			raise Exception("TCP length is invalid: %d" % olen)
-
-		htype = None
-
-		try:
-			# Source or destination port should match
-			ports = [unpack_H(buf[0:2])[0], unpack_H(buf[2:4])[0]]
-			htype = [x for x in ports if x in self._id_handlerclass_dct[TCP]][0]
-			#logger.debug("TCP: trying to set handler, type: %d = %s" %
-			#(type, self._id_handlerclass_dct[TCP][type]))
-		except:
-			# No type found
-			pass
-		return 20 + olen, htype
-
 	__TCP_OPT_SINGLE = {TCP_OPT_EOL, TCP_OPT_NOP}
 
 	@staticmethod
@@ -230,12 +235,12 @@ class TCP(pypacker.Packet):
 		while off < len(buf):
 			# logger.debug("got TCP-option type %s" % buf[i])
 			if buf[off] in TCP.__TCP_OPT_SINGLE:
-				opt = TCPOptSingle(buf[off: off + 1])
+				opt = TCP.TCPOptSingle(buf[off: off + 1])
 				off += 1
 			else:
 				olen = buf[off + 1]
 				# p = TCPOptMulti(type=buf[i], len=olen, body_bytes=buf[i + 2: i + olen])
-				opt = TCPOptMulti(buf[off: off + olen])
+				opt = TCP.TCPOptMulti(buf[off: off + olen])
 				off += olen  # typefield + lenfield + data-len
 			optlist.append(opt)
 		# logger.debug("tcp: parseopts finished, length: %d" % len(optlist))

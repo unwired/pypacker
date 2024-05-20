@@ -36,7 +36,6 @@ class LazyDict(dict):
 
 	def __delitem__(self, key):
 		self._lazy_init()
-		pass
 
 	def __str__(self):
 		self._lazy_init()
@@ -44,7 +43,7 @@ class LazyDict(dict):
 
 	def __iter__(self):
 		self._lazy_init()
-		super().__iter__()
+		return super().__iter__()
 
 	def __len__(self):
 		self._lazy_init()
@@ -53,3 +52,7 @@ class LazyDict(dict):
 	def items(self):
 		self._lazy_init()
 		return super().items()
+
+	def get(self, key, default=None):
+		self._lazy_init()
+		return super().get(key, default)

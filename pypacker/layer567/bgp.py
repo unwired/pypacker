@@ -162,7 +162,7 @@ class BGP(pypacker.Packet):
 			pcount = buf[9]
 
 			if pcount != 0:
-				OFF_PARAMS = 10
+				OFF_PARAMS = 10 # pylint: disable=invalid-name
 				self.params(buf[OFF_PARAMS:], BGP.Open._dissect_params)
 			return len(buf)
 
@@ -190,7 +190,7 @@ class BGP(pypacker.Packet):
 			while off < buflen:
 				#logger.debug("bytes for wroutes...")
 				rlen = 3 + 0
-				route = Route(buf[off: off + rlen])
+				route = BGP.Route(buf[off: off + rlen])
 				wroutes.append(route)
 				off += rlen
 			return wroutes
@@ -216,7 +216,7 @@ class BGP(pypacker.Packet):
 
 			while off + 3 <= buflen:
 				rlen = 3 + 0
-				route = Route(buf[off: off + rlen])
+				route = BGP.Route(buf[off: off + rlen])
 				anncroutes.append(route)
 				off += rlen
 
@@ -224,16 +224,22 @@ class BGP(pypacker.Packet):
 
 		def _dissect(self, buf):
 			off = 4
-			off_end = off + unpack_H(buf[:2])[0]
-			self.wroutes(buf[off: off_end], BGP.Update._dissect_wroutes)
+			wroutelen = unpack_H(buf[:2])[0]
 
-			off = off_end
-			off_end = off + unpack_H(buf[2:4])[0]
-			self.pathattrs(buf[off: off_end], BGP.Update._dissect_pathattrs)
+			if wroutelen > 0:
+				off_end = off + wroutelen
+				self.wroutes(buf[off: off_end], BGP.Update._dissect_wroutes)
+				off = off_end
 
-			off = off_end
-			off_end = len(buf)
-			self.anncroutes(buf[off: off_end], BGP.Update._dissect_anncroutes)
+			pathroutelen = unpack_H(buf[2:4])[0]
+
+			if pathroutelen > 0:
+				off_end = off + pathroutelen
+				self.pathattrs(buf[off: off_end], BGP.Update._dissect_pathattrs)
+				off = off_end
+
+			# TODO: needed?
+			#self.anncroutes(buf[off: off_end], BGP.Update._dissect_anncroutes)
 			return off_end
 
 		class Attribute(pypacker.Packet):
@@ -395,8 +401,7 @@ class BGP(pypacker.Packet):
 		ROUTE_REFRESH: RouteRefresh
 	}
 
-
-class Route(pypacker.Packet):
-	__hdr__ = (
-		("len", "B", 0),
-	)
+	class Route(pypacker.Packet):
+		__hdr__ = (
+			("len", "B", 0),
+		)

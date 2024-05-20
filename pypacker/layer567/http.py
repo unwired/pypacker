@@ -11,19 +11,6 @@ from pypacker import pypacker, triggerlist
 
 logger = logging.getLogger("pypacker")
 
-
-class HTTPHeader(triggerlist.TriggerList):
-	def _pack(self, tuple_entry):
-		# logger.debug("packing HTTP-header")
-		# no header = no CRNL
-		if len(self) == 0:
-			# logger.debug("empty buf 2")
-			return b""
-		#return b"\r\n".join([b": ".join(keyval) for keyval in self]) + b"\r\n\r\n"
-		#logger.debug("adding: %r" % (tuple_entry[0] +b": "+ tuple_entry[1] + b"\r\n"))
-		# Note: does not preserve deviating separators, eg "x  :   yz"
-		return tuple_entry[0] + b": " + tuple_entry[1] + b"\r\n"
-
 # [Method] [Path] HTTP...\r\n
 # key: value\r\n
 # \r\n
@@ -44,11 +31,23 @@ HTTP_PROTO_IPP_RESP	= b"ipp_resp"  # Via HTTP response
 
 
 class HTTP(pypacker.Packet):
+	class HTTPHeaderTL(triggerlist.TriggerList):
+		def _pack(self, tuple_entry):
+			# logger.debug("packing HTTP-header")
+			# no header = no CRNL
+			if len(self) == 0:
+				# logger.debug("empty buf 2")
+				return b""
+			#return b"\r\n".join([b": ".join(keyval) for keyval in self]) + b"\r\n\r\n"
+			#logger.debug("adding: %r" % (tuple_entry[0] +b": "+ tuple_entry[1] + b"\r\n"))
+			# Note: does not preserve deviating separators, eg "x  :   yz"
+			return tuple_entry[0] + b": " + tuple_entry[1] + b"\r\n"
+
 	__hdr__ = (
 		# content: b"startline"
 		("startline", None, None),  # Including trailing \r\n
 		# content: [("name", "value"), ...]
-		("hdr", None, HTTPHeader),  # Including trailing \r\n
+		("hdr", None, HTTPHeaderTL),  # Including trailing \r\n
 		("sep", "2s", b"\r\n")
 	)
 
@@ -65,9 +64,11 @@ class HTTP(pypacker.Packet):
 		# Responseline: [version] [status] [reason] eg HTTP/1.1 200 OK
 		#logger.debug("Full HTTP: %s", buf)
 		# Request/responseline is mendatory to parse header
+		# TODO: raise exception to trigger dissect error in __init__?
 		if len(buf) == 0 or not PROG_STARTLINE_MATCH(buf):
 			self.sep = None
-			return 0
+			raise Exception()
+			#return 0
 
 		try:
 			bts_header, bts_body = PROG_SPLIT_HEADBODY_SPLIT(buf, maxsplit=1)

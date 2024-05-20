@@ -34,8 +34,8 @@ class TriggerList(list):
 		self._cached_bin = buffer
 		#logger.debug("Triggerlist %r: buffer type=%r" % (self.__class__, type(buffer)))
 
-	def _lazy_dissect(self):
-		if self._packet._unpacked == False:
+	def _before_change(self):
+		if self._packet._unpacked is False: # noqa E712
 			# Before changing TriggerList we need to unpack or
 			# cached header won't fit on _unpack(...).
 			# Ignored if still in dissect (_unpacked == None).
@@ -60,40 +60,46 @@ class TriggerList(list):
 			initial_list_content = [self._cached_bin]
 
 		self._dissect_callback = None
-		# This is re-calling _lazy_dissect(), avoid by calling parent version
+		# This is re-calling _before_change(), avoid by calling parent version
 		#logger.debug("Initial list content=%r" % str(initial_list_content))
-		super(TriggerList, self).extend(initial_list_content)
+		super(TriggerList, self).extend(initial_list_content) # pylint: disable=super-with-arguments
 		# Add listener to packets in list. Nothing has changed, no notify needed.
 		self._refresh_listener(initial_list_content, notify_change=False)
 
+	"""
+	# Only needed by DNS, too few use cases
+	def _after_change(self):
+		pass
+	"""
+
 	def __getitem__(self, needle):
-		self._lazy_dissect()
+		self._before_change()
+
 		if type(needle) != types.FunctionType:
 			return super().__getitem__(needle)
-		else:
-			idx_value = []
-			idx = 0
 
-			for idx, value in enumerate(self):
-				try:
-					if needle(value):
-						idx_value.append((idx, value))
-				except:
-					#except Exception as ex:
-					# Don't care. Note: gets inperformant if too many exceptions
-					pass
-					#logger.exception(ex)
-			return idx_value
+		idx_value = []
+		idx = 0
+
+		for idx, value in enumerate(self):
+			try:
+				if needle(value):
+					idx_value.append((idx, value))
+			except:
+				# Don't care. Note: gets inperformant if too many exceptions
+				pass
+				#logger.exception(ex)
+		return idx_value
 
 	def __iadd__(self, v):
 		"""Item can be added using '+=', use 'append()' instead."""
-		self._lazy_dissect()
+		self._before_change()
 		super().__iadd__(v)
 		self._refresh_listener([v])
 		return self
 
 	def __setitem__(self, needle, value):
-		self._lazy_dissect()
+		self._before_change()
 		idxs_to_set = []
 
 		if type(needle) != types.FunctionType:
@@ -105,7 +111,6 @@ class TriggerList(list):
 				try:
 					if needle(value_it):
 						idxs_to_set.append(idx)
-						break
 				except:
 					# Don't care. Note: gets inperformant if too many exceptions
 					pass
@@ -122,7 +127,7 @@ class TriggerList(list):
 			self._refresh_listener([value])
 
 	def __delitem__(self, k):
-		self._lazy_dissect()
+		self._before_change()
 		if type(k) is int:
 			itemlist = [self[k]]
 		else:
@@ -132,31 +137,31 @@ class TriggerList(list):
 		self._refresh_listener(itemlist, connect_packet=False)
 
 	def __len__(self):
-		self._lazy_dissect()
+		self._before_change()
 		return super().__len__()
 
 	def __iter__(self):
-		self._lazy_dissect()
+		self._before_change()
 		return super().__iter__()
 
 	def append(self, v):
-		self._lazy_dissect()
+		self._before_change()
 		super().append(v)
 		self._refresh_listener([v])
 
 	def extend(self, v):
-		self._lazy_dissect()
+		self._before_change()
 		super().extend(v)
 		self._refresh_listener(v)
 
 	def insert(self, pos, v):
-		self._lazy_dissect()
+		self._before_change()
 		super().insert(pos, v)
 		self._refresh_listener([v])
 
 	def clear(self):
-		self._lazy_dissect()
-		items = [item for item in self]
+		self._before_change()
+		items = list(self)
 		super().clear()
 		self._refresh_listener(items, connect_packet=False)
 
@@ -181,7 +186,7 @@ class TriggerList(list):
 				# base packet <- TriggerList (observes changes, set changed status
 				# in basepacket) <- contained packet (changes)
 				# Add change listener to the packet this TL is contained in.
-				lwrapper = lambda informer: self._notify_change(informer)
+				lwrapper = lambda informer: self._notify_change(informer) # pylint: disable=unnecessary-lambda-assignment
 				v._add_change_listener(lwrapper)
 			else:
 				# Remove any old listener
@@ -192,7 +197,7 @@ class TriggerList(list):
 			#logger.debug("_refresh_listener -> _notify_change (tl add, remove etc)")
 			self._notify_change(self)
 
-	def _notify_change(self, informer):
+	def _notify_change(self, informer): # pylint: disable=unused-argument
 		"""
 		Inform the Packet having this TriggerList as field:
 		- pkt.tl_name <- tl
@@ -206,13 +211,25 @@ class TriggerList(list):
 
 		if self._packet._tlchanged_shared:
 			# Unshare to allow later add()
-			self._packet._tlchanged = set(self._packet._tlchanged)
+			self._packet._tlchanged = {*self._packet._tlchanged}
 			self._packet._tlchanged_shared = False
 
 		self._packet._tlchanged.add(self._headername)
 		self._cached_bin = None
 
-	def bin(self):
+	def entry_to_bytes(self, idx):
+		entry = self[idx]
+		entry_type = type(entry)
+
+		if entry_type is bytes:
+			return entry
+
+		if entry_type is tuple:
+			return self._pack(entry)
+
+		return entry.bin()
+
+	def bin(self, update_auto_fields=True):
 		"""
 		Output the TriggerLists elements as concatenated bytestring.
 		Custom implementations for tuple-handling can be set by overwriting _pack().
@@ -231,7 +248,7 @@ class TriggerList(list):
 					result_arr.append(self._pack(entry))
 				else:
 					# This Must be a packet, otherthise invalid entry!
-					result_arr.append(entry.bin())
+					result_arr.append(entry.bin(update_auto_fields=update_auto_fields))
 
 			self._cached_bin = b"".join(result_arr)
 		elif type(self._cached_bin) == memoryview:
@@ -250,23 +267,30 @@ class TriggerList(list):
 		return tuple_entry[1]
 
 	def __repr__(self):
-		self._lazy_dissect()
+		self._before_change()
 		return super().__repr__()
 
 	def __eq__(self, obj):
-		self._lazy_dissect()
+		self._before_change()
 		return super().__eq__(obj)
 
 	def __str__(self):
-		self._lazy_dissect()
+		self._before_change()
 		tl_descr_l = []
 		contains_pkt = False
 
 		for val_tl in self:
-			if type(val_tl) in TRIGGERLIST_CONTENT_SIMPLE:
-				tl_descr_l.append("%s" % str(val_tl))
+			val_tl_type = type(val_tl)
+
+			if val_tl_type in TRIGGERLIST_CONTENT_SIMPLE:
+				if val_tl_type == bytes:
+					# bytes() needed in case of memoryview
+					tl_descr_l.append("%s" % bytes(val_tl))
+				else:
+					# bytes() needed in case of memoryview
+					tl_descr_l.append("(%r, %s" % (val_tl[0], bytes(val_tl[1])))
 			else:
-				# assume packet
+				# Assume packet
 				#pkt_fqn = val_tl.__module__[9:] + "." + val_tl.__class__.__name__
 				#tl_descr_l.append(pkt_fqn)
 				tl_descr_l.append("%s" % val_tl)
@@ -275,13 +299,14 @@ class TriggerList(list):
 		if not contains_pkt or len(tl_descr_l) == 0:
 			# Oneline output
 			return "[" + ", ".join(tl_descr_l) + "]"
-		else:
-			# Multiline output
-			# TODO: deeper output = more ">"
-			final_descr = ["(see below)\n" + ">" * 10 + "\n"]
 
-			for idx, val in enumerate(tl_descr_l):
-				idx_descr = "[%d]" % idx
-				final_descr.append("-> %s:\n%s\n" % (idx_descr, val))
-			final_descr.append("<" * 10)
-			return "".join(final_descr)
+		# Multiline output
+		# TODO: deeper output = more ">"? -> May create trouble on many entries
+		final_descr = ["(see below)\n" + ">" * 10 + "\n"]
+
+		for idx, val in enumerate(tl_descr_l):
+			idx_descr = "[%d]" % idx
+			final_descr.append("-> %s:\n%s\n" % (idx_descr, val))
+
+		final_descr.append("<" * 10)
+		return "".join(final_descr)

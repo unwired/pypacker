@@ -1,5 +1,5 @@
 # set this to the NEXT (not yet published) version
-VERSION="5.4"
+VERSION="5.5"
 
 if [ -z "$1" ]; then
 	echo "Usage: $0 [stable | dev]"
@@ -16,7 +16,7 @@ case "$1" in
 	pyfiles=$(find . -name "*.py")
 
 	msg "Changing debug level to WARNING"
-	sed -i -r "s/# *(logger.setLevel\(logging.WARNING\))/\1/g;s/^(logger.setLevel\(logging.DEBUG\))/# \1/g" pypacker/pypacker.py
+	sed -i -r "s/# *(logger.setLevel\(logging.WARNING\))/\1/g;s/^(logger.setLevel\(logging.DEBUG\))/# \1/g" pypacker/__init__.py
 
 	msg "Replacing version numbers"
 	sed -i -r "s/version=\".*\"/version=\"$VERSION\"/g" setup.py
@@ -30,21 +30,28 @@ case "$1" in
 	done
 
 	msg "Non disabled debug output"
-	grep --color=auto -ir "^[^#]*logger.debug" *
+	grep --color=auto -ir "^[^#]*logger.debug" --exclude "checksum.py" *
 
 	msg "Raw print calls"
 	grep --color=auto -r "print(" --exclude "test_pypacker.py" --exclude "README.md" --exclude "switch_setup.sh"\
-		--exclude "sniff_n_dump.py" --exclude "list_packet_classes.py" --exclude-dir "examples"
-
-	#msg "doing style checks"
-	#msg "PEP8"
-	#pep8  --config=./qa_config.txt ./
+		--exclude "sniff_n_dump.py" --exclude "list_packet_classes.py" --exclude-dir "examples" --exclude "can.py"\
+		--exclude-dir "docs" --exclude-dir "tests"
 
 	msg "flake8"
-	flake8 --config=./qa_config.txt ./pypacker
+	if command -v flake8 &> /dev/null; then
+		# flake8 = Wrapper around PyFlakes, pep8 & mccab
+		flake8 --config=./qa_config.txt ./pypacker
+	else
+		echo "Warning: Install flake8"
+	fi
 
-	#msg "Pylint"
-	#pylint --rcfile=./.pylintrc $pydir/*.py
+	msg "Pylint"
+	if command -v pylint &> /dev/null; then
+		# Variable names: allow constant name style (all uppercase)
+		pylint --rcfile=./qa_config.txt --variable-rgx='([a-z_]+)|([A-Z_]+)' ./pypacker
+	else
+		echo "Warning: Install Pylint"
+	fi
 
 	#if [ "$2" = "rebuilddoc" ]; then
 	#	msg "regenerating doc"
@@ -60,14 +67,14 @@ case "$1" in
 	msg "Header definition: string instead of bytes?"
 	grep --color=auto -ir -Po "\"\ds\", *\".+"
 
-	msg "set(...) instead of {...}? (still needed for list which need to be made unique)"
+	msg "set(...) instead of {...}?"
 	grep --color=auto -ir -Po " set\([^\)]"
 
 	msg "Lower case hex numbers/upper case hex strings?"
 	for f in $pyfiles; do
-		# Hex numbers in uppercase
+		# Hex numbers should be uppercase
 		grep --color=auto -H -P "0x[0-9]{0,1}[a-f]{1,2}" $f
-		# Hex bytes in lowercase
+		# Hex bytes should be lowercase
 		grep --color=auto -H -P "\\\\x[0-9]{0,1}[A-F]{1,2}" $f
 	done
 
@@ -78,7 +85,7 @@ case "$1" in
 	if [ "$2" == "v" ]; then
 		msg "re-adding tag 'v$VERSION'"
 		git tag --del "v$VERSION" 1>&/dev/null
-		# remove remote tag
+		# Remove remote tag
 		#git push origin :refs/tags/"v$VERSION" 1>&/dev/null
 		git tag "v$VERSION"
 	fi
@@ -93,6 +100,6 @@ case "$1" in
 ;;
 "dev")
 	msg "Changing debug level to DEBUG"
-	sed -i -r "s/# *(logger.setLevel\(logging.DEBUG\))/\1/;s/^(logger.setLevel\(logging.WARNING\))/# \1/g" pypacker/pypacker.py
+	sed -i -r "s/# *(logger.setLevel\(logging.DEBUG\))/\1/;s/^(logger.setLevel\(logging.WARNING\))/# \1/g" pypacker/__init__.py
 ;;
 esac

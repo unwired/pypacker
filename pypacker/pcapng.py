@@ -5,11 +5,9 @@
 Primaly refer:
 	http://www.winpcap.org/ntar/draft/PCAP-DumpFileFormat.html
 
-TODO:
-	* Writer class implementation.
-	* Options getter/setter implementation.
-	* Support nanosecond.
-		Investigate the implementation to support multi interface.
+TODO: Writer class implementation.
+TODO: Options getter/setter implementation.
+TODO: Investigate the implementation to support multi interface.
 
 Limitation:
 	Because the generally considered to only use wireshark,	support header
@@ -236,12 +234,12 @@ class ISBLe(ISB):
 		__byte_order__ = "<"
 
 
-class Writer(object):
+class Writer():
 	def __init__(self):
 		pass
 
 
-class Reader(object):
+class Reader():
 	def __init__(self,
 		fileobj=None,
 		filename=None):
@@ -249,16 +247,16 @@ class Reader(object):
 		self.idbs = []
 		self.isbs = []
 		self.__block_order__ = ""
-		self._IDB = IDB
-		self._EPB = EPB
-		self._ISB = ISB
-		self._SHB = SHB
+		self._IDB = IDB # pylint: disable=invalid-name
+		self._EPB = EPB # pylint: disable=invalid-name
+		self._ISB = ISB # pylint: disable=invalid-name
+		self._SHB = SHB # pylint: disable=invalid-name
 
 		# handle source modes
 		if fileobj is not None:
 			self.__fh = fileobj
 		elif filename is not None:
-			self.__fh = open(filename, "rb")
+			self.__fh = open(filename, "rb") # pylint: disable=consider-using-with
 		else:
 			raise Exception("No fileobject and no filename given..nothing to read!!!")
 

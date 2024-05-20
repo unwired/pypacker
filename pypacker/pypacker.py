@@ -1,3 +1,4 @@
+# pylint: disable=too-many-lines
 # Copyright 2013, Michael Stahn
 # Use of this source code is governed by a GPLv2-style license that can be
 # found in the LICENSE file.
@@ -7,48 +8,28 @@ Simple packet creation and parsing logic.
 import logging
 import random
 import re
+import struct
 from struct import Struct
 import inspect
 from ipaddress import IPv6Address, v6_int_to_packed
+from collections import defaultdict
 
-# imported to make usable via import "pypacker.[FIELD_FLAG_AUTOUPDATE | FIELD_FLAG_IS_TYPEFIELD]"
-from pypacker.pypacker_meta import MetaPacket, FIELD_FLAG_AUTOUPDATE, FIELD_FLAG_IS_TYPEFIELD
-from pypacker.structcbs import pack_mac, unpack_mac, pack_ipv4, unpack_ipv4, unpack_Q, pack_Q
+# Imported to make usable via import "pypacker.[FIELD_FLAG_AUTOUPDATE | FIELD_FLAG_IS_TYPEFIELD]"
+from pypacker.pypacker_meta import MetaPacket, FIELD_FLAG_AUTOUPDATE, FIELD_FLAG_IS_TYPEFIELD # pylint: disable=unused-import
+from pypacker.structcbs import pack_mac, unpack_mac, pack_ipv4, unpack_ipv4, pack_H, unpack_Q, pack_Q
 from pypacker.lazydict import LazyDict
 
 logger = logging.getLogger("pypacker")
-# logger.setLevel(logging.DEBUG)
-logger.setLevel(logging.WARNING)
 
 
-class NiceFormatter(logging.Formatter):
-	FORMATS = {
-		logging.DEBUG: "%(module)s -> %(funcName)s -> %(lineno)d: %(message)s",
-		logging.INFO: "%(message)s",
-		logging.WARNING: "WARNING: %(module)s: %(lineno)d: %(message)s",
-		logging.ERROR: "ERROR: %(module)s: %(lineno)d: %(message)s",
-		"DEFAULT": "%(message)s"}
+def recusive_dict():
+	return defaultdict(recusive_dict)
 
-	def __init__(self):
-		super().__init__(fmt="%(levelno)d: %(msg)s", datefmt=None, style="%")
 
-	def format(self, record):
-		format_orig = self._style._fmt
-		self._style._fmt = self.FORMATS.get(record.levelno, self.FORMATS["DEFAULT"])
-		result = logging.Formatter.format(self, record)
-
-		self._style._fmt = format_orig
-
-		return result
-
-logger_streamhandler = logging.StreamHandler()
-logger_formatter = NiceFormatter()
-logger_streamhandler.setFormatter(logger_formatter)
-
-logger.addHandler(logger_streamhandler)
-
-PROG_NONVISIBLE_CHARS	= re.compile(b"[^\x21-\x7e]")
-HEADER_TYPES_SIMPLE	= {int, bytes}
+PROG_NONVISIBLE_CHARS		= re.compile(b"[^\x21-\x7e]")
+PROG_SPACED_SINGLE_CHAR		= re.compile(" . ")
+HEADER_TYPES_SIMPLE		= {int, bytes, type(None)}
+TRIGGERLIST_TYPES_SIMPLE	= {bytes, tuple}
 
 DIR_SAME		= 1
 DIR_REV			= 2
@@ -58,9 +39,7 @@ DIR_NOT_IMPLEMENTED	= 255
 ERROR_NONE		= 0
 ERROR_DISSECT		= 1  # This layer had an error when parsing/creating an upper layer
 
-VARFILTER_TYPES = {bytes, int}
-
-LAMBDA_TRUE = lambda pkt: True
+VARFILTER_TYPES = {bytes, int, property}
 
 
 class NotEnoughBytesException(Exception):
@@ -71,7 +50,7 @@ class DissectException(Exception):
 	pass
 
 
-class Packet(object, metaclass=MetaPacket):
+class Packet(metaclass=MetaPacket):
 	"""
 	Base packet class, with metaclass magic to generate members from self.__hdr__ field.
 	This class can be instatiated via:
@@ -117,7 +96,7 @@ class Packet(object, metaclass=MetaPacket):
 
 	- Auto-decoding of headers via given format-patterns (defined via __hdr__)
 	- Auto-decoding of body-handlers (IP -> parse IP-data -> add TCP-handler to IP -> parse TCP-data..)
-	- Access of higher layers via layer1.higher_layer or "layer1[layerX]" notation
+	- Access of lower/higher layers via layer1.lower_layer, layer1.higher_layer or "layer1[...]" notation
 	- There are three types of headers:
 	1) Simple constant fields (constant format)
 		Format for __hdr__: ("name", "format", value [, FLAGS])
@@ -145,7 +124,6 @@ class Packet(object, metaclass=MetaPacket):
 		Convenient access should be set via varname_s = pypacker.Packet.get_property_XXX("varname")
 		Get/set via is always done using strings (not byte strings).
 	- Concatination via "packet = layer1 + layer2 + layerX"
-	- Access to next lower/upper layer
 	- Header-values with length < 1 Byte should be set by using properties
 	- Deactivate/activate non-TriggerList header fields, eg pkt.hdr=None (inactive), pkt.hdr=b"xxx" (active)
 	- Checksums (static auto fields in general) are auto-recalculated when calling
@@ -165,7 +143,7 @@ class Packet(object, metaclass=MetaPacket):
 				-> (optional): initiate triggerlists via tlname(bts, cb)
 				-> (optional): Set values for dynamic fields via self.xyz = b"test" (see layer567.dns -> Query)
 				-> (optional): Activate/deactivate fields
-				-> return hlen, id, bts
+				-> return hlen [, id [, bodybts]]
 			-> (optional) on access to simple headers: _unpack() sets all header values of a layer
 			-> (optional) on access to TriggerList headers: lazy parsing gets triggered
 			-> (optional) on access to body handler: next upper layer gets initiated
@@ -190,7 +168,7 @@ class Packet(object, metaclass=MetaPacket):
 	DIR_UNKNOWN		= DIR_UNKNOWN
 	DIR_NOT_IMPLEMENTED	= DIR_NOT_IMPLEMENTED
 
-	def __init__(self, *args, **kwargs):
+	def __init__(self, *args, **kwargs): # pylint: disable=too-many-branches
 		"""
 		Packet constructors:
 
@@ -198,28 +176,28 @@ class Packet(object, metaclass=MetaPacket):
 			Note: lower_layer_object only for internal usage
 		Packet(keyword1=val1, keyword2=val2, ...)
 
-		bytestring -- Packet bytes to build packet from (use memoryview for best performance
+		bytestring -- Packet bytes to build packet from (use memoryview for best performance)
 		lower_layer_object -- For internal usage only. Used by _dissect()
 			Ideally the current layer is agnostic to the lower layer. But sometimes...
 		keywords -- Keyword arguments correspond to header fields to be set
 		"""
 
 		if args:
-			# args[0]: bytes or memoryview
+			# args[0]: bytes or memoryview, should be ok to double-pack
 			mview_all = memoryview(args[0])
 
 			if len(args) == 2:
 				# Make lower layer accessible. This won't change the body
 				self._lower_layer = args[1]
-				# An exception on higher layer will lead to body bytes instead of heandler (see _lazy_init_handler)
-				# TODO: Should occur mostly on >layer4 protocols, eg TCP -> splitted packet. Checkout!
+				# An exception on higher layer will lead to body bytes instead of handler in lower layer (see _lazy_init_handler)
+				# Should occur mostly on >layer4 protocols, eg TCP -> splitted packet.
 				hlen_bodyid_bodybts = self._dissect(mview_all)
 			else:
-				# This is the lowest layer, handle exception to make it more user friendly
+				# This is the lowest layer, handle exception to make it more user friendly (unlikely)
 				try:
 					hlen_bodyid_bodybts = self._dissect(mview_all)
 				except:
-					raise DissectException(
+					raise DissectException( # pylint: disable=raise-missing-from
 						"Could not initiate packet %r, not enough/wrong bytes given?"
 						" Got %d bytes: %r, std format needs %d" % (
 							self.__class__,
@@ -227,7 +205,21 @@ class Packet(object, metaclass=MetaPacket):
 							self._header_format_cached.size)
 					)
 
-			hlen = hlen_bodyid_bodybts if hlen_bodyid_bodybts.__class__ == int else hlen_bodyid_bodybts[0]
+			# hlen | (hlen, handler_id) | (hlen, handler_id, bodybts)
+			handler_id = None
+			bodybts_dissect = None
+
+			if hlen_bodyid_bodybts.__class__ == int:
+				# Assume hlen
+				hlen = hlen_bodyid_bodybts
+			else:
+				# Assume [hlen, handler_id, ?]
+				hlen = hlen_bodyid_bodybts[0] # pylint: disable=unsubscriptable-object
+				handler_id = hlen_bodyid_bodybts[1] # pylint: disable=unsubscriptable-object
+
+				if len(hlen_bodyid_bodybts) == 3:
+					bodybts_dissect = hlen_bodyid_bodybts[2] # pylint: disable=unsubscriptable-object
+
 			# Not enough bytes means packet can't be unpacked.
 			# Check this here and not in _dissect() as it's always the same for all dissects.
 			if len(args[0]) < hlen:
@@ -237,61 +229,52 @@ class Packet(object, metaclass=MetaPacket):
 
 			self._header_cached = mview_all[:hlen]
 
-			if hlen_bodyid_bodybts.__class__ != int:
-				# Assume list
-				if len(hlen_bodyid_bodybts) != 3:
-					# Assume [hlen, handler_id] (more likely)
-					bodybts = mview_all[hlen:]
-				else:
-					# Assume [hlen, handler_id, bodybts]
-					bodybts = hlen_bodyid_bodybts[2]
-					#logger.debug("Setting explicit bodybts=len=%r,%r" % (len(bodybts), bodybts.tobytes()))
-
-				# Prepare handler for lazy dissect
-				# handler_id may be None and bodybts explicitly given: [hlen, None, bodybts]
-				if hlen_bodyid_bodybts[1] is not None:
-					try:
-						# Likely to succeed
-						clz_upper = Packet._id_handlerclass_dct[self.__class__][hlen_bodyid_bodybts[1]]
-						#logger.debug("Lazy config of handler:\n%s(%r: %r)\n-> %s(%r: %r)",
-						#	self.__class__, len(self._header_cached.tobytes()), self._header_cached.tobytes(),
-						#	clz_upper, len(bodybts.tobytes()), bodybts.tobytes())
-						self._lazy_handler_data = [clz_upper, bodybts]
-						bodybts = None
-					except:
-						#except Exception as ex:
-						#logger.warning("Can't set lazy handler config (invalid handler id?): base=%s, init data: hlen=%r, reason: %r",
-						#	self.__class__, hlen_bodyid_bodybts, ex)
-						#logger.exception(ex)
-						# Set raw bytes as data (eg handler class not found)
-						self._lazy_handler_data = None
-
-				# May be None, that's ok
-				self._body_bytes = bodybts
+			if bodybts_dissect is None:
+				# More likely
+				bodybts = mview_all[hlen:]
 			else:
-				self._body_bytes = mview_all[hlen:]
+				bodybts = bodybts_dissect
 
+			# Prepare handler for lazy dissect
+			# handler_id may be None and bodybts explicitly given: [hlen, None, bodybts]
+			# Avoid unneeded handler preparation by checking for minimum bytes
+			if handler_id is not None and len(bodybts) > 0:
+				try:
+					# Likely to succeed
+					clz_upper = Packet._id_handlerclass_dct[self.__class__][handler_id]
+					#logger.debug("Lazy config of handler:\n%s(%r: %r)\n-> %s(%r: %r)",
+					#	self.__class__, len(self._header_cached.tobytes()), self._header_cached.tobytes(),
+					#	clz_upper, len(bodybts.tobytes()), bodybts.tobytes())
+					self._lazy_handler_data = [clz_upper, bodybts]
+					bodybts = None
+				except:
+					#except Exception as ex:
+					#logger.warning("Can't set lazy handler config (invalid handler id?): base=%s, init data: hlen=%r, reason: %r",
+					#	self.__class__, hlen_bodyid_bodybts, ex)
+					#logger.exception(ex)
+					pass
+
+			# Can be None if layer was initiated successfully
+			self._body_bytes = bodybts
+			# Raw bytes given = no changes
 			self._reset_changed()
-			# Original unpacked value = no changes
+			# Dissect finished, _unpacked: None -> False
 			self._unpacked = False
 		else:
-			if len(kwargs) > 0:
-				# Overwrite default parameters
-				# Keyword args means: allready unpacked (nothing to unpack)
-				# No reset: directly assigned = changed
-				self._unpack()
+			# Keyword parameters given: use default values and overwrite w/ keyword parameters
+			# No bytes given = Use original values = nothing to unpack
+			self._unpacked = True
 
-				for k, v in kwargs.items():
-					#logger.debug("Setting via keyword arg: %r=%r" % (k, v))
-					setattr(self, k, v)
-			else:
-				self._unpacked = False
+			for k, v in kwargs.items():
+				#logger.debug("Setting via keyword arg: %r=%r" % (k, v))
+				setattr(self, k, v)
+			# Assigning via Packet(key=val) will be the same as packet.key = val -> no reset ("directly assigned" = changed)
 
-	def _dissect(self, buf):
+	def _dissect(self, buf): # pylint: disable=unused-argument
 		"""
 		Dissect packet bytes. See __init__ -> Call-flows
 		buf -- bytestring to be dissected
-		return -- header_length [, handler_id]
+		return -- header_length [, handler_id | None [, bodybts]]
 		"""
 		# _dissect(...) was not overwritten: no changes to header, return original header length
 		return self._header_format_cached.size
@@ -301,11 +284,11 @@ class Packet(object, metaclass=MetaPacket):
 		if self._lazy_handler_data is not None:
 			# Lazy data present: avoid unneeded parsing
 			return self.header_len + len(self._lazy_handler_data[1])
-		elif self._higher_layer is not None:
+		if self._higher_layer is not None:
 			return self.header_len + len(self._higher_layer)
-		else:
-			# Assume body bytes are set
-			return self.header_len + len(self._body_bytes)
+
+		# Assume body bytes are set
+		return self.header_len + len(self._body_bytes)
 
 	#
 	# Public access to header length: keep it uptodate
@@ -327,7 +310,7 @@ class Packet(object, metaclass=MetaPacket):
 	def is_error_present(self, error):
 		"""
 		Check if one of pypacker.ERROR_XXX is present
-		error -- the error to be check against internal error state
+		error -- The error to be check against internal error state
 		"""
 		return (self._errors & error) != 0
 
@@ -344,16 +327,17 @@ class Packet(object, metaclass=MetaPacket):
 			if type(self._lazy_handler_data[1]) == memoryview:
 				self._lazy_handler_data[1] = self._lazy_handler_data[1].tobytes()
 			return self._lazy_handler_data[1]
-		elif self._higher_layer is not None:
+
+		if self._higher_layer is not None:
 			# Some handler was set
 			hndl = self._higher_layer
 			return hndl._pack_header() + hndl._get_bodybytes()
-		else:
-			# Return raw bytes (no handler)
-			if type(self._body_bytes) == memoryview:
-				self._body_bytes = self._body_bytes.tobytes()
 
-			return self._body_bytes
+		# Return raw bytes (no handler)
+		if type(self._body_bytes) == memoryview:
+			self._body_bytes = self._body_bytes.tobytes()
+
+		return self._body_bytes
 
 	def _set_bodybytes(self, value):
 		"""
@@ -410,10 +394,10 @@ class Packet(object, metaclass=MetaPacket):
 		"""
 		#logger.debug(self.__class__)
 		#logger.debug("Higher layer will be: %r" % hndl.__class__)
-		if self._higher_layer is not None:
+		if self._higher_layer is not None: # pylint: disable=access-member-before-definition
 			# Clear old linked data of upper layer if body handler is already parsed
 			# A.B -> A.higher_layer = x -> B.lower_layer = None
-			self._higher_layer._lower_layer = None
+			self._higher_layer._lower_layer = None # pylint: disable=access-member-before-definition
 
 		if hndl is not None:
 			# Set a new body handler
@@ -502,6 +486,7 @@ class Packet(object, metaclass=MetaPacket):
 			# This was a lazy init: same as direct dissecting -> no body change
 			self._body_value_changed = False
 		except:
+			# TODO: activate this and below comment for debugging
 			#except Exception as ex:
 			# Error on lazy dissecting: set raw bytes
 			self._errors |= ERROR_DISSECT
@@ -515,6 +500,7 @@ class Packet(object, metaclass=MetaPacket):
 				self._higher_layer)
 			logger.exception(ex)
 			"""
+
 		self._lazy_handler_data = None
 
 	def __getitem__(self, pkt_clzs):
@@ -531,7 +517,7 @@ class Packet(object, metaclass=MetaPacket):
 		]
 
 		All layers have to match starting from A (explicit is better than implicit).
-		Comparing starts from first layer otherwise ALL layers would have to
+		Comparing starts from first layer and stops on first mismatch, otherwise ALL layers would have to
 		be parsed all the time until a matching layer (to A) appears (starting layer
 		is not known a priori).
 
@@ -547,29 +533,35 @@ class Packet(object, metaclass=MetaPacket):
 			# Keep unpacking until pkt_clzs is found (no intermediate storing)
 			pkt_clzs_len = len(pkt_clzs)
 			layers = []
-			gotmatch = False
 
 			for pkt_clz in pkt_clzs:
-				filter = LAMBDA_TRUE
-				gotmatch = True
+				gotmach_cb = None
+				gotmatch = False
 
-				# (A, lambda a: a.src="123")
+				# (A|None, lambda a: a.src="123")
 				if type(pkt_clz) is tuple:
-					pkt_clz, filter = pkt_clz
-				# else: A
+					pkt_clz, gotmach_cb = pkt_clz
+				# else: pkt_clz = A
 
-				if pkt_clz is not None and pkt_clz != p_instance.__class__:
-					# Mismatch in type
-					gotmatch = False
+				# 3 cases: None, Type, (Type, gotmach_cb), (None, gotmach_cb)
+				type_ignore_or_matches = pkt_clz is None or pkt_clz == p_instance.__class__
 
-				try:
-					if not filter(p_instance):
-						# Mismatch in filter
-						gotmatch = False
-				except:
-					# This happens if filter is (?, lambda pkt: ...)
-					# Eg: checking attributes on wrong packet type
-					gotmatch = False
+				if gotmach_cb is None:
+					# Onle type comparison, None == "ignore"
+					gotmatch = type_ignore_or_matches
+				else:
+					if type_ignore_or_matches:
+						# Type not given or matches -> further check gotmach_cb
+						try:
+							gotmatch = gotmach_cb(p_instance)
+						# Exceptions can happen if gotmach_cb is (?, lambda pkt: ...)
+						# Eg: checking attributes on wrong packet type
+						except (NameError, AttributeError) as ex:
+							# Re-raise the worst Exceptions, others are ignored silently and lead to "None" layers
+							logger.warning("lambda gotmach_cb is invalid, check code:")
+							logger.exception(ex)
+						except:
+							pass
 
 				layers.append(p_instance if gotmatch else None)
 
@@ -577,22 +569,22 @@ class Packet(object, metaclass=MetaPacket):
 				if not gotmatch or p_instance.higher_layer is None or len(layers) == pkt_clzs_len:
 					break
 				# End of match sequence in pkt_clzs not reached, go higher
-				#logger.debug(p_instance.__class__)
 				p_instance = p_instance.higher_layer
 
 			# Return matching layers
 			return layers if len(layers) == pkt_clzs_len else layers + [None] * (pkt_clzs_len - len(layers))
+
 		# Single-value index search
-		else:
-			# Keep unpacking until pkt_clz is found (no intermediate storing)
-			while not type(p_instance) is pkt_clzs:
-				# This will auto-parse lazy handler data via _get_higherlayer()
-				p_instance = p_instance.higher_layer
+		# Keep unpacking until pkt_clz is found (no intermediate storing)
+		# WARNING: this is highly imperformant because ALL layers get dissected all the time
+		while not type(p_instance) is pkt_clzs:
+			# This will auto-parse lazy handler data via _get_higherlayer()
+			p_instance = p_instance.higher_layer
 
-				if p_instance is None:
-					break
+			if p_instance is None:
+				break
 
-			return p_instance
+		return p_instance
 
 	def __iter__(self):
 		"""
@@ -626,7 +618,7 @@ class Packet(object, metaclass=MetaPacket):
 		Recursive read all layer inlcuding header up to highest layer.
 		"""
 		for name in self._headerfield_names:
-			self.__getattribute__(name)
+			getattr(self, name)
 
 		if self.higher_layer is not None:
 			self.higher_layer.dissect_full()
@@ -664,7 +656,7 @@ class Packet(object, metaclass=MetaPacket):
 		e.g. A.B.C -> [A, B, C]
 		return -- [layer1, layer2, ...]
 		"""
-		layers = [layer for layer in self]
+		layers = list(self)
 
 		# Disconnect all layers
 		for layer in layers:
@@ -674,7 +666,7 @@ class Packet(object, metaclass=MetaPacket):
 			layer.lower_layer = None
 		return layers
 
-	def summarize(self):
+	def summarize(self): # pylint: disable=too-many-locals,too-many-branches,too-many-statements
 		"""
 		Print a summary of this layer.
 		Optional: Call bin() to update auto-update fields.
@@ -687,47 +679,70 @@ class Packet(object, metaclass=MetaPacket):
 		# Show all header even deactivated ones
 		layer_sums_l = []
 
-		for idx, name in enumerate(self._headerfield_names):
+		OFF_FIELDNAME_TO_COLON = 17
+		SPACE_FIELDNAME_TO_AFTER_COLON = " " * (OFF_FIELDNAME_TO_COLON + 2)
+
+		for idx, name in enumerate(self._headerfield_names): # pylint: disable=too-many-nested-blocks
 			#logger.debug("Getting %s" % name)
 			val = getattr(self, name)
-			value_alt = ""
-			value_translated = ""
+			val_alt = ""
+			val_translated = ""
 
-			try:
-				# Try to get convenient name
-				value_alt = " = " + getattr(self, name + "_s")
-			except:
-				# Not set
-				pass
+			if hasattr(self, name + "_s"):
+				val_alt = " = " + getattr(self, name + "_s")
 
-			try:
-				# Try to get translated name
-				value_translated = getattr(self, name + "_t")
+			if hasattr(self, name + "_t"):
+				val_translated, pmcv = getattr(self, name + "_t") # pylint: disable=unused-variable
 
-				if value_translated != "":
-					value_translated = " = " + value_translated
-			except:
-				# Not set
-				pass
-
+				# module, class, varname
+				if val_translated != "":
+					# Remove known parts from description (default is module level)
+					# pypacker.layerX.modulename.[Classname.]varname -> [Classname.]varname
+					val_translated = " = " + val_translated
 			# Values: int
 			if type(val) is int:
-				format = self._header_formats[idx]
-				layer_sums_l.append("%-12s (%s): 0x%X = %d = %s" % (name, format, val, val,
-					bin(val)) + value_alt + value_translated)
+				hdr_format = self._header_formats[idx]
+				layer_sums_l.append("%-13s (%s): 0x%X = %d = %s" % (name, hdr_format, val, val,
+					bin(val)) + val_alt + val_translated)
+
+				if name in self._headerfieldname__subbyteinfo:
+					subbyte_infos = self._headerfieldname__subbyteinfo[name]
+					# Assume last element ist most right. Format: (prop, start, stop, name)
+					binlen_max = subbyte_infos[-1][2]
+
+					for prop, bstart, bstop, propname in subbyte_infos:
+						propval = prop.fget(self)
+						propval_bin = bin(propval)[2:]
+						bin_add_left = "0" * (((bstop - bstart) + 1) - len(propval_bin))
+						binvalue_spaced = " " * bstart + bin_add_left + propval_bin
+						binvalue_spaced += " " * (binlen_max - len(binvalue_spaced) + 1)
+						val_translated_subbyte = ""
+
+						if hasattr(self, propname + "_t"):
+							val_translated_subbyte, val_translated_subbyte_mcv = getattr(self, propname + "_t") # pylint: disable=unused-variable
+							#logger.debug("Got %s=%s" % (propname + "_t", val_translated_subbyte))
+
+							# module, class, varname
+							if val_translated_subbyte != "":
+								val_translated_subbyte = " = " + val_translated_subbyte
+
+						descr = SPACE_FIELDNAME_TO_AFTER_COLON + ("%-8s" % propname) +\
+							" = " + binvalue_spaced +\
+							(" = %d" % propval) +\
+							val_translated_subbyte
+						layer_sums_l.append(descr)
+
+			# Values: bytes
+			elif type(val) is bytes:
+				bts_cnt = "(%d)" % len(val)
+				layer_sums_l.append("%-9s %7s: %s" % (name, bts_cnt, val) + val_alt + val_translated)
 			# Inactive
 			elif val is None:
-				layer_sums_l.append("%-16s: (inactive)" % name)
+				layer_sums_l.append("%-17s: (inactive)" % name)
+			# Values: Triggerlist (can contain Packets, tuples, bytes)
 			else:
-				# Values: bytes
-				if type(val) is bytes:
-					bts_cnt = "(%d)" % len(val)
-					layer_sums_l.append("%-9s %6s: %s" % (name, bts_cnt, val) +
-						value_alt + value_translated)
-				# Values Triggerlist (can contain Packets, tuples, bytes)
-				else:
-					#logger.debug("%r %r" % (self.__class__, name))
-					layer_sums_l.append("%-16s: %s" % (name, val) + value_alt)
+				#logger.debug("%r %r" % (self.__class__, name))
+				layer_sums_l.append("%-17s: %s" % (name, val))
 
 		try:
 			# Add padding info, not part of _headerfield_names. See Ethernet or SCTP
@@ -738,7 +753,7 @@ class Packet(object, metaclass=MetaPacket):
 				if len(value_padding) > 0:
 					bts_cnt = "(%d)" % len(value_padding)
 					layer_sums_l.append(
-						"%-9s %6s: %s (lower layer = more outer padding)" % ("//padding", bts_cnt, value_padding))
+						"%-9s %7s: %s (lower layer = more outer padding)" % ("//padding", bts_cnt, value_padding))
 		except:
 			# No padding
 			pass
@@ -746,7 +761,7 @@ class Packet(object, metaclass=MetaPacket):
 		if self.higher_layer is None:
 			# No upper layer present: describe body bytes
 			bts_cnt = "(%d)" % len(self.body_bytes)
-			layer_sums_l.append("%-9s %6s: " % ("body_bytes", bts_cnt) + "%s" % self.body_bytes)
+			layer_sums_l.append("%10s %6s: " % ("body_bytes", bts_cnt) + "%s" % self.body_bytes)
 
 		layer_sums = "%s\n\t%s" % (
 			self.__module__[9:] + "." + self.__class__.__name__,
@@ -761,12 +776,162 @@ class Packet(object, metaclass=MetaPacket):
 			self.bin()
 		# This does lazy init of handler
 		upperlayer_str = "\n%s" % self.higher_layer if self.higher_layer is not None else ""
-		return self.summarize() + upperlayer_str
+		# TODO: Can be removed after debugging
+		try:
+			return self.summarize() + upperlayer_str
+		except ValueError as e:
+			logger.warning("Could not summarize layer %s", self.__class__)
+			raise e
+
+	def __repr__(self):
+		package__imports, layer_descr = self._get_repr()
+		imports = []
+
+		for modulename, classnames in package__imports.items():
+			imports.append("from %s import %s" % (modulename, ", ".join(classnames)))
+		imports.append("\n")
+
+		return "\n".join(imports) + layer_descr
+
+	@staticmethod
+	def _repr_collect_for_headerfield( # pylint: disable=too-many-arguments,too-many-locals,too-many-branches
+		layer,
+		headerfield_name,
+		headerfield_value,
+		name_value_descr,
+		package__imports,
+		varnames_in_layer):
+		"""
+		if layer.__class__.__name__ == "TCP":
+			logger.warning("Checking headerfield_name %s" % headerfield_name)
+		"""
+		headerfield_value = getattr(layer, headerfield_name)
+
+		# Don't show default values
+		if layer._headerfieldname__value_default[headerfield_name] == headerfield_value:
+			return
+
+		# Explicitly deactivated field (non-default)
+		if headerfield_value is None:
+			name_value_descr.append("%s=None" % headerfield_name)
+			return
+
+		if type(headerfield_value) in HEADER_TYPES_SIMPLE:
+			varname_convenient = "%s_s" % headerfield_name
+			varname_translated = "%s_t" % headerfield_name
+			found_alternative = False
+
+			# Add convenient OR translated description
+			if varname_convenient in varnames_in_layer:
+				value_convenient = getattr(layer, varname_convenient)
+				name_value_descr.append("%s=%r" % (varname_convenient, value_convenient))
+				found_alternative = True
+			elif varname_translated in varnames_in_layer:
+				# Derive imports from translated names (uses real python names)
+				val_translated, pmcv = getattr(layer, varname_translated)
+
+				if val_translated != "":
+					found_alternative = True
+					# x imports for one variable value
+					for pkgname, modname, clzname, varname in pmcv: # pylint: disable=unused-variable
+						package__imports[pkgname].add(modname)
+					"""
+					if headerfield_name == "flags":
+						logger.warning("%s -> %s", varname_translated, val_translated)
+					"""
+					# ..._t can't be assigned, don't use naming for output but standard varname
+					name_value_descr.append("%s=%s" % (headerfield_name, val_translated))
+				"""
+				# This may happen all the time (invalid values)
+				else:
+					logger.warning("Incomplete translation name: %s.%s=%r=0x%X" % (
+						layer.__class__.__qualname__, varname_translated, headerfield_value, headerfield_value)
+					)
+				"""
+			if not found_alternative:
+				name_value_descr.append("%s=%r" % (headerfield_name, headerfield_value))
+			# TODO: add sub-byte values? May become messy
+			# for name, subbyte_infos in self._headerfieldname__subbyteinfo.items()
+			# for prop, bstart, bstop, propname in subbyte_infos
+		else:
+			# Assume TriggerList
+			tl_descr = []
+
+			for tl_element in headerfield_value:
+				if type(tl_element) in TRIGGERLIST_TYPES_SIMPLE:
+					tl_descr.append(repr(tl_element))
+				else:
+					# Assume packet
+					package__imports_tl, layer_descr_tl = tl_element._get_repr()
+					#logger.debug("Imports for %s: %r" % (headerfield_value.__class__.__name__, package__imports_tl))
+
+					for import_mod_tl, import_sub_tl in package__imports_tl.items():
+						package__imports[import_mod_tl].update(import_sub_tl)
+
+					tl_descr.append(layer_descr_tl)
+
+			if len(tl_descr) > 0:
+				name_value_descr.append("\n%s=[\n%s]" % (headerfield_name, ",\t\n".join(tl_descr)))
+			else:
+				name_value_descr.append("%s=[%s]" % (headerfield_name, ", ".join(tl_descr)))
+
+	def _get_repr(self): # pylint: disable=too-many-locals,too-many-branches,too-many-statements
+		"""
+		return -- {"pypacker.layerX.module": {"Classname", "VARNAME", ...}}, "Class(...)"
+		"""
+		layer_descr = []
+		package__imports = defaultdict(set)
+
+		for layer in self: # pylint: disable=too-many-nested-blocks
+			name_value_descr = []
+			varnames_in_layer = {*dir(layer)}
+			"""
+			if layer.__class__.__name__ == "TCP":
+				logger.warning("In TCP")
+			"""
+			# Fill descriptions in name_value_descr
+			for headerfield_name in layer._headerfield_names:
+				"""
+				if layer.__class__.__name__ == "TCP":
+					logger.warning("Checking headerfield_name %s" % headerfield_name)
+				"""
+				headerfield_value = getattr(layer, headerfield_name)
+
+				Packet._repr_collect_for_headerfield(
+					layer, headerfield_name, headerfield_value, name_value_descr, package__imports, varnames_in_layer)
+
+			"""
+			if "padding" in varnames_in_layer:
+				name_value_descr.append("padding=%r" % getattr(layer, "padding"))
+			"""
+
+			for hdrname_extra in layer._headerfield_names_extra:
+				hdrname_extra_val = getattr(layer, hdrname_extra)
+
+				if len(hdrname_extra_val) > 0:
+					name_value_descr.append("%s=%r" % (hdrname_extra, hdrname_extra_val))
+
+			if layer.higher_layer is None and len(layer.body_bytes) > 0:
+				name_value_descr.append("body_bytes=%r" % layer.body_bytes)
+
+			layer_qualname = layer.__class__.__qualname__
+			layer_descr.append("%s(%s)" % (layer_qualname, ", ".join(name_value_descr)))
+
+			layer_modulename = layer.__class__.__module__
+
+			if "__main__" not in layer_modulename:
+				# Add imports for package class, use explcicit class import instead of indirect via module name (more readable)
+				# eg from pypacker.layer3.ip import IP
+				package__imports[layer_modulename].add(layer_qualname.split(".")[0])
+			#logger.debug("package__imports: %r" % package__imports)
+
+		return package__imports, " +\\\n".join(layer_descr)
 
 	def _unpack(self):
 		"""
-		Unpack a full layer (set field values) unpacked from cached header bytes.
-		This will use the current value of _header_cached to set all field values.
+		Unpack a full layer (set header field values) unpacked from cached header bytes (_header_cached).
+		This is only needed for Packet(b"somebytes").
+
 		NOTE:
 		- This is only called by the Packet class itself
 		- This is called prior to changing ANY header values
@@ -792,7 +957,6 @@ class Packet(object, metaclass=MetaPacket):
 		Reverse source <-> destination address of THIS packet. This is at minimum
 		defined for: Ethernet, IP, TCP, UDP
 		"""
-		pass
 
 	def reverse_all_address(self):
 		"""
@@ -831,7 +995,7 @@ class Packet(object, metaclass=MetaPacket):
 			#logger.debug(e)
 			return dir_ext
 
-	def direction(self, other):
+	def direction(self, other): # pylint: disable=unused-argument
 		"""
 		Check if this layer got a specific direction compared to "other". Can be overwritten.
 
@@ -871,19 +1035,20 @@ class Packet(object, metaclass=MetaPacket):
 		if self._id_fieldname is None\
 			or not self._body_value_changed\
 			or self._higher_layer is None\
-			or not self.__getattribute__("%s_au_active" % self._id_fieldname):
+			or not getattr(self, "%s_au_active" % self._id_fieldname):
 			return
 
 		# logger.debug("will update handler id, %s / %s / %s / %s",
 		#	self._id_fieldname,
-		#	self.__getattribute__("%s_au_active" % self._id_fieldname),
+		#	getattr(self, "%s_au_active" % self._id_fieldname),
 		#	self._lazy_handler_data,
 		#	self._body_changed)
 		# Likely to succeed
 		try:
 			handler_clz = self._higher_layer.__class__
 			# Only set id if the upper layer class can be assoicated to this layer (eg Ethernet -> IP, not Ethernet -> TCP)
-			self.__setattr__(self._id_fieldname,
+			setattr(self,
+				self._id_fieldname,
 				Packet._handlerclass_id_dct[self.__class__][handler_clz])
 		except:
 			# No type id found, something like eth + Telnet
@@ -898,7 +1063,6 @@ class Packet(object, metaclass=MetaPacket):
 		Callflow on a packet "pkt = layer1 + layer2 + layer3 -> pkt.bin()":
 		layer3._update_fields() -> layer2._update_fields() -> layer1._update_fields() ...
 		"""
-		pass
 
 	def bin(self, update_auto_fields=True):
 		"""
@@ -938,12 +1102,12 @@ class Packet(object, metaclass=MetaPacket):
 			for layer in layers:
 				layer._update_fields()
 
-		header_tmp = self._pack_header()
+		header_tmp = self._pack_header(update_auto_fields=update_auto_fields)
 
 		if self._higher_layer is not None:
 			# Recursive call
 			# This should allow padding like "1 2 3 .... p2 p1"
-			bodybytes_tmp = self._higher_layer.bin()
+			bodybytes_tmp = self._higher_layer.bin(update_auto_fields=update_auto_fields)
 		else:
 			bodybytes_tmp = self._get_bodybytes()
 
@@ -953,13 +1117,13 @@ class Packet(object, metaclass=MetaPacket):
 		self._reset_changed()
 		return header_tmp + bodybytes_tmp
 
-	def _update_cached_header_format_and_tl_states(self):
+	def _update_cached_header_format_and_tl_states(self, update_auto_fields=True):
 		"""
 		Update format of this packet header.
 		"""
 		#logger.debug(self.__class__)
 		#logger.debug("Formats: %s" % self._header_formats)
-		if self._header_format_cached is None:
+		if self._header_format_cached is None: # pylint: disable=access-member-before-definition
 			if len(self._tlchanged) > 0:
 				# Update values and formats of tl in this packet
 				# _header_formats: should be already unshared (on/off, dynamic, tl init)
@@ -968,7 +1132,7 @@ class Packet(object, metaclass=MetaPacket):
 				for name in self._tlchanged:
 					tlobj, idx = self._headername_tlobj[name]
 					# tl changed so calling to bin() is needed (instead of just __len__)
-					bts = tlobj.bin()
+					bts = tlobj.bin(update_auto_fields=update_auto_fields)
 					self._header_values[idx] = bts
 					self._header_formats[idx] = "%ds" % len(bts)
 
@@ -976,7 +1140,7 @@ class Packet(object, metaclass=MetaPacket):
 
 			self._header_format_cached = Struct(">" + "".join(self._header_formats))
 
-	def _pack_header(self):
+	def _pack_header(self, update_auto_fields=True):
 		"""
 		Return header as byte string.
 		"""
@@ -991,10 +1155,16 @@ class Packet(object, metaclass=MetaPacket):
 		# - Format may be None (value set)
 		# - Changes to header but not unpacked (only tl was accessed)
 		# -> update
-		self._update_cached_header_format_and_tl_states()
+		self._update_cached_header_format_and_tl_states(update_auto_fields=update_auto_fields)
 		#logger.debug("%r: %r -> %r" % (self.__class__, self._header_format_cached.format, self._header_values))
-		self._header_cached = self._header_format_cached.pack(*self._header_values)
-
+		try:
+			self._header_cached = self._header_format_cached.pack(*self._header_values)
+		except struct.error as ex:
+			# Exception decreases performance but helps significantly
+			logger.warning("Header contains wrongly assigned value types, check these:")
+			logger.warning(self._header_formats)
+			logger.warning(self._header_values)
+			logger.exception(ex)
 		return self._header_cached
 
 	# Readonly access to header
@@ -1014,7 +1184,8 @@ class Packet(object, metaclass=MetaPacket):
 				#logger.debug("Found change in %r" % p_instance.__class__)
 				changed = True
 				break
-			elif p_instance._lazy_handler_data is None:
+
+			if p_instance._lazy_handler_data is None:
 				# One layer up, stop if next layer is not yet initiated which means: no change
 				p_instance = p_instance.higher_layer
 			else:
@@ -1035,7 +1206,7 @@ class Packet(object, metaclass=MetaPacket):
 
 		listener_cb -- the change listener to be added as callback-function
 		"""
-		if self._changelistener is None:
+		if self._changelistener is None: # pylint: disable=access-member-before-definition
 			self._changelistener = {listener_cb}
 		else:
 			self._changelistener.add(listener_cb)
@@ -1088,10 +1259,10 @@ class Packet(object, metaclass=MetaPacket):
 
 	def hexdump(self, length=16, only_header=False):
 		"""
-		length -- amount of bytes per line
+		length -- Amount of bytes per line
 		only_header -- if True: just dump header, else header + body (default)
 
-		return -- hexdump output string for this packet (header or header + body).
+		return -- Hexdump output string for this packet (header or header + body).
 		"""
 		bytepos = 0
 		res = []
@@ -1110,6 +1281,7 @@ class Packet(object, metaclass=MetaPacket):
 			res.append("  %04d:      %-*s %s" % (bytepos, length * 3, hexa, line))
 			bytepos += length
 		return "\n".join(res)
+
 
 #
 # Utility functions
@@ -1144,9 +1316,9 @@ def get_rnd_mac():
 
 def get_property_mac(varname):
 	"""Create a get/set-property for a MAC address as string-representation."""
-	return property(
-		lambda obj: mac_bytes_to_str(obj.__getattribute__(varname)),
-		lambda obj, val: obj.__setattr__(varname, mac_str_to_bytes(val))
+	return property( # pylint: disable=unused-variable
+		lambda obj: mac_bytes_to_str(getattr(obj, varname)),
+		lambda obj, val: setattr(obj, varname, mac_str_to_bytes(val))
 	)
 
 
@@ -1169,9 +1341,9 @@ def get_rnd_ipv4():
 
 def get_property_ip4(var):
 	"""Create a get/set-property for an IP4 address as string-representation."""
-	return property(
-		lambda obj: ip4_bytes_to_str(obj.__getattribute__(var)),
-		lambda obj, val: obj.__setattr__(var, ip4_str_to_bytes(val))
+	return property( # pylint: disable=unused-variable
+		lambda obj: ip4_bytes_to_str(getattr(obj, var)),
+		lambda obj, val: setattr(obj, var, ip4_str_to_bytes(val))
 	)
 
 
@@ -1189,9 +1361,38 @@ def ip6_bytes_to_str(ip6_bytes):
 def get_property_ip6(var):
 	"""Create a get/set-property for an IP6 address as string-representation."""
 	return property(
-		lambda obj: ip6_bytes_to_str(obj.__getattribute__(var)),
-		lambda obj, val: obj.__setattr__(var, ip6_str_to_bytes(val))
+		lambda obj: ip6_bytes_to_str(getattr(obj, var)),
+		lambda obj, val: setattr(obj, var, ip6_str_to_bytes(val))
 	)
+
+
+def dns_tokenize_encoded_name(name):
+	"""
+	return -- [b"\\x04", ..., b"\\x00" |  b"\\xc???"], [b"test", ... ]
+	"""
+	# Contains terminating 0x00
+	# len(name_tokenized_lengths) - 1 = len(name_tokenized)
+	name_tokenized_lengths = []
+	name_tokenized = []
+	off = 0
+
+	while off < len(name):
+		length = name[off]
+
+		if length == 0:
+			name_tokenized_lengths.append(b"\x00")
+			break
+
+		if (length & 0b11000000) == 0:
+			# b"xxx" -> "xxx"
+			name_tokenized_lengths.append(name[off: off + 1])
+			name_tokenized.append(name[off + 1: off + 1 + length])
+			off += (1 + length)
+		else:
+			# DNS message compression, should be suffix/last element
+			name_tokenized_lengths.append(name[off: off + 2])
+			break
+	return name_tokenized_lengths, name_tokenized
 
 
 # DNS names
@@ -1202,28 +1403,29 @@ def dns_name_decode(name, cb_mc_bytes=lambda: b""):
 	name -- example: b"\x03www\x07example\x03com\x00"
 	cb_bytes -- callback to get bytes used to find name in case of Message Compression
 		cb_bytes_pointer(): bytes
-	return -- example: "www.example.com."
+	return -- example: "www.example.com"
 	"""
 	# ["www", "example", "com"]
 	name_decoded = []
 	parsed_pointers = set()
 	off = 1
-	buf = name
-	#logger.debug("Decoding DNS: %r" % buf)
+	#logger.debug("Decoding DNS: %r" % name)
 
-	while off < len(buf):
-		size = buf[off - 1]
+	while off < len(name):
+		size = name[off - 1]
+
 		if size == 0:
 			break
-		elif (size & 0b11000000) == 0:
+
+		if (size & 0b11000000) == 0:
 			# b"xxx" -> "xxx"
-			name_decoded.append(buf[off:off + size].decode())
+			name_decoded.append(name[off:off + size].decode())
 			off += size + 1
 		else:
 			# DNS message compression
-			off = (((buf[off - 1] & 0b00111111) << 8) | buf[off]) + 1
-			buf = cb_mc_bytes()
-			#logger.debug("Found compression, off=%d, msg: %r" % (off, buf))
+			off = (((name[off - 1] & 0b00111111) << 8) | name[off]) + 1
+			name = cb_mc_bytes()
+			#logger.debug("Found compression, off=%d, msg: %r" % (off, name))
 
 			if off in parsed_pointers:
 				# DNS message loop, abort...
@@ -1231,24 +1433,66 @@ def dns_name_decode(name, cb_mc_bytes=lambda: b""):
 				break
 			parsed_pointers.add(off)
 	#logger.debug("Returning: %r" % (".".join(name_decoded) + "."))
-	return ".".join(name_decoded) + "."
+	return ".".join(name_decoded)
 
 
 def dns_name_encode(name):
 	"""
-	DNS domain name encoder (string to bytes)
+	DNS domain name encoder (string to bytes). Does not use compression:
+	'Programs are free to avoid using pointers in messages they generate,
+	although this will reduce datagram capacity, and may cause truncation.
+	However all programs are required to understand arriving messages that
+	contain pointers.' (RFC 1035)
 
-	name -- example: "www.example.com"
-	return -- example: b'\x03www\x07example\x03com\x00'
+	name -- "www.example.com"
+	return -- b"\x03www\x07example\x03com\x00"
 	"""
 	name_encoded = [b""]
-	# "www" -> b"www"
+	# "www" -> [b"www", ...]
 	labels = [part.encode() for part in name.split(".") if len(part) != 0]
 
 	for label in labels:
 		# b"www" -> "\x03www"
 		name_encoded.append(chr(len(label)).encode() + label)
 	return b"".join(name_encoded) + b"\x00"
+
+
+def compress_dns(name_bts, compress_ref_bts):
+	"""return -- Compressed name or None"""
+	name_tokenized_lengths, name_tokenized = dns_tokenize_encoded_name(name_bts)
+
+	if name_tokenized_lengths[-1][0] & 0xC0 == 0xC0:
+		# Already compressed
+		return None
+	name_part = [b"\x00"]
+	off_bts_found_last = -1
+	idx_last = -1
+
+	#logger.debug("Trying to compress %r" % name_bts)
+
+	for idx in range(len(name_tokenized) - 1, -1, -1):
+		name_part.insert(0, name_tokenized_lengths[idx] + name_tokenized[idx])
+		off_bts_found = compress_ref_bts.find(b"".join(name_part))
+
+		#logger.debug("Suffix search: idx=%r off_bts_found=%r name=%r" % (idx, off_bts_found, name_part))
+		if off_bts_found != -1:
+			#logger.debug("Found at off %r" % off_bts_found)
+			off_bts_found_last = off_bts_found
+			idx_last = idx
+		else:
+			break
+
+	if off_bts_found_last != -1:
+		prefix = []
+		for idx, len_bts__token_bts in enumerate(zip(name_tokenized_lengths, name_tokenized)):
+			#logger.debug("Prefix create: %r %r" % (idx, len_bts__token_bts))
+			if idx == idx_last:
+				break
+			prefix.append(b"".join(len_bts__token_bts))
+		return b"".join(prefix) + pack_H(0xC000 + off_bts_found_last)
+
+	# Nothing found = no compression
+	return None
 
 
 def get_property_dnsname(var, cb_mc_bytes=lambda obj: b""):
@@ -1259,9 +1503,9 @@ def get_property_dnsname(var, cb_mc_bytes=lambda obj: b""):
 		cb_bytes_pointer(containing_obj) -- bytes
 	"""
 	return property(
-		lambda obj: dns_name_decode(obj.__getattribute__(var),
+		lambda obj: dns_name_decode(getattr(obj, var),
 			cb_mc_bytes=lambda: cb_mc_bytes(obj)),
-		lambda obj, val: obj.__setattr__(var, dns_name_encode(val))
+		lambda obj, val: setattr(obj, var, dns_name_encode(val))
 	)
 
 
@@ -1283,7 +1527,7 @@ def get_property_bytes_num_v1(var, format_target):
 	format_varname_s = ("_%s" % var) + "_format"
 
 	def get_formatlen_of_var(obj):
-		format_var_s = obj.__getattribute__(format_varname_s)
+		format_var_s = getattr(obj, format_varname_s)
 
 		if format_var_s is None:
 			#logger.warning("Got None format for %s, can't convert for convenience!", var)
@@ -1293,12 +1537,12 @@ def get_property_bytes_num_v1(var, format_target):
 
 	def get_val_bts_to_int(obj):
 		format_var_len = get_formatlen_of_var(obj)
-		prefix_bts = (b"\x00" * (format_target_struct.size - format_var_len))
-		return format_target_unpack(prefix_bts + obj.__getattribute__(var))[0]
+		prefix_bts = b"\x00" * (format_target_struct.size - format_var_len)
+		return format_target_unpack(prefix_bts + getattr(obj, var))[0]
 
 	def set_val_int_to_bts(obj, val):
 		format_var_len = get_formatlen_of_var(obj)
-		obj.__setattr__(var, format_target_pack(format_target, val)[:-format_var_len])
+		setattr(obj, var, format_target_pack(format_target, val)[: -format_var_len]) # pylint: disable=invalid-unary-operand-type
 
 	return property(
 		# bytes -> int
@@ -1331,7 +1575,7 @@ def get_property_bytes_num(varname):
 	varname = [varname]
 
 	def _bts_to_int(obj):
-		val_bts = obj.__getattribute__(varname[0])
+		val_bts = getattr(obj, varname[0])
 
 		if val_bts is None:
 			return None
@@ -1339,12 +1583,13 @@ def get_property_bytes_num(varname):
 		return bts_to_int(val_bts)
 
 	def _int_to_bts(obj, val_int):
-		val_bts_current = obj.__getattribute__(varname[0])
+		val_bts_current = getattr(obj, varname[0])
 
 		if val_bts_current is None:
 			logger.warning("Field for autoconvert is inactive, activate it first!")
 			return
-		obj.__setattr__(var, int_to_bts(val_int, len(val_bts_current)))
+
+		setattr(obj, varname[0], int_to_bts(val_int, len(val_bts_current)))
 
 	return property(
 		_bts_to_int,
@@ -1355,35 +1600,88 @@ def get_property_bytes_num(varname):
 def get_property_translator(
 	varname,
 	varname_regex,
-	cb_get_description=lambda value, value_name_dct: value_name_dct[value]):
+	cb_create_descriptions=None,
+	cb_get_description=None,
+	classes_varvalues=None):
 	"""
 	Get a descriptor allowing to make a "value -> variable name representation" translation.
 	The variable name representation can actually be used to assign values to the field in question.
-	Example: ip.py -> contains IP_PROTO_UDP=17 -> ip1.p=ip.IP_PROTO_UDP -> ip.p_t gives "IP_PROTO_UDP"
+	Example: ip.py -> contains IP_PROTO_UDP=17 -> ip1.p=ip.IP_PROTO_UDP
+		-> ip.p_t gives ("pypacker.layer3.ip", "", "IP_PROTO_UDP")
 
-	varname_regex -- The regex to find variables.
-	cb_get_description -- lambda value, value_name_dct: Description
+	Call flow:
+	1) cb_create_descriptions -> cb_get_description
+
+	varname -- Variable name to translate, eg 1 -> "SOME_FLAG"
+	varname_regex -- The regex to find variable names
+	cb_create_descriptions: Descriptions for single values.
+		lambda: {value_raw : ("module", "classes", "varname")}
+	cb_get_description -- Allows final modifications of the description like "A | B"
+		lambda self, value, storage_object: "pypacker.layerX.module.[Class1.]varname | ...",
+			[("package", "module", "classes", "var"), ...]
+	classes_varvalues -- Classes containing variables to collect, None = module level (default)
 	return -- property allowing get-access to get an descriptive name
 	"""
-	# Get globals of calling module containing the variables in question
-	globals_caller = inspect.stack()[1][0].f_globals
+	if classes_varvalues is None:
+		classes_varvalues = [None]
 
-	def collect_cb():
+	if cb_create_descriptions is None:
+		#logger.debug("Setting default callback to create descriptions")
+		varnames_stack = inspect.stack()[1][0].f_globals
 		varname_pattern = re.compile(varname_regex)
-		return {value: name for name, value in globals_caller.items() if
-			type(value) in VARFILTER_TYPES and varname_pattern.match(name)}
 
-	ldict = LazyDict(collect_cb)
+		def create_descriptions():
+			# Collect imports for access like: package.module0.class0[class1...].var
+			# from pypacker.layer0 import module0, ...
+			# ...
+			# val = module0.class0.var
+			value__pkg_mod_clz_var = {}
+			# pypacker.layer0.package0 -> pypacker, layer0, package0
+			package_module_l = varnames_stack["__name__"].split(".")
+			packagename, modname = ".".join(package_module_l[:-1]), package_module_l[-1]
+			#logger.debug("modname, packagename = %s, %s" % (modname, packagename))
 
-	def descricptor_cb(value):
-		if value not in ldict:
-			return ""
+			for class_varvalues in classes_varvalues:
+				# Default is module level: package_module."".varname
+				classname = ""
 
-		return cb_get_description(value, ldict)
+				if class_varvalues is None:
+					variables_name__value = varnames_stack
+				else:
+					classname = class_varvalues.__class__.__qualname__
+					variables_name__value = vars(class_varvalues)
+
+				for varname, varvalue in variables_name__value.items():
+					if type(varvalue) in VARFILTER_TYPES and varname_pattern.match(varname):
+						value__pkg_mod_clz_var[varvalue] = (packagename, modname, classname, varname)
+						"""
+						if "layer3" in packagename or "layer3" in modname or varname == "IP_PROTO_UDP":
+							logger.warning(value__pkg_mod_clz_var[varvalue])
+							logger.warning(package_module_l)
+						"""
+			return value__pkg_mod_clz_var
+
+		cb_create_descriptions = create_descriptions # pylint: disable=unnecessary-lambda-assignment
+
+	if cb_get_description is None:
+		def get_description_simple(_, value, value__pkg_mod_clz_var):
+			"""Create description for variable: (package, module, class, var) -> module.[class.]var"""
+			pkg_mod_clz_var_l = []
+			description_str = ""
+
+			if value in value__pkg_mod_clz_var:
+				pkg_mod_clz_var = value__pkg_mod_clz_var.get(value)
+				pkg_mod_clz_var_l.append(pkg_mod_clz_var)
+				description_str = ".".join(filter(None, pkg_mod_clz_var[1:]))
+
+			return description_str, pkg_mod_clz_var_l
+		cb_get_description = get_description_simple
+
+	value__pkg_mod_clz_var = LazyDict(cb_create_descriptions)
 
 	# Only get access
-	return property(
-		lambda obj: descricptor_cb(obj.__getattribute__(varname))
+	return property( # pylint: disable=unused-variable
+		lambda obj: cb_get_description(obj, getattr(obj, varname), value__pkg_mod_clz_var)
 	)
 
 
@@ -1398,13 +1696,13 @@ def get_ondemand_property(varname, initval_cb):
 	def get_var(self):
 		try:
 			# Likely to succeed
-			return self.__getattribute__(varname_shadowed)
+			return getattr(self, varname_shadowed)
 		except:
 			val = initval_cb()
-			self.__setattr__(varname_shadowed, val)
+			setattr(self, varname_shadowed, val)
 			return val
 
 	def set_var(self, value):
-		return self.__setattr__(varname_shadowed, value)
+		return setattr(self, varname_shadowed, value)
 
 	return property(get_var, set_var)

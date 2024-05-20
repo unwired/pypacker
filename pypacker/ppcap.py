@@ -99,7 +99,11 @@ MAGIC__PCAPFILECONFIG = {
 # PCAP callbacks
 
 
-def pcap_cb_init_write(self, snaplen=1500, linktype=DLT_EN10MB, magic=TCPDUMP_MAGIC_NANO, **initdata):
+def pcap_cb_init_write(self,
+	snaplen=1500,
+	linktype=DLT_EN10MB,
+	magic=TCPDUMP_MAGIC_NANO,
+	**initdata): # pylint: disable=unused-argument
 	# Nanoseconds
 	self._timestamp = 0
 
@@ -164,7 +168,7 @@ def pcap_cb_write(self, bts, **metadata):
 	self._fh.write(bts)
 
 
-def pcap_cb_init_read(self, **initdata):
+def pcap_cb_init_read(self, **initdata): # pylint: disable=unused-argument
 	buf = self._fh.read(24)
 	# File header is skipped per default (needed for __next__)
 	self._fh.seek(24)
@@ -174,7 +178,7 @@ def pcap_cb_init_read(self, **initdata):
 		TCPDUMP_MAGIC_NANO_SWAPPED]:
 		return False
 
-	is_le = False if fhdr.magic in [TCPDUMP_MAGIC_MICRO, TCPDUMP_MAGIC_NANO] else True
+	is_le = fhdr.magic not in [TCPDUMP_MAGIC_MICRO, TCPDUMP_MAGIC_NANO]
 
 	#logger.debug("Pcap magic: %X, le: %s" % (fhdr.magic, is_le))
 	# Handle file types
@@ -199,7 +203,7 @@ def pcap_cb_read(self):
 	return d[0] * 1000000000 + (d[1] * self._resolution_factor), buf
 
 
-def pcap_cb_btstopkt(self, meta, bts):
+def pcap_cb_btstopkt(self, meta, bts): # pylint: disable=unused-argument
 	return self._lowest_layer_new(bts)
 
 
@@ -222,9 +226,12 @@ FILEHANDLER = {
 }
 
 
-class FileHandler(object):
-	def __init__(self, filename, accessmode):
-		self._fh = open(filename, accessmode)
+class FileHandler():
+	def __init__(self, filename=None, fileobj=None, accessmode=None):
+		if filename is not None:
+			self._fh = open(filename, accessmode) # pylint: disable=unspecified-encoding,consider-using-with
+		elif fileobj is not None:
+			self._fh = fileobj
 		self._closed = False
 
 	def __enter__(self):
@@ -245,11 +252,9 @@ class Writer(FileHandler):
 	"""
 	Simple pcap writer supporting pcap format.
 	"""
-	def __init__(self, filename, filetype=FILETYPE_PCAP, append=False, **initdata):
-		if append:
-			super().__init__(filename, "a+b")
-		else:
-			super().__init__(filename, "wb")
+	def __init__(self, filename=None, fileobj=None, filetype=FILETYPE_PCAP, append=False, **initdata):
+		accessmode = "a+b" if append else "wb"
+		super().__init__(filename=filename, fileobj=fileobj, accessmode=accessmode)
 
 		callbacks = FILEHANDLER[filetype]
 		callbacks[0](self, **initdata)
@@ -260,13 +265,13 @@ class Reader(FileHandler):
 	"""
 	Simple pcap file reader supporting pcap format.
 	"""
-	def __init__(self, filename, filetype=FILETYPE_PCAP, **initdata):
-		super().__init__(filename, "rb")
+	def __init__(self, filename=None, fileobj=None, filetype=FILETYPE_PCAP, **initdata):
+		super().__init__(filename=filename, fileobj=fileobj, accessmode="rb")
 
 		callbacks = FILEHANDLER[filetype]
 		ismatch = False
 
-		for pcaptype, callbacks in FILEHANDLER.items():
+		for pcaptype, callbacks in FILEHANDLER.items(): # pylint: disable=unused-variable
 			self._fh.seek(0)
 			# init callback
 			ismatch = callbacks[2](self, **initdata)
@@ -283,19 +288,19 @@ class Reader(FileHandler):
 
 	def read_packet(self, pktfilter=lambda pkt: True):
 		"""
-		pktfilter -- filter as lambda function to match packets to be retrieved,
+		pktfilter -- Filter as lambda function to match packets to be retrieved,
 			return True to accept a specific packet.
 		return -- (metadata, packet) if packet can be created from bytes
 			else (metadata, bytes). For pcap/tcpdump metadata is a nanoseconds timestamp
 		"""
 		while True:
-			# until StopIteration
-			meta, bts = self.__next__()
+			# Until StopIteration
+			meta, bts = self.__next__() # pylint: disable=not-callable,unnecessary-dunder-call
 
 			try:
-				pkt = self._btstopkt(meta, bts)
+				pkt = self._btstopkt(meta, bts) # pylint: disable=not-callable
 			except Exception as ex:
-				logger.warning("could not create packets from bytes: %r", ex)
+				logger.warning("Could not create packets from bytes: %r", ex)
 				return meta, bts
 
 			if pktfilter(pkt):
@@ -303,7 +308,7 @@ class Reader(FileHandler):
 
 	def read_packet_iter(self, pktfilter=lambda pkt: True):
 		"""
-		pktfilter -- filter as lambda function to match packets to be retrieved,
+		pktfilter -- Filter as lambda function to match packets to be retrieved,
 			return True to accept a specific packet.
 		return -- iterator yielding (metadata, packet)
 		"""
@@ -325,17 +330,16 @@ class Reader(FileHandler):
 
 		while True:
 			try:
-				yield self.__next__()
+				yield self.__next__() # pylint: disable=not-callable
 			except StopIteration:
 				break
 
 	def read(self):
 		"""
 		Get all packets as list.
-		limit -- Maximum amount of
 		return -- [(ts, bts), ...]
 		"""
-		return [(ts, bts) for ts, bts in self]
+		return list(self)
 
 
 def merge_pcaps(pcap_filenames_in, pcap_filename_out, filter_accept=lambda bts: True, linktype=DLT_EN10MB):
@@ -354,10 +358,10 @@ def merge_pcaps(pcap_filenames_in, pcap_filename_out, filter_accept=lambda bts: 
 		try:
 			for _, bts in fp_in:
 				if filter_accept(bts):
-					fp_out.write(bts)
+					fp_out.write(bts) # pylint: disable=not-callable
 				cnt += 1
+			fp_in.close()
 		except Exception as ex:
-			logger.warning("Terminated reading %s at packet %d" % (pcap_filename_in, cnt))
+			logger.warning("Terminated reading %s at packet %d", pcap_filename_in, cnt)
 			logger.exception(ex)
-		fp_in.close()
 	fp_out.close()

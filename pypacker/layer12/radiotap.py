@@ -7,7 +7,7 @@ import logging
 from pypacker import pypacker, triggerlist
 # Handler
 from pypacker.layer12 import ieee80211
-from pypacker.structcbs import pack_H_le, unpack_H_le, pack_I, pack_I_le, unpack_I, unpack_I_le
+from pypacker.structcbs import pack_H_le, unpack_H_le, unpack_I
 
 logger = logging.getLogger("pypacker")
 
@@ -36,6 +36,10 @@ ANTENNA_MASK		= 0x00080000
 ANT_SIG_MASK		= 0x00100000
 ANT_NOISE_MASK		= 0x00200000
 RX_FLAGS_MASK		= 0x00400000
+TX_FLAGS_MASK		= 0x00800000
+
+DATA_RETRY_MASK		= 0x00000200
+MCS_INFO_MASK		= 0x00000800
 
 CHANNELPLUS_MASK	= 0x00000400
 HT_MASK			= 0x00000800
@@ -72,6 +76,11 @@ RADIO_FIELDS = {
 	ANT_NOISE_MASK: (1, 1),
 	RX_FLAGS_MASK: (2, 2),
 
+	TX_FLAGS_MASK: (2, 2),
+
+	DATA_RETRY_MASK: (1, 1),
+
+	MCS_INFO_MASK: (3, 1),
 	# CHANNELPLUS_MASK	:,
 	HT_MASK: (3, 1),
 
@@ -104,19 +113,16 @@ RADIO_FIELDS_MASKS = [
 	ANT_SIG_MASK,
 	ANT_NOISE_MASK,
 	RX_FLAGS_MASK,
+	TX_FLAGS_MASK,
+
+	DATA_RETRY_MASK,
+	MCS_INFO_MASK,
 
 	HT_MASK,
 
 	AMPDU_MASK,
 	VHT_MASK
 ]
-
-
-class FlagTriggerList(triggerlist.TriggerList):
-	# no __init__ needed: we just add tuples
-	def _pack(self, tuple_entry):
-		#return b"".join([flag[1] for flag in self])
-		return tuple_entry[1]
 
 
 def get_channelinfo(channel_bytes):
@@ -155,29 +161,24 @@ def channel_to_freq(channel):
 
 
 class Radiotap(pypacker.Packet):
+	class FlagTriggerList(triggerlist.TriggerList):
+		# no __init__ needed: we just add tuples
+		def _pack(self, tuple_entry):
+			#return b"".join([flag[1] for flag in self])
+			return tuple_entry[1]
+
 	__hdr__ = (
 		("version", "B", 0),
 		("pad", "B", 0),
 		("len", "H", 0x0800),
 		("present_flags", "I", 0),
-		("flags", None, FlagTriggerList)		# stores: (XXX_MASK, value)
+		("flags", None, FlagTriggerList),  # stores: (XXX_MASK, value)
+		[("fcs", b"")]
 	)
 
 	__handler__ = {
 		RTAP_TYPE_80211: ieee80211.IEEE80211
 	}
-
-	# handle frame check sequence
-	def _get_fcs(self):
-		try:
-			return self._fcs
-		except AttributeError:
-			return b""
-
-	def _set_fcs(self, fcs):
-		self._fcs = fcs
-
-	fcs = property(_get_fcs, _set_fcs)
 
 	def _get_channel(self):
 		return self.flags[lambda v: v[0] == CHANNEL_MASK][0][1][1]
@@ -224,7 +225,7 @@ class Radiotap(pypacker.Packet):
 				flags_off = 8 + 8
 			if buf[flags_off] & 0x10 != 0:
 				#logger.debug("FCS found")
-				self._fcs = buf[-4:]
+				self.fcs = buf[-4:].tobytes()
 				pos_end = -4
 
 		hdr_len = unpack_H_le(buf[2:4])[0]
@@ -240,23 +241,22 @@ class Radiotap(pypacker.Packet):
 		# Assume order of flags is correctly stated by "present_flags"
 		# We need to know if fcs is present: minimum TSFT and flags must get parsed
 		for mask in RADIO_FIELDS_MASKS:
-			#logger.debug(self.present_flags)
 			# flag not set
 			if mask & self.present_flags == 0:
 				continue
 
-			size_align = RADIO_FIELDS[mask]
-			size = size_align[0]
-			# check alignment
-			mod = off % size_align[1]
+			size, align = RADIO_FIELDS[mask]
+
+			# Check alignment
+			mod = off % align
 
 			if mod != 0:
-				# enlarge size by alignment
-				size += (size_align[1] - mod)
+				# Enlarge size by alignment
+				size += (align - mod)
 
-			# logger.debug("got flag %02X, length/align: %r" % (mask, size_align))
-			# add all fields for the stated flag
-			value = buf[off: off + size]
+			#logger.debug("Got flag %02X, length/align: %r" % (mask, size_align))
+			# Add all fields for the stated flag
+			value = buf[off: off + size].tobytes()
 
 			# FCS present?
 			# if mask == FLAGS_MASK and unpack_B(value)[0] & 0x10 != 0:

@@ -342,145 +342,13 @@ class UDS(pypacker.Packet):
 		return 2
 
 
-ISOTP_TYPE_SF	= 0x00  # single frame
-ISOTP_TYPE_FF	= 0x01  # first frame
-ISOTP_TYPE_CF	= 0x02  # consecutive frame
-ISOTP_TYPE_FC	= 0x03  # flow control
+ISOTP_TYPE_SF	= 0x00  # Single frame
+ISOTP_TYPE_FF	= 0x01  # First frame
+ISOTP_TYPE_CF	= 0x02  # Consecutive frame
+ISOTP_TYPE_FC	= 0x03  # Flow control
 
-
-types_isotp_offset_upper = {
-	ISOTP_TYPE_SF: 1,
-	ISOTP_TYPE_FF: 2,
-	ISOTP_TYPE_CF: 1,
-	ISOTP_TYPE_FC: 3
-}
 
 types_isotp_offset_upper_got_type = {ISOTP_TYPE_SF, ISOTP_TYPE_FF}
-
-
-class ISOTPBase(pypacker.Packet):
-	def __get_sig(self):
-		return (self.pci & 0xF0) >> 4
-
-	def __set_sig(self, value):
-		self.pci = (value & 0xF) << 4 | (self.pci & 0xF)
-
-	sig = property(__get_sig, __set_sig)
-
-	def _dissect(self, buf):
-		#logger.debug("dissect in base class")
-		# OBD/UDS can one be differentiated in ISOTP_TYPE_SF and ISOTP_TYPE_FF
-		sig = buf[0] >> 4
-		#logger.debug("bytes in ISOTP: %r" % buf)
-		#logger.debug("ISOTP type: %X, offset: %d" % (sig, types_isotp_offset_upper[sig]))
-		#logger.debug("upper bytes: %r" % buf[types_isotp_offset_upper[sig]: ])
-
-		hlen = types_isotp_offset_upper[sig]
-
-		# check by request/response SID, on both OBD2 and UDS response will be SID+0x40
-		if sig in types_isotp_offset_upper_got_type or (sig - 0x40) in types_isotp_offset_upper_got_type:
-			obd_mode = buf[types_isotp_offset_upper[sig]]
-
-			if obd_mode in OBD2_MODE_DESCR:
-				# Assume OBD2
-				#logger.debug("got OBD2")
-				return hlen, 0
-			else:
-				# Assume UDS
-				#logger.debug("got UDS, will use bytes: %r" % buf[types_isotp_offset_upper[sig]: ])
-				return hlen, 1
-
-		return hlen
-
-
-class ISOTPSingleFrame(ISOTPBase):
-	__hdr__ = (
-		("pci", "B", ISOTP_TYPE_SF),
-	)
-
-	def __get_dl(self):
-		return self.pci & 0xF
-
-	def __set_dl(self, value):
-		self.pci = (self.pci & 0xF0) | (value & 0xF)
-
-	dl = property(__get_dl, __set_dl)
-
-	__handler__ = {
-		0: OBD2, 1: UDS
-	}
-
-
-class ISOTPFirstFrame(ISOTPBase):
-	__hdr__ = (
-		("pci", "H", ISOTP_TYPE_FF),
-	)
-
-	__handler__ = {
-		0: OBD2, 1: UDS
-	}
-
-	def __get_sig(self):
-		return (self.pci & 0xF000) >> 12
-
-	def __set_sig(self, value):
-		self.pci = (value & 0xF) << 12 | (self.pci & 0xFFF)
-
-	sig = property(__get_sig, __set_sig)
-
-	def __get_dl(self):
-		return self.pci & 0xFFF
-
-	def __set_dl(self, value):
-		self.pci = (self.pci & 0xF000) | (value & 0xFFF)
-
-	dl = property(__get_dl, __set_dl)
-
-
-class ISOTPConsecutiveFrame(ISOTPBase):
-	__hdr__ = (
-		("pci", "B", ISOTP_TYPE_CF),
-	)
-
-	__handler__ = {
-		0: OBD2, 1: UDS
-	}
-
-	def __get_sn(self):
-		return self.pci & 0xF
-
-	def __set_sn(self, value):
-		self.pci = (self.pci & 0xF0) | (value & 0xF)
-
-	sn = property(__get_sn, __set_sn)
-
-
-class ISOTPFlowControl(ISOTPBase):
-	__hdr__ = (
-		("pci", "B", ISOTP_TYPE_FC),
-		("pci_blocksize", "B", 0),
-		("pci_minsep", "B", 0),
-	)
-
-	__handler__ = {
-		0: OBD2, 1: UDS
-	}
-
-	def __get_flowstatus(self):
-		return self.pci & 0xF
-
-	def __set_flowstatus(self, value):
-		self.pci = (self.pci & 0xF0) | (value & 0xF)
-
-	flowstatus = property(__get_flowstatus, __set_flowstatus)
-
-
-isotp_type_class = {
-	ISOTP_TYPE_SF: ISOTPSingleFrame,
-	ISOTP_TYPE_FF: ISOTPFirstFrame,
-	ISOTP_TYPE_CF: ISOTPConsecutiveFrame,
-	ISOTP_TYPE_FC: ISOTPFlowControl
-}
 
 # CAN flags, little endian..wtf?
 CAN_MASK_EXT		= 0x80000000
@@ -494,12 +362,9 @@ MASK_ID			= 0x1FFFFFFF
 MASK_FLAGS		= ~MASK_ID
 
 
-ISOTP_PKT_CLZES = {ISOTPConsecutiveFrame, ISOTPFirstFrame, ISOTPFlowControl, ISOTPSingleFrame}
-
-
 class CAN(pypacker.Packet):
 	"""
-		Format:
+	Format:
 
 	The field containing the CAN ID and flags is in network byte order (big-endian).
 	The bottom 29 bits contain the CAN ID of the frame. The remaining bits are:
@@ -558,13 +423,6 @@ class CAN(pypacker.Packet):
 		("res2", "B", 0)
 	)
 
-	__handler__ = {
-		ISOTP_TYPE_SF: ISOTPSingleFrame,
-		ISOTP_TYPE_FF: ISOTPFirstFrame,
-		ISOTP_TYPE_CF: ISOTPConsecutiveFrame,
-		ISOTP_TYPE_FC: ISOTPFlowControl
-	}
-
 	def __get_extended(self):
 		return 0 if (self.flag_id & CAN_MASK_EXT) == 0 else 1
 
@@ -599,10 +457,9 @@ class CAN(pypacker.Packet):
 	id = property(__get_id, __set_id)
 
 	def _dissect(self, buf):
-		# assume ISO-TP
+		# Assume ISO-TP
 		isotp_type = (buf[8] & 0xF0) >> 4
-		#logger.debug("got ISOTP type: %d, class will be: %r" %
-		#(isotp_type, isotp_type_class[isotp_type]))
+		#logger.debug("Got ISOTP type: %d", isotp_type)
 		return 8, isotp_type
 
 	def _update_fields(self):
@@ -615,7 +472,7 @@ class CAN(pypacker.Packet):
 			self.extended = 0
 
 	def show_packet(self, prefix=""):
-		if self.body_handler.__class__ not in ISOTP_PKT_CLZES:
+		if self.body_handler.__class__ not in CAN.ISOTP_PKT_CLZES:
 			logger.warning("not an isotp packet: %r", self.body_handler)
 			return
 
@@ -639,3 +496,131 @@ class CAN(pypacker.Packet):
 			output.append(" %r, content: %s" % (isotp_pkt.__class__.__name__, isotp_pkt.body_bytes))
 
 		print("%s" % "".join(output))
+
+	class ISOTPBase(pypacker.Packet):
+		types_isotp_offset_upper = {
+			ISOTP_TYPE_SF: 1,
+			ISOTP_TYPE_FF: 2,
+			ISOTP_TYPE_CF: 1,
+			ISOTP_TYPE_FC: 3
+		}
+
+		def __get_sig(self):
+			return (self.pci & 0xF0) >> 4
+
+		def __set_sig(self, value):
+			self.pci = (value & 0xF) << 4 | (self.pci & 0xF)
+
+		sig = property(__get_sig, __set_sig)
+
+		def _dissect(self, buf):
+			#logger.debug("Dissect in base class")
+			# OBD/UDS can one be differentiated in ISOTP_TYPE_SF and ISOTP_TYPE_FF
+			sig = buf[0] >> 4
+			#logger.debug("bytes in ISOTP: %r" % buf)
+			#logger.debug("ISOTP type: %X, offset: %d" % (sig, types_isotp_offset_upper[sig]))
+			#logger.debug("upper bytes: %r" % buf[types_isotp_offset_upper[sig]: ])
+
+			hlen = CAN.ISOTPBase.types_isotp_offset_upper[sig]
+
+			# Check by request/response SID, on both OBD2 and UDS response will be SID+0x40
+			if sig in types_isotp_offset_upper_got_type or (sig - 0x40) in types_isotp_offset_upper_got_type:
+				obd_mode = buf[CAN.ISOTPBase.types_isotp_offset_upper[sig]]
+
+				if obd_mode in OBD2_MODE_DESCR:
+					# Assume OBD2
+					#logger.debug("got OBD2")
+					return hlen, 0
+
+				# Assume UDS
+				#logger.debug("got UDS, will use bytes: %r" % buf[types_isotp_offset_upper[sig]: ])
+				return hlen, 1
+
+			return hlen
+
+	class ISOTPSingleFrame(ISOTPBase):
+		__hdr__ = (
+			("pci", "B", ISOTP_TYPE_SF),
+		)
+
+		def __get_dl(self):
+			return self.pci & 0xF
+
+		def __set_dl(self, value):
+			self.pci = (self.pci & 0xF0) | (value & 0xF)
+
+		dl = property(__get_dl, __set_dl)
+
+		__handler__ = {
+			0: OBD2, 1: UDS
+		}
+
+	class ISOTPFirstFrame(ISOTPBase):
+		__hdr__ = (
+			("pci", "H", ISOTP_TYPE_FF),
+		)
+
+		__handler__ = {
+			0: OBD2, 1: UDS
+		}
+
+		def __get_sig(self):
+			return (self.pci & 0xF000) >> 12
+
+		def __set_sig(self, value):
+			self.pci = (value & 0xF) << 12 | (self.pci & 0xFFF)
+
+		sig = property(__get_sig, __set_sig)
+
+		def __get_dl(self):
+			return self.pci & 0xFFF
+
+		def __set_dl(self, value):
+			self.pci = (self.pci & 0xF000) | (value & 0xFFF)
+
+		dl = property(__get_dl, __set_dl)
+
+	class ISOTPConsecutiveFrame(ISOTPBase):
+		__hdr__ = (
+			("pci", "B", ISOTP_TYPE_CF),
+		)
+
+		__handler__ = {
+			0: OBD2, 1: UDS
+		}
+
+		def __get_sn(self):
+			return self.pci & 0xF
+
+		def __set_sn(self, value):
+			self.pci = (self.pci & 0xF0) | (value & 0xF)
+
+		sn = property(__get_sn, __set_sn)
+
+	class ISOTPFlowControl(ISOTPBase):
+		__hdr__ = (
+			("pci", "B", ISOTP_TYPE_FC),
+			("pci_blocksize", "B", 0),
+			("pci_minsep", "B", 0),
+		)
+
+		__handler__ = {
+			0: OBD2, 1: UDS
+		}
+
+		def __get_flowstatus(self):
+			return self.pci & 0xF
+
+		def __set_flowstatus(self, value):
+			self.pci = (self.pci & 0xF0) | (value & 0xF)
+
+		flowstatus = property(__get_flowstatus, __set_flowstatus)
+
+	__handler__ = {
+		ISOTP_TYPE_SF: ISOTPSingleFrame,
+		ISOTP_TYPE_FF: ISOTPFirstFrame,
+		ISOTP_TYPE_CF: ISOTPConsecutiveFrame,
+		ISOTP_TYPE_FC: ISOTPFlowControl
+	}
+
+	ISOTP_PKT_CLZES = {ISOTPConsecutiveFrame, ISOTPFirstFrame, ISOTPFlowControl, ISOTPSingleFrame}

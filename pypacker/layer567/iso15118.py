@@ -5,11 +5,8 @@
 ISO15118
 """
 import logging
-import sys
 
 from pypacker.pypacker import Packet
-from pypacker.structcbs import pack_H_le, unpack_H, unpack_H_le
-from pypacker.triggerlist import TriggerList
 
 logger = logging.getLogger("pypacker")
 

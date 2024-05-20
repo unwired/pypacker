@@ -9,9 +9,6 @@ from pypacker.structcbs import unpack_HH
 
 logger = logging.getLogger("pypacker")
 
-TRUNK_NAME	= 0x01
-MAC_ADDR	= 0x04
-
 
 class DTP(pypacker.Packet):
 	__hdr__ = (
@@ -32,7 +29,7 @@ class DTP(pypacker.Packet):
 				# length: inclusive header
 				_, hlen = unpack_HH(buf[off: off + 4])
 				if collect_tvs:
-					packet = TV(buf[off: off + hlen])
+					packet = DTP.TV(buf[off: off + hlen])
 					tvs.append(packet)
 				off += hlen
 			return tvs if collect[0] else off
@@ -45,9 +42,8 @@ class DTP(pypacker.Packet):
 		self.tvs(buf[off_tvs: off_tvs + tvlen], DTP._dissect_tvs())
 		return off_tvs + tvlen
 
-
-class TV(pypacker.Packet):
-	__hdr__ = (
-		("t", "H", 0),
-		("len", "H", 0)
-	)
+	class TV(pypacker.Packet):
+		__hdr__ = (
+			("t", "H", 0),
+			("len", "H", 0)
+		)

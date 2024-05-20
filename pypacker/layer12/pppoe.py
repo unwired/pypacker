@@ -3,15 +3,14 @@
 # found in the LICENSE file.
 """PPP-over-Ethernet."""
 from pypacker import pypacker
-from pypacker.layer12.ppp import PPP
 
 # RFC 2516 codes
-PPPoE_PADI	= 0x09
-PPPoE_PADO	= 0x07
-PPPoE_PADR	= 0x19
-PPPoE_PADS	= 0x65
-PPPoE_PADT	= 0xA7
-PPPoE_SESSION	= 0x00
+PPPOE_PADI	= 0x09
+PPPOE_PADO	= 0x07
+PPPOE_PADR	= 0x19
+PPPOE_PADS	= 0x65
+PPPOE_PADT	= 0xA7
+PPPOE_SESSION	= 0x00
 
 
 class PPPoE(pypacker.Packet):
@@ -38,12 +37,7 @@ class PPPoE(pypacker.Packet):
 
 	def _dissect(self, buf):
 		code = buf[1]
-		if code == PPPoE_SESSION:
-			try:
-				# TODO: needs testing
-				return 6, code
-			except Exception:
-				pass
-		else:
-			pass
+		if code == PPPOE_SESSION:
+			return 6, code
+
 		return 6

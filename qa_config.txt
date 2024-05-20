@@ -1,15 +1,20 @@
-[pep8]
-# E101: autoformat on pycharm creates spaces
-ignore = W191,E128,E223,E265,E101,E731,E721
-max-line-length = 125
 [flake8]
 indent-string=\t
-ignore = W191,E128,E223,E265,F403,E722,F405,E305,F401,F821,E731,E117,W504,E721,F723
-max-line-length = 125
+max-line-length=120
+ignore = W191,E128,E223,E265,E261,E722,E731,E721,E131,F821,F401,E501
+# W191: Spaces enforced? -> We use TABS!
+# E128: Continuation line under-indented for visual indent -> Looks sh$§
+# E223: Tab before operator -> yep, we use tabs
+# E265: "#some comment" is ok -> it's readable
+# F821: Runtime setting variables not recognized -> false positives
+# F401: Handled by pylint
+# E501: Long lines: use pylint for this
 [pylint]
 [FORMAT]
 indent-string=\t
 max-line-length=120
 [MESSAGES CONTROL]
-#disable=bad-continuation,bad-whitespace,missing-docstring,too-many-arguments,invalid-name,bare-except,protected-access,unidiomatic-typecheck,no-self-use,too-many-instance-attributes,redefined-variable-type,line-too-long,pointless-string-statement,broad-except,no-member,undefined-variable,attribute-defined-outside-init
-disable=bad-continuation,bad-whitespace,missing-docstring,too-many-arguments,invalid-name,bare-except,protected-access,unidiomatic-typecheck,no-self-use,too-many-instance-attributes,redefined-variable-type,broad-except,no-member,undefined-variable,attribute-defined-outside-init,unnecessary-lambda,too-few-public-methods,len-as-condition,wildcard-import,unused-wildcard-import,fixme,bad-mcs-class method-argument
+disable=fixme,pointless-string-statement,broad-exception-raised,consider-using-f-string,missing-docstring,bare-except,unidiomatic-typecheck,too-many-instance-attributes,broad-except,no-member,unnecessary-lambda,too-few-public-methods,attribute-defined-outside-init,undefined-variable,protected-access
+# undefined-variable: see F821
+# invalid-name (and others): too many false positives
+extension-pkg-allow-list=netifaces

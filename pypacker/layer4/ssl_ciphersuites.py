@@ -11,7 +11,7 @@ These are supposed to be immutable; don't mess with them.
 """
 
 
-class CipherSuite(object):
+class CipherSuite():
 	"""
 	Encapsulates a cipher suite.
 
@@ -24,7 +24,7 @@ class CipherSuite(object):
 	* mac: message authentication code algorithm
 	"""
 
-	def __init__(self, code, name, kx, auth, encoding, mac):
+	def __init__(self, code, name, kx, auth, encoding, mac): # pylint: disable=too-many-arguments
 		self.code = code
 		self.name = name
 		self.kx = kx
@@ -56,7 +56,7 @@ class CipherSuite(object):
 		return self.BLOCK_SIZES.get(self.encoding, 1)
 
 
-# master list of CipherSuite Objects
+# Master list of CipherSuite Objects
 CIPHERSUITES = [
 	# not a real cipher suite, can be ignored, see RFC5746
 	CipherSuite(0xFF, 'TLS_EMPTY_RENEGOTIATION_INFO', 'NULL', 'NULL', 'NULL', 'NULL'),

@@ -23,7 +23,7 @@ logger = logging.getLogger("pypacker")
 
 MSG_NO_NFQUEUE = "Could not load netfilter_queue library. See README.md for interceptor requirements."
 
-netfilter = None
+netfilter = None # pylint: disable=invalid-name
 
 try:
 	# Load library
@@ -108,13 +108,13 @@ class Timeval(ctypes.Structure):
 # Return netfilter netlink handler
 nfnlh = netfilter.nfq_nfnlh
 nfnlh.restype = ctypes.POINTER(NfnlHandle)
-nfnlh.argtypes = ctypes.POINTER(NfqHandle),
+nfnlh.argtypes = (ctypes.POINTER(NfqHandle),)
 
 # Return a file descriptor for the netlink connection associated with the
 # given queue connection handle.
 nfq_fd = netfilter.nfnl_fd
 nfq_fd.restype = ctypes.c_int
-nfq_fd.argtypes = ctypes.POINTER(NfnlHandle),
+nfq_fd.argtypes = (ctypes.POINTER(NfnlHandle),)
 
 nfnl_rcvbufsiz = netfilter.nfnl_rcvbufsiz
 nfnl_rcvbufsiz.restype = ctypes.c_int
@@ -127,7 +127,7 @@ ll_open_queue.restype = ctypes.POINTER(NfqHandle)
 # This function closes the nfqueue handler and free associated resources.
 close_queue = netfilter.nfq_close
 close_queue.restype = ctypes.c_int
-close_queue.argtypes = ctypes.POINTER(NfqHandle),
+close_queue.argtypes = (ctypes.POINTER(NfqHandle),)
 
 # Bind a nfqueue handler to a given protocol family.
 bind_pf = netfilter.nfq_bind_pf
@@ -147,7 +147,7 @@ create_queue.argtypes = ctypes.POINTER(NfqHandle), ctypes.c_uint16, ctypes.c_voi
 # Removes the binding for the specified queue handle.
 destroy_queue = netfilter.nfq_destroy_queue
 destroy_queue.restype = ctypes.c_int
-destroy_queue.argtypes = ctypes.POINTER(NfqQHandler),
+destroy_queue.argtypes = (ctypes.POINTER(NfqQHandler),)
 
 # Triggers an associated callback for the given packet received from the queue.
 handle_packet = netfilter.nfq_handle_packet
@@ -191,13 +191,13 @@ NF_MAX_VERDICT = NF_STOP
 # NF_MAX_VERDICT -
 set_verdict = netfilter.nfq_set_verdict
 set_verdict.restype = ctypes.c_int
-set_verdict.argtypes = ctypes.POINTER(NfqQHandler), ctypes.c_uint32, ctypes.c_uint32,\
+set_verdict.argtypes = ctypes.POINTER(NfqQHandler), ctypes.c_uint32, ctypes.c_uint32, \
 	ctypes.c_uint32, ctypes.c_char_p
 
 # Return the metaheader that wraps the packet.
 get_msg_packet_hdr = netfilter.nfq_get_msg_packet_hdr
 get_msg_packet_hdr.restype = ctypes.POINTER(NfqnlMsgPacketHdr)
-get_msg_packet_hdr.argtypes = ctypes.POINTER(NfqData),
+get_msg_packet_hdr.argtypes = (ctypes.POINTER(NfqData),)
 
 
 # Get interface index
@@ -206,23 +206,23 @@ get_msg_packet_hdr.argtypes = ctypes.POINTER(NfqData),
 # uint32_t nfq_get_physindev ( struct nfq_data *  nfad )
 get_physindev = netfilter.nfq_get_physindev
 get_physindev.restype = ctypes.c_uint32
-get_physindev.argtypes = ctypes.POINTER(NfqData),
+get_physindev.argtypes = (ctypes.POINTER(NfqData),)
 
 # uint32_t nfq_get_physoutdev ( struct nfq_data *  nfad )
 get_physoutdev = netfilter.nfq_get_physoutdev
 get_physoutdev.restype = ctypes.c_uint32
-get_physoutdev.argtypes = ctypes.POINTER(NfqData),
+get_physoutdev.argtypes = (ctypes.POINTER(NfqData),)
 
 
 # uint32_t  nfq_get_indev (struct nfq_data *nfad)
 get_indev = netfilter.nfq_get_indev
 get_indev.restype = ctypes.c_uint32
-get_indev.argtypes = ctypes.POINTER(NfqData),
+get_indev.argtypes = (ctypes.POINTER(NfqData),)
 
 # uint32_t nfq_get_outdev ( struct nfq_data *  nfad )
 get_outdev = netfilter.nfq_get_outdev
 get_outdev.restype = ctypes.c_uint32
-get_outdev.argtypes = ctypes.POINTER(NfqData),
+get_outdev.argtypes = (ctypes.POINTER(NfqData),)
 
 
 # Retrieves the hardware address associated with the given queued packet.
@@ -232,7 +232,7 @@ get_outdev.argtypes = ctypes.POINTER(NfqData),
 # so cannot currently be retrieved. (nfqueue documentation)
 get_packet_hw = netfilter.nfq_get_packet_hw
 get_packet_hw.restype = ctypes.POINTER(NfqnlMsgPacketHw)
-get_packet_hw.argtypes = ctypes.POINTER(NfqData),
+get_packet_hw.argtypes = (ctypes.POINTER(NfqData),)
 
 # Retrieve the payload for a queued packet.
 get_payload = netfilter.nfq_get_payload
@@ -257,16 +257,15 @@ class UnableToBindException(Exception):
 		self.queue_id = queue_id
 
 
-class Interceptor(object):
+class Interceptor():
 	"""
 	Packet interceptor. Allows MITM and filtering.
 	Example config for iptables:
 	$ iptables -I INPUT 1 -p icmp -j NFQUEUE --queue-balance 0:2
 	Alternatively add nftables rule:
 	$ nft add table inet pptable
-	$ nft add chain inet pptable filter { type filter hook input priority 0 \; policy accept\; }
+	$ nft add chain inet pptable filter { type filter hook input priority 0; policy accept; }
 	$ nft add rule inet pptable filter counter queue num 0-2
-
 	"""
 	QueueConfig = namedtuple("QueueConfig",
 		["queue", "queue_id", "nfq_handle", "nfq_socket", "verdictthread", "handler"])
@@ -326,13 +325,13 @@ class Interceptor(object):
 		#	obj.stop()
 
 	def _setup_queue(self, queue_id, ctx, verdict_callback):
-		def verdict_callback_ind(queue_handle, nfmsg, nfa, _data):
+		def verdict_callback_ind(queue_handle, nfmsg, nfa, _data): # pylint: disable=too-many-locals,unused-argument
 			packet_ptr = ctypes.c_void_p(0)
 			pkg_hdr = get_msg_packet_hdr(nfa)
 			packet_id = ntohl(pkg_hdr.contents.packet_id)
 			linklayer_protoid = htons(pkg_hdr.contents.hw_protocol)
 
-			len_recv, data = get_full_payload(nfa, packet_ptr)
+			len_recv, data = get_full_payload(nfa, packet_ptr) # pylint: disable=unused-variable
 			hw_addr = None
 			packet_hw = get_packet_hw(nfa)
 
@@ -430,7 +429,7 @@ class Interceptor(object):
 				destroy_queue(qconfig.queue)
 				close_queue(qconfig.nfq_handle)
 				qconfig.nfq_socket.close()
-				logger.debug("Joining verdict thread for queue %d", qconfig.queue_id)
+				#logger.debug("Joining verdict thread for queue %d", qconfig.queue_id)
 				qconfig.verdictthread.join()
 			except:
 				# Don't mind, we can't do anything if something goes wrong here

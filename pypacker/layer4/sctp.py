@@ -13,7 +13,7 @@ from pypacker.pypacker import FIELD_FLAG_AUTOUPDATE
 # Handler
 from pypacker.layer4 import tcp
 from pypacker.layer567 import diameter
-from pypacker.structcbs import unpack_H, unpack_I
+from pypacker.structcbs import unpack_H
 
 logger = logging.getLogger("pypacker")
 
@@ -43,6 +43,8 @@ class Chunk(pypacker.Packet):
 		("len", "H", 0)		# length of header up to end (including data)
 	)
 	# May have padding
+
+
 """
 Data Chunk:
 type		B
@@ -61,10 +63,9 @@ class SCTP(pypacker.Packet):
 		("dport", "H", 0),
 		("vtag", "I", 0),
 		("sum", "I", 0, FIELD_FLAG_AUTOUPDATE),
-		("chunks", None, triggerlist.TriggerList)
+		("chunks", None, triggerlist.TriggerList),
+		[("padding", b"")]
 	)
-
-	padding = pypacker.get_ondemand_property("padding", lambda: b"")
 
 	__handler__ = {
 		123: diameter.Diameter,
@@ -115,8 +116,9 @@ class SCTP(pypacker.Packet):
 
 	def _dissect(self, buf):
 		off_chunks = 12
-		chunks_len, padding = SCTP._dissect_chunks(collect_chunks=False)(buf[off_chunks:])
-		self._padding = padding
+		chunks_len, padding = SCTP._dissect_chunks( # pylint: disable=unbalanced-tuple-unpacking
+			collect_chunks=False)(buf[off_chunks:])
+		self.padding = padding
 		self.chunks(buf[off_chunks: off_chunks + chunks_len], SCTP._dissect_chunks())
 		#logger.debug("sctp base header len=%r, Chunk len=%r, padding len=%r" % (off_chunks, chunks_len, len(padding)))
 		hlen = off_chunks + chunks_len

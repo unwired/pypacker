@@ -24,7 +24,7 @@ SE	= 240		# end sub negotiation
 EOR	= 239		# end of record (transparent mode)
 ABORT	= 238		# Abort process
 SUSP	= 237		# Suspend process
-xEOF	= 236		# End of file: EOF is already used...
+XEOF	= 236		# End of file: EOF is already used...
 
 SYNCH	= 242		# for telfunc calls
 

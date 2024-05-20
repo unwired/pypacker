@@ -131,8 +131,8 @@ TAG_DEL_UNSUPPORTED_ATTR_TAG	= 0x05
 #0x06-0x0E         reserved for future delimiters
 #0x0F              reserved for future chunking-end-of-attributes-tag
 
-TAGS_DELIMITER = set([TAG_DEL_RESERVED, TAG_DEL_OP_ATTR_TAG, TAG_DEL_JOBATTR_TAG, TAG_DEL_END_OF_ATTR,
-	TAG_DEL_PRINTER_ATTR_TAG, TAG_DEL_UNSUPPORTED_ATTR_TAG])
+TAGS_DELIMITER = {TAG_DEL_RESERVED, TAG_DEL_OP_ATTR_TAG, TAG_DEL_JOBATTR_TAG, TAG_DEL_END_OF_ATTR,
+	TAG_DEL_PRINTER_ATTR_TAG, TAG_DEL_UNSUPPORTED_ATTR_TAG}
 
 TAG_TYPE_BOOL			= 0x22
 TAG_TYPE_KEYWORD		= 0x44
@@ -159,112 +159,109 @@ Expect: 100-continue
 """
 
 
-class TypeNameContent(pypacker.Packet):
-	__hdr__ = (
-		("type", "B", 0),
-		("name_len", "H", 0, FIELD_FLAG_AUTOUPDATE),
-		("name", None, b""),
-		("content_len", "H", 0, FIELD_FLAG_AUTOUPDATE)
-	)
+class IPPBase(pypacker.Packet):
+	class TypeNameContent(pypacker.Packet):
+		__hdr__ = (
+			("type", "B", 0),
+			("name_len", "H", 0, FIELD_FLAG_AUTOUPDATE),
+			("name", None, b""),
+			("content_len", "H", 0, FIELD_FLAG_AUTOUPDATE)
+		)
 
-	def _dissect(self, buf):
-		name_len = unpack_H(buf[1: 3])[0]
-		self.name = buf[3: 3 + name_len]
-		return 5 + name_len
+		def _dissect(self, buf):
+			name_len = unpack_H(buf[1: 3])[0]
+			self.name = buf[3: 3 + name_len]
+			return 5 + name_len
 
-	def _update_fields(self):
-		if self._changed():
-			if self.name_len_au_active:
-				self.name_len = len(self.name)
-			if self.content_len_au_active:
-				self.content_len = len(self.body_bytes)
+		def _update_fields(self):
+			if self._changed():
+				if self.name_len_au_active:
+					self.name_len = len(self.name)
+				if self.content_len_au_active:
+					self.content_len = len(self.body_bytes)
 
+	class Attribute(pypacker.Packet):
+		__hdr__ = (
+			("parameter", None, triggerlist.TriggerList),
+		)
 
-class Attribute(pypacker.Packet):
-	__hdr__ = (
-		("parameter", None, triggerlist.TriggerList),
-	)
+		def get_name(self):
+			# Avoid exception below
+			if len(self.parameter) == 0 or type(self.parameter[0]) != TypeNameContent:
+				return None
 
-	def get_name(self):
-		# Avoid exception below
-		if len(self.parameter) == 0 or type(self.parameter[0]) != TypeNameContent:
-			return None
+			# Assume TypeNameContent is used
+			try:
+				return self.parameter[0].body_bytes
+			except:
+				return None
 
-		# Assume TypeNameContent is used
-		try:
-			return self.parameter[0].body_bytes
-		except:
-			return None
+	"""
+	Attribute example Structure:
 
-"""
-Attribute example Structure:
+	//[operation-attributes-tag:1]
+	[value-tag:2]
+		name: [len:1][content:len]
+		value: [len:1][content:len]
+	[value-tag:2]
+		name: [len:1][content:len]
+		value: [len:1][content:len]
+		// Member of same parent value-tag as long name-len is 0
+		value:
+			[value-tag:2]
+			[name-len:1=0][name:name-len]
+			[len:1][content:len]
+	//[end-of-attributes-tag:1]
+	"""
 
-//[operation-attributes-tag:1]
-[value-tag:2]
-	name: [len:1][content:len]
-	value: [len:1][content:len]
-[value-tag:2]
-	name: [len:1][content:len]
-	value: [len:1][content:len]
-	// Member of same parent value-tag as long name-len is 0
-	value:
-		[value-tag:2]
-		[name-len:1=0][name:name-len]
-		[len:1][content:len]
-//[end-of-attributes-tag:1]
-"""
-
-
-def dissect_attributes(only_offsets=False):
-	def dissect_attributes_sub(buf):
-		"""
-		buf -- start direct after operation-attributes-tag
-		"""
-		#logger.debug("dissect_attributes_sub")
-		attributes = []
-		tncs = []
-		off = 0
-		value_tag = buf[off]
-		value_tag_new = None
-
-		while off < len(buf):
-			# type:1, len:2, value:len
-			name_len = unpack_H(buf[off + 1: off + 1 + 2])[0]
-			content_len = unpack_H(buf[off + 1 + 2 + name_len: off + 1 + 2 + name_len + 2])[0]
-			off_new = off + 1 + 2 + name_len + 2 + content_len
-			#logger.debug(f"value_tag={value_tag:#x}, off={off}, name_len={name_len},
-			#	 content_len={content_len}, off_new={off_new}")
-
+	@staticmethod
+	def dissect_attributes(only_offsets=False):
+		def dissect_attributes_sub(buf):
+			"""buf -- Start direct after operation-attributes-tag"""
+			#logger.debug("dissect_attributes_sub")
+			attributes = []
+			tncs = []
+			off = 0
+			value_tag = buf[off]
 			value_tag_new = None
 
-			if off_new < len(buf):
-				value_tag_new = buf[off_new]
-				#logger.debug(f"value_tag_new={value_tag_new:X}")
+			while off < len(buf):
+				name_len = unpack_H(buf[off + 1: off + 1 + 2])[0] # type:1, len:2, value:len
+				content_len = unpack_H(buf[off + 1 + 2 + name_len: off + 1 + 2 + name_len + 2])[0]
+				off_new = off + 1 + 2 + name_len + 2 + content_len
+				#logger.debug(f"value_tag={value_tag:#x}, off={off}, name_len={name_len},
+				#	 content_len={content_len}, off_new={off_new}")
 
-			if not only_offsets:
-				tnc = TypeNameContent(buf[off: off_new])
-				tncs.append(tnc)
+				value_tag_new = None
 
-				if value_tag_new != value_tag:
-					# End of Attribute reached, add all tncs
-					attribute = Attribute()
-					attribute.parameter.extend(tncs)
-					attributes.append(attribute)
-					tncs = []
+				if off_new < len(buf):
+					value_tag_new = buf[off_new]
+					#logger.debug(f"value_tag_new={value_tag_new:X}")
 
-			off = off_new
+				if not only_offsets:
+					tnc = IPPBase.TypeNameContent(buf[off: off_new])
+					tncs.append(tnc)
 
-			if value_tag_new is None or value_tag_new in TAGS_DELIMITER:
-				break
+					if value_tag_new != value_tag:
+						# End of Attribute reached, add all tncs
+						attribute = IPPBase.Attribute()
+						attribute.parameter.extend(tncs)
+						attributes.append(attribute)
+						tncs = []
 
-			value_tag = value_tag_new
+				off = off_new
 
-		return off if only_offsets else attributes
+				if value_tag_new is None or value_tag_new in TAGS_DELIMITER:
+					break
 
-	return dissect_attributes_sub
+				value_tag = value_tag_new
+
+			return off if only_offsets else attributes
+
+		return dissect_attributes_sub
 
 
-class IPPRequest(pypacker.Packet):
+class IPPRequest(IPPBase):
 	__hdr__ = (
 		("version", "H", 0x0200),
 		# The operation-attributes-tag MUST be the first tag delimiter, ...
@@ -288,7 +285,7 @@ class IPPRequest(pypacker.Packet):
 
 	def _dissect(self, buf):
 		#op_attr_len = dissect_attributes(only_offsets=True)(buf[9:])
-		self.op_attr(buf[9: -1], dissect_attributes())
+		self.op_attr(buf[9: -1], IPPBase.dissect_attributes())
 
 		return len(buf)
 
@@ -296,7 +293,7 @@ class IPPRequest(pypacker.Packet):
 RESPONSE_STATUS_OK	= 0
 
 
-class IPPResponse(pypacker.Packet):
+class IPPResponse(IPPBase):
 	__hdr__ = (
 		("version", "H", 0x0200),
 		("status", "H", RESPONSE_STATUS_OK),

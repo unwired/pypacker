@@ -25,8 +25,8 @@ ETH_HDR_LEN	= 14
 ETH_LEN_MIN	= 64		# minimum frame length with CRC
 ETH_LEN_MAX	= 1518		# maximum frame length with CRC
 
-ETH_MTU		= (ETH_LEN_MAX - ETH_HDR_LEN - ETH_CRC_LEN)
-ETH_MIN		= (ETH_LEN_MIN - ETH_HDR_LEN - ETH_CRC_LEN)
+ETH_MTU		= ETH_LEN_MAX - ETH_HDR_LEN - ETH_CRC_LEN
+ETH_MIN		= ETH_LEN_MIN - ETH_HDR_LEN - ETH_CRC_LEN
 
 # Ethernet payload types - http://standards.ieee.org/regauth/ethertype
 ETH_TYPE_PUP		= 0x0200		# PUP protocol
@@ -54,7 +54,7 @@ ETH_TYPE_PBRIDGE	= 0x88A8		# Provider Bridging IEEE 802.1ad
 ETH_TYPE_POWERLINK	= 0x88AB		# Realtime Ethernet POWERLINK
 ETH_TYPE_LLDP		= 0x88CC		# Link Layer Discovery Protocol
 ETH_TYPE_SERCOS		= 0x88CD		# Realtime Ethernet SERCOS III
-ETH_TYPE_PTPv2		= 0x88F7		# PTPv2 IEEE 1588-2008
+ETH_TYPE_PTPV2		= 0x88F7		# PTPv2 IEEE 1588-2008
 ETH_TYPE_FIBRE_ETH	= 0x8906		# Fibre Channel over Ethernet
 ETH_TYPE_FCOE		= 0x8914		# FCoE Initialization Protocol (FIP)
 ETH_TYPE_TUNNELING	= 0x9100		# Provider Bridging IEEE 802.1QInQ 2007
@@ -73,36 +73,7 @@ MPLS_TTL_SHIFT		= 0
 MPLS_STACK_BOTTOM	= 0x0100
 
 
-class Dot1Q(pypacker.Packet):
-	__hdr__ = (
-		("type", "H", ETH_TYPE_8021Q),
-		("tci", "H", 0)  # tag control information PCP(3 bits),CFI(1 bit), VID(12 bits)
-	)
-
-	def __get_prio(self):
-		return (self.tci & 0xE000) >> 13
-
-	def __set_prio(self, value):
-		self.tci = (self.tci & ~0xE000) | (value << 13)
-	prio = property(__get_prio, __set_prio)
-
-	def __get_cfi(self):
-		return (self.tci & 0x1000) >> 12
-
-	def __set_cfi(self, value):
-		self.tci = (self.tci & ~0x1000) | (value << 12)
-	cfi = property(__get_cfi, __set_cfi)
-
-	def __get_vid(self):
-		return self.tci & 0x0FFF
-
-	def __set_vid(self, value):
-		self.tci = self.tci & 0xF000 | value
-	vid = property(__get_vid, __set_vid)
-
-	type_t = pypacker.get_property_translator("type", "ETH_TYPE_")
-
-# standard or double vlan tag
+# Standard or double vlan tag
 # ETH_TYPE_TUNNELING as outer tag is NON-standard!
 # see: https://en.wikipedia.org/wiki/IEEE_802.1ad
 VLAN_TAG_START = {ETH_TYPE_8021Q, ETH_TYPE_PBRIDGE, ETH_TYPE_TUNNELING}
@@ -113,7 +84,8 @@ class Ethernet(pypacker.Packet):
 		("dst", "6s", b"\xff" * 6),
 		("src", "6s", b"\xff" * 6),
 		("vlan", None, triggerlist.TriggerList),
-		("type", "H", ETH_TYPE_IP, FIELD_FLAG_IS_TYPEFIELD)
+		("type", "H", ETH_TYPE_IP, FIELD_FLAG_IS_TYPEFIELD),
+		[("padding", b"")]
 	]
 
 	dst_s = pypacker.get_property_mac("dst")
@@ -128,12 +100,41 @@ class Ethernet(pypacker.Packet):
 		ETH_TYPE_IP6: ip6.IP6,
 		ETH_TYPE_PPOE_DISC: pppoe.PPPoE,
 		ETH_TYPE_PPOE_SESS: pppoe.PPPoE,
-		ETH_TYPE_PTPv2: ptpv2.PTPv2,
+		ETH_TYPE_PTPV2: ptpv2.PTPv2,
 		ETH_TYPE_EFC: flow_control.FlowControl,
 		ETH_TYPE_LLDP: lldp.LLDP,
 		ETH_TYPE_SP: lacp.LACP,
 		ETH_TYPE_SLAC: slac.Slac
 	}
+
+	class Dot1Q(pypacker.Packet):
+		__hdr__ = (
+			("type", "H", ETH_TYPE_8021Q),
+			("tci", "H", 0)  # tag control information PCP(3 bits),CFI(1 bit), VID(12 bits)
+		)
+
+		def __get_prio(self):
+			return (self.tci & 0xE000) >> 13
+
+		def __set_prio(self, value):
+			self.tci = (self.tci & ~0xE000) | (value << 13)
+		prio = property(__get_prio, __set_prio)
+
+		def __get_cfi(self):
+			return (self.tci & 0x1000) >> 12
+
+		def __set_cfi(self, value):
+			self.tci = (self.tci & ~0x1000) | (value << 12)
+		cfi = property(__get_cfi, __set_cfi)
+
+		def __get_vid(self):
+			return self.tci & 0x0FFF
+
+		def __set_vid(self, value):
+			self.tci = self.tci & 0xF000 | value
+		vid = property(__get_vid, __set_vid)
+
+		type_t = pypacker.get_property_translator("type", "ETH_TYPE_")
 
 	def _dissect(self, buf):
 		hlen = 14
@@ -146,14 +147,14 @@ class Ethernet(pypacker.Packet):
 		if eth_type in VLAN_TAG_START:
 			if eth_type == ETH_TYPE_8021Q:
 				#logger.debug("VLAN: ETH_TYPE_8021Q")
-				self.vlan(buf[12: 16], lambda tval: Dot1Q(tval))
+				self.vlan(buf[12: 16], lambda tval: Ethernet.Dot1Q(tval))
 				hlen += 4
 				# Get real higher layer type
 				eth_type = unpack_H(buf[16: 18])[0]
 			# 802.1ad: support up to 2 tags (double tagging aka QinQ)
 			else:
 				#logger.debug("VLAN: 802.1ad")
-				self.vlan(buf[12: 20], lambda tval: [Dot1Q(tval[0: 4]), Dot1Q(tval[4: 8])])
+				self.vlan(buf[12: 20], lambda tval: [Ethernet.Dot1Q(tval[0: 4]), Ethernet.Dot1Q(tval[4: 8])])
 				hlen += 8
 				# Get real higher layer type
 				eth_type = unpack_H(buf[20: 22])[0]
@@ -179,8 +180,8 @@ class Ethernet(pypacker.Packet):
 
 					if dlen_ip < dlen:
 						# Padding found
-						self._padding = buf[hlen + dlen_ip:].tobytes()
-						#logger.debug("Got padding for (ip total length=%d): %r" % (dlen_ip, self._padding))
+						self.padding = buf[hlen + dlen_ip:].tobytes()
+						#logger.debug("Got padding for (ip total length=%d): %r" % (dlen_ip, self.padding))
 						dlen = dlen_ip
 				# Handle padding using IPv6
 				# IPv6 is a piece of sh$§! payloadlength (in header) = exclusive standard header
@@ -192,19 +193,19 @@ class Ethernet(pypacker.Packet):
 
 					if 40 + dlen_ip < dlen:
 						# Padding found
-						self._padding = buf[hlen + 40 + dlen_ip:].tobytes()
-						#logger.debug("Got padding for IPv6: %r" % self._padding)
+						self.padding = buf[hlen + 40 + dlen_ip:].tobytes()
+						#logger.debug("Got padding for IPv6: %r" % self.padding)
 						dlen = 40 + dlen_ip
 				elif eth_type == ETH_TYPE_LLDP:
 					#logger.debug("Padding: ETH_TYPE_LLDP")
 					# This is a bit redundant as we re-parse TLV when accessing the LLDP layer
 					dlen_lldp, _ = lldp.count_and_dissect_tlvs(buf[hlen:], onlylen=True)
-					self._padding = buf[hlen + dlen_lldp:].tobytes()
+					self.padding = buf[hlen + dlen_lldp:].tobytes()
 					dlen = dlen_lldp
 				elif eth_type == ETH_TYPE_SP:
 					#logger.debug("Padding: ETH_TYPE_SP")
 					lacppdu_len = 110
-					self._padding = buf[hlen + lacppdu_len:].tobytes()
+					self.padding = buf[hlen + lacppdu_len:].tobytes()
 					dlen = lacppdu_len
 			except:
 				# Could not extract padding info, assuming incomplete ethernet frame.
@@ -233,8 +234,6 @@ class Ethernet(pypacker.Packet):
 			(self.dst == b"\xff\xff\xff\xff\xff\xff" and other.dst == self.src):  # broadcast
 			return pypacker.Packet.DIR_REV
 		return pypacker.Packet.DIR_UNKNOWN
-
-	padding = pypacker.get_ondemand_property("padding", lambda: b"")
 
 	def reverse_address(self):
 		self.dst, self.src = self.src, self.dst

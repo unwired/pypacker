@@ -16,20 +16,18 @@ from pypacker.layer12 import ethernet
 logger = logging.getLogger("pypacker")
 
 
-class SocketHndl(object):
+class SocketHndl():
 	"""
 	Simple socket handler for layer 2 reading/writing.
 	"""
 	ETH_P_ALL	= 0x0003
 	ETH_P_IPV4	= 0x0800
 
-	# TODO: remove **params
 	def __init__(self,
 		iface_name="lo",
 		timeout=3,
 		buffersize_recv=None,
-		buffersize_send=None,
-		**params):
+		buffersize_send=None):
 		"""
 		iface_name -- Bind to the given interface
 		timeout -- read timeout in seconds
@@ -98,9 +96,13 @@ class SocketHndl(object):
 		try:
 			return self.recv()
 		except socket.timeout:
-			raise StopIteration
+			raise StopIteration # pylint: disable=raise-missing-from
 
-	def recvp(self, filter_match_recv=lambda _: True, lowest_layer=ethernet.Ethernet, max_amount=1):
+	def recvp(self,
+		filter_match_recv=lambda _: True,
+		pkt_criteria=None,
+		lowest_layer=ethernet.Ethernet,
+		max_amount=1): # pylint: disable=raise-missing-from
 		"""
 		Receive packets from network. This does the same as calling recv() but using a receive
 		filter and received bytes will be converted to packets using class given by lowest_layer.
@@ -109,25 +111,37 @@ class SocketHndl(object):
 		filter_match_recv -- filter as callback function to match packets to be retrieved.
 			Callback-structure: fct(packet), Return True to accept a specific packet.
 			Raise StopIteration to stop receiving packets, max_amount will match after all.
-		lowest_layer -- packet class to be used to create new packets
-		max_amount -- maximum amount of packets to be fetched
-		return -- packets received from network as list
+		pkt_criteria -- Same as pkt[pkt_criteria]
+		lowest_layer -- Packet class to be used to create new packets
+		max_amount -- Maximum amount of packets to be fetched
+		return -- Packets received from network as list
 		"""
 		received = []
-		# logger.debug("listening for packets")
 
-		while len(received) < max_amount:
-			bts = self.recv()
-			packet_recv = lowest_layer(bts)
-			# logger.debug("got packet: %s" % packet_recv)
-			try:
-				if filter_match_recv(packet_recv):
-					received.append(packet_recv)
-			except StopIteration:
-				break
-			except:
-				# any other exception: ignore
-				pass
+		if pkt_criteria is not None:
+			while len(received) < max_amount:
+				bts = self.recv()
+				packet_recv = lowest_layer(bts)
+				layers = packet_recv[pkt_criteria]
+
+				try:
+					if layers[-1] is not None:
+						received.append(packet_recv)
+				except StopIteration:
+					break
+		else:
+			while len(received) < max_amount:
+				bts = self.recv()
+				packet_recv = lowest_layer(bts)
+				# logger.debug("got packet: %s" % packet_recv)
+				try:
+					if filter_match_recv(packet_recv):
+						received.append(packet_recv)
+				except StopIteration:
+					break
+				except:
+					# any other exception: ignore
+					pass
 
 		return received
 
@@ -194,7 +208,7 @@ class SocketHndl(object):
 			pass
 
 
-def get_ssl_clientsocket(
+def get_ssl_clientsocket( # pylint: disable=too-many-arguments
 	hostname,
 	port,
 	server_cert=None,
@@ -211,7 +225,7 @@ def get_ssl_clientsocket(
 	if server_cert is not None:
 		context.load_verify_locations(server_cert)
 
-	context.check_hostname = False if ssl_server_hostname_to_check is None else True
+	context.check_hostname = ssl_server_hostname_to_check is not None
 	context.verify_mode = verify_mode
 	socket_simple = socket.create_connection((hostname, port))
 	socket_ssl = context.wrap_socket(socket_simple, server_hostname=ssl_server_hostname_to_check)
@@ -242,7 +256,7 @@ def get_ssl_serversocket(file_certchain, file_privatekey, bindoptions, password_
 
 
 # Server (TCP)
-"""
+""" # pylint: disable=pointless-string-statement
 # ncat 127.0.0.1 80
 sock_server = socket.socket(socket.AF_INET, socket.SOCK_STREAM) # IPv6: AF_INET6
 sock_server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -253,7 +267,6 @@ sock_server.listen(5)
 (sock_client, address) = sock_server.accept()
 
 data = sock_client.recv(1024)
-print(data)
 sock_client.send(data)
 
 for _sock in [sock_server, sock_client]:
@@ -262,7 +275,7 @@ for _sock in [sock_server, sock_client]:
 """
 
 # Server (UDP)
-"""
+""" # pylint: disable=pointless-string-statement
 # ncat 127.0.0.1 80 -u
 # Needs to be re-recreated for every new client
 def get_udpsock(port):
@@ -301,7 +314,7 @@ sock_server.close()
 """
 
 # Client (TCP, UDP)
-"""
+""" # pylint: disable=pointless-string-statement
 # ncat -l 80
 sock_client = socket.socket(socket.AF_INET, socket.SOCK_STREAM) # IPv6: AF_INET6
 # UDP
@@ -313,7 +326,6 @@ sock_client.bind("127.0.0.1", 0)
 sock_client.connect(("127.0.0.1", 80))
 
 data = sock_client.recv(1024)
-print(data)
 sock_client.send(data)
 
 sock_client.shutdown(socket.SHUT_RDWR)

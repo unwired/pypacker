@@ -9,7 +9,7 @@ RFC 791
 import logging
 
 from pypacker import pypacker, triggerlist, checksum
-from pypacker.layer3.ip_shared import IP_PROTO_IP6, IP_PROTO_ICMP, IP_PROTO_IGMP, IP_PROTO_TCP,\
+from pypacker.layer3.ip_shared import IP_PROTO_IP6, IP_PROTO_ICMP, IP_PROTO_IGMP, IP_PROTO_TCP, \
 	IP_PROTO_UDP, IP_PROTO_ESP, IP_PROTO_PIM, IP_PROTO_IPXIP, IP_PROTO_SCTP, IP_PROTO_OSPF
 from pypacker.pypacker import FIELD_FLAG_AUTOUPDATE, FIELD_FLAG_IS_TYPEFIELD
 # handler
@@ -53,32 +53,88 @@ IP_OPT_QS			= 25
 IP_OPT_EXP			= 30
 
 
-class IPOptSingle(pypacker.Packet):
-	__hdr__ = (
-		("type", "B", 0),
-	)
+# Type of service, RFC 1349 ("obsoleted by RFC 2474")
+IP_TOS_DEFAULT			= 0x00			# default
+IP_TOS_LOWDELAY			= 0x10			# low delay
+IP_TOS_THROUGHPUT		= 0x08			# high throughput
+IP_TOS_RELIABILITY		= 0x04			# high reliability
+IP_TOS_LOWCOST			= 0x02			# low monetary cost - XXX
+IP_TOS_ECT			= 0x02			# ECN-capable transport
+IP_TOS_CE			= 0x01			# congestion experienced
 
+# IP precedence
+IP_TOS_PREC_ROUTINE		= 0x00
+IP_TOS_PREC_PRIORITY		= 0x20
+IP_TOS_PREC_IMMEDIATE		= 0x40
+IP_TOS_PREC_FLASH		= 0x60
+IP_TOS_PREC_FLASHOVERRIDE	= 0x80
+IP_TOS_PREC_CRITIC_ECP		= 0xA0
+IP_TOS_PREC_INTERNETCONTROL	= 0xC0
+IP_TOS_PREC_NETCONTROL		= 0xE0
 
-class IPOptMulti(pypacker.Packet):
-	"""
-	len = total length (header + data)
-	"""
-	__hdr__ = (
-		("type", "B", 0),
-		("len", "B", 2),
-	)
+# Fragmentation flags (ip_off)
+IP_FRAG_RESERVED		= 0x4			# reserved
+IP_FRAG_DONT			= 0x2			# don't fragment
+IP_FRAG_MORE			= 0x1			# more fragments (not last frag)
 
-	def _update_fields(self):
-		self.len = len(self)
+# Time-to-live (ip_ttl), seconds
+IP_TTL_DEFAULT			= 64			# default ttl, RFC 1122, RFC 1340
+IP_TTL_MAX			= 255			# maximum ttl
 
 
 class IP(pypacker.Packet):
+	# version
+	def __get_v(self):
+		return self.v_hl >> 4
+
+	def __set_v(self, value):
+		self.v_hl = (value << 4) | (self.v_hl & 0xF)
+	v = property(__get_v, __set_v)
+
+	# Header length
+	def __get_hl(self):
+		return self.v_hl & 0x0F
+
+	def __set_hl(self, value):
+		self.v_hl = (self.v_hl & 0xF0) | value
+	hl = property(__get_hl, __set_hl)
+
+	def __get_flags(self):
+		return (self.frag_off & 0xE000) >> 13
+
+	def __set_flags(self, value):
+		self.frag_off = (self.frag_off & ~0xE000) | (value << 13)
+	fragment = property(__get_flags, __set_flags)
+
+	def __get_offset(self):
+		return self.frag_off & ~0xE000
+
+	def __set_offset(self, value):
+		self.frag_off = (self.frag_off & 0xE000) | value
+	offset = property(__get_offset, __set_offset)
+
+	def __get_dscp(self):
+		return (self.tos & 0xFC) >> 2
+
+	def __set_dscp(self, value):
+		self.tos = (value << 2) | ((~0xFC) & self.tos)
+	# Diff Services Codepoint
+	dscp = property(__get_dscp, __set_dscp)
+
+	def __get_ecn(self):
+		return self.tos & 0x03
+
+	def __set_ecn(self, value):
+		self.tos = (self.tos & 0xFC) | value
+	# Explicit Congestion Notification
+	ecn = property(__get_ecn, __set_ecn)
+
 	__hdr__ = (
-		("v_hl", "B", 69, FIELD_FLAG_AUTOUPDATE),  # = 0x45, hl = Header length (=hl*4 bytes)
-		("tos", "B", 0),
+		("v_hl", "B", 69, FIELD_FLAG_AUTOUPDATE, ((v, 0, 3), (hl, 4, 7))),  # = 0x45, hl = Header length (=hl*4 bytes)
+		("tos", "B", 0, None, ((dscp, 0, 5), (ecn, 6, 7))),
 		("len", "H", 20, FIELD_FLAG_AUTOUPDATE),  # Header + data length
 		("id", "H", 0),
-		("frag_off", "H", 0),
+		("frag_off", "H", 0, None, ((fragment, 0, 2), (offset, 3, 15))),
 		("ttl", "B", 64),
 		("p", "B", IP_PROTO_TCP, FIELD_FLAG_IS_TYPEFIELD),
 		("sum", "H", 0, FIELD_FLAG_AUTOUPDATE),
@@ -100,37 +156,7 @@ class IP(pypacker.Packet):
 		IP_PROTO_OSPF: ospf.OSPF
 	}
 
-	UPDATE_DEPENDANTS = {tcp.TCP, udp.UDP}
-
-	def __get_v(self):
-		return self.v_hl >> 4
-
-	def __set_v(self, value):
-		self.v_hl = (value << 4) | (self.v_hl & 0xF)
-	# version
-	v = property(__get_v, __set_v)
-
-	def __get_hl(self):
-		return self.v_hl & 0x0F
-
-	def __set_hl(self, value):
-		self.v_hl = (self.v_hl & 0xF0) | value
-	# header length
-	hl = property(__get_hl, __set_hl)
-
-	def __get_flags(self):
-		return (self.frag_off & 0xE000) >> 13
-
-	def __set_flags(self, value):
-		self.frag_off = (self.frag_off & ~0xE000) | (value << 13)
-	flags = property(__get_flags, __set_flags)
-
-	def __get_offset(self):
-		return self.frag_off & ~0xE000
-
-	def __set_offset(self, value):
-		self.frag_off = (self.frag_off & 0xE000) | value
-	offset = property(__get_offset, __set_offset)
+	__update_dependants__ = {tcp.TCP, udp.UDP}
 
 	def create_fragments(self, fragment_len=1480):
 		"""
@@ -157,10 +183,10 @@ class IP(pypacker.Packet):
 			ip_frag = IP(id=self.id, p=self.p, src=self.src, dst=self.dst)
 
 			if length_payload - off > fragment_len:
-				# more fragments follow
+				# More fragments follow
 				ip_frag.flags = 0x1
 			else:
-				# last fragment
+				# Last fragment
 				ip_frag.flags = 0x0
 
 			ip_frag.offset = int(off / 8)
@@ -174,10 +200,33 @@ class IP(pypacker.Packet):
 	src_s = pypacker.get_property_ip4("src")
 	dst_s = pypacker.get_property_ip4("dst")
 	p_t = pypacker.get_property_translator("p", "IP_PROTO_")
+	dscp_t = pypacker.get_property_translator("dscp", "IP_TOS_PREC_")
+	fragment_t = pypacker.get_property_translator("fragment", "IP_FRAG")
+
+	class IPOptSingle(pypacker.Packet):
+		__hdr__ = (
+			("type", "B", 0),
+		)
+
+		type_t = pypacker.get_property_translator("type", "IP_OPT_")
+
+	class IPOptMulti(pypacker.Packet):
+		"""
+		len = total length (header + data)
+		"""
+		__hdr__ = (
+			("type", "B", 0),
+			("len", "B", 2),
+		)
+
+		type_t = pypacker.get_property_translator("type", "IP_OPT_")
+
+		def _update_fields(self):
+			self.len = len(self)
 
 	def _dissect(self, buf):
 		# 4 bits that specify the number of 32-bit words in the header
-		total_header_length = ((buf[0] & 0xF) << 2)
+		total_header_length = (buf[0] & 0xF) << 2
 		#logger.debug("Total length: %d" % total_header_length)
 		options_length = total_header_length - 20  # total IHL - standard IP-len = options length
 
@@ -186,7 +235,7 @@ class IP(pypacker.Packet):
 			# logger.debug("got some IP options: %s" % tl_opts)
 			self.opts(buf[20: 20 + options_length], self._dissect_opts)
 		elif options_length < 0:
-			# invalid header length: assume no options at all
+			# Invalid header length: assume no options at all
 			raise Exception("Invalid options length: %d" % options_length)
 
 		# There are some cases where padding can not be identified on ethernet -> do it here (eg VSS shit trailer)
@@ -204,12 +253,12 @@ class IP(pypacker.Packet):
 		while i < len(buf):
 			#logger.debug("Dissecting IP-option type %s" % buf[i])
 			if buf[i] in IP.__IP_OPT_SINGLE:
-				p = IPOptSingle(type=buf[i])
+				p = IP.IPOptSingle(type=buf[i])
 				i += 1
 			else:
 				olen = buf[i + 1]
 				#logger.debug("IPOptMulti")
-				p = IPOptMulti(type=buf[i], len=olen, body_bytes=buf[i + 2: i + olen])
+				p = IP.IPOptMulti(type=buf[i], len=olen, body_bytes=buf[i + 2: i + olen])
 				#logger.debug("body bytes: %s" % buf[i + 2: i + olen])
 				i += olen		# typefield + lenfield + data-len
 				#logger.debug("IPOptMulti 2")
@@ -227,7 +276,7 @@ class IP(pypacker.Packet):
 			# options length need to be multiple of 4 Bytes
 			self.hl = int(self.header_len / 4) & 0xF
 		if self.sum_au_active:
-			# length changed so we have to recalculate checksum
+			# Length changed so we have to recalculate checksum
 			# reset checksum for recalculation,  mark as changed / clear cache
 			self.sum = 0
 			#logger.debug("Calculating sum over %d bytes (%r), current: %0X" % (
@@ -248,31 +297,3 @@ class IP(pypacker.Packet):
 
 	def reverse_address(self):
 		self.src, self.dst = self.dst, self.src
-
-# Type of service (ip_tos), RFC 1349 ("obsoleted by RFC 2474")
-IP_TOS_DEFAULT			= 0x00			# default
-IP_TOS_LOWDELAY			= 0x10			# low delay
-IP_TOS_THROUGHPUT		= 0x08			# high throughput
-IP_TOS_RELIABILITY		= 0x04			# high reliability
-IP_TOS_LOWCOST			= 0x02			# low monetary cost - XXX
-IP_TOS_ECT			= 0x02			# ECN-capable transport
-IP_TOS_CE			= 0x01			# congestion experienced
-
-# IP precedence (high 3 bits of ip_tos), hopefully unused
-IP_TOS_PREC_ROUTINE		= 0x00
-IP_TOS_PREC_PRIORITY		= 0x20
-IP_TOS_PREC_IMMEDIATE		= 0x40
-IP_TOS_PREC_FLASH		= 0x60
-IP_TOS_PREC_FLASHOVERRIDE	= 0x80
-IP_TOS_PREC_CRITIC_ECP		= 0xA0
-IP_TOS_PREC_INTERNETCONTROL	= 0xC0
-IP_TOS_PREC_NETCONTROL		= 0xE0
-
-# Fragmentation flags (ip_off)
-IP_RF				= 0x4			# reserved
-IP_DF				= 0x2			# don't fragment
-IP_MF				= 0x1			# more fragments (not last frag)
-
-# Time-to-live (ip_ttl), seconds
-IP_TTL_DEFAULT			= 64			# default ttl, RFC 1122, RFC 1340
-IP_TTL_MAX			= 255			# maximum ttl

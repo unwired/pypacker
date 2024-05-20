@@ -14,7 +14,7 @@ from pypacker.layer4 import udp, tcp
 
 DIR_CURRENT = os.path.dirname(os.path.realpath(__file__)) + "/"
 
-wlan_monitor_if		= "wlan1"
+wlan_monitor_if	= "wlan1"
 
 #
 # Create packets using raw bytes
@@ -27,8 +27,11 @@ BYTES_ETH_IP_ICMPREQ = b"\x52\x54\x00\x12\x35\x02\x08\x00\x27\xa9\x93\x9e\x08\x0
 	b"\x1c\x1d\x1e\x1f\x20\x21\x22\x23\x24\x25\x26\x27\x28\x29" +\
 	b"\x2a\x2b\x2c\x2d\x2e\x2f\x30\x31\x32\x33\x34\x35\x36\x37"
 packet1 = ethernet.Ethernet(BYTES_ETH_IP_ICMPREQ)
-print("Packet contents: %s" % packet1)
-print("Packet as bytes: %s" % packet1.bin())
+# Create verbose Packet description
+pkt_descr = "%s" % packet1
+# Get packet as bytes
+pkt_bts = packet1.bin()
+
 # Create custom packets and concat them
 packet1 = ethernet.Ethernet(dst_s="aa:bb:cc:dd:ee:ff", src_s="ff:ee:dd:cc:bb:aa") +\
 	ip.IP(src_s="192.168.0.1", dst_s="192.168.0.2") +\
@@ -37,14 +40,14 @@ packet1 = ethernet.Ethernet(dst_s="aa:bb:cc:dd:ee:ff", src_s="ff:ee:dd:cc:bb:aa"
 print("Custom packet: %s" % packet1)
 
 # Change dynamic header
-packet1[ip.IP].opts.append(ip.IPOptMulti(type=ip.IP_OPT_TS, len=3, body_bytes=b"\x00\x11\x22"))
+packet1[ip.IP].opts.append(ip.IP.IPOptMulti(type=ip.IP_OPT_TS, len=3, body_bytes=b"\x00\x11\x22"))
 
 # Change dynamic header even more
 # opts = [(ip.IP_OPT_TR, b"\x33\x44\x55"), (ip.IP_OPT_NOP, b"")]
-opts = [ip.IPOptMulti(type=ip.IP_OPT_TR,
+opts = [ip.IP.IPOptMulti(type=ip.IP_OPT_TR,
 	len=3,
 	body_bytes=b"\x33\x44\x55"),
-	ip.IPOptSingle(type=ip.IP_OPT_NOP)]
+	ip.IP.IPOptSingle(type=ip.IP_OPT_NOP)]
 packet1[ip.IP].opts.extend(opts)
 
 # Get specific layers

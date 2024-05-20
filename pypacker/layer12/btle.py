@@ -79,206 +79,14 @@ def reverse_bts_to_str(bts):
 for name, mask_off in FLAGS_NAME_MASK.items():
 	subheader = [
 		name,
-		(lambda mask, off: (lambda _obj: (_obj.flags & mask) >> off))(mask_off[0], mask_off[1]),
-		(lambda mask, off: (lambda _obj, _val: _obj.__setattr__("flags", (_obj.flags & ~mask) | (_val << off)))
-			)(mask_off[0], mask_off[1])
+		(lambda mask, off: # pylint: disable=unnecessary-direct-lambda-call
+			(lambda _obj: (_obj.flags & mask) >> off))
+			(mask_off[0], mask_off[1]), # pylint: disable=unnecessary-direct-lambda-call
+		(lambda mask, off: # pylint: disable=unnecessary-direct-lambda-call
+			(lambda _obj, _val: setattr(_obj, "flags", (_obj.flags & ~mask) | (_val << off))))
+			(mask_off[0], mask_off[1])
 	]
 	_subheader_properties.append(subheader)
-
-
-class AdvData(pypacker.Packet):
-	__hdr__ = (
-		("len", "B", 0),
-		("type", "B", 0)
-	)
-
-
-def parse_advdata(bts):
-	off = 0
-	ret = []
-
-	while off < len(bts):
-		alen = bts[off]
-		pkt = AdvData(len=alen, type=bts[off + 1], body_bytes=bts[off + 2: off + 1 + alen])
-		ret.append(pkt)
-		off += 1 + alen
-	return ret
-
-
-#
-# Sub header
-#
-
-
-class AdvInd(pypacker.Packet):
-	__hdr__ = (
-		("adv_addr", "6s", b"\xff" * 6),
-		("adv_data", None, triggerlist.TriggerList),
-	)
-
-	def _dissect(self, buf):
-		self.adv_data(buf[6:], parse_advdata)
-		return len(buf)
-
-	adv_addr_s = property(lambda obj: reverse_bts_to_str(obj.adv_addr))
-	adv_data_s = property(lambda obj: reverse_bts_to_str(obj.adv_data))
-
-
-class AdvNonconnInd(pypacker.Packet):
-	__hdr__ = (
-		("adv_addr", "6s", b"\xff" * 6),
-		("adv_data", None, triggerlist.TriggerList)
-	)
-
-	def _dissect(self, buf):
-		self.adv_data(buf[6:], parse_advdata)
-		return len(buf)
-
-	adv_addr_s = property(lambda obj: reverse_bts_to_str(obj.adv_addr))
-	adv_data_s = property(lambda obj: reverse_bts_to_str(obj.adv_data))
-
-
-class ScanRequest(pypacker.Packet):
-	__hdr__ = (
-		("scan_addr", "6s", b"\xff" * 6),
-		("adv_addr", "6s", b"\xff" * 6),
-	)
-
-	scan_addr_s = property(lambda obj: reverse_bts_to_str(obj.scan_addr))
-	adv_addr_s = property(lambda obj: reverse_bts_to_str(obj.adv_addr))
-
-
-class ScanResponse(pypacker.Packet):
-	__hdr__ = (
-		("adv_addr", "6s", b"\xff" * 6),
-		("adv_data", None, triggerlist.TriggerList)
-	)
-
-	def _dissect(self, buf):
-		self.adv_data(buf[6:], parse_advdata)
-		return len(buf)
-
-	adv_addr_s = property(lambda obj: reverse_bts_to_str(obj.adv_addr))
-	adv_data_s = property(lambda obj: reverse_bts_to_str(obj.adv_data))
-
-
-class ConnRequest(pypacker.Packet):
-	__hdr__ = (
-		("init_addr", "6s", b"\xff" * 6),
-		("adv_addr", "6s", b"\xff" * 6),
-		("access_addr", "4s", b"\xff" * 6),
-		("crcinit", "3s", b"\xff" * 3),
-		("winsize", "B", 0),
-		("winoff", "H", 0),
-		("interval", "H", 0),
-		("latency", "H", 0),
-		("timeout", "H", 0),
-		("chanmap", "5s", b"\xff" * 5),
-		("hop_sleep", "B", 0)
-	)
-
-	init_addr_s = property(lambda obj: reverse_bts_to_str(obj.init_addr))
-	adv_addr_s = property(lambda obj: reverse_bts_to_str(obj.adv_addr))
-	access_addr_s = property(lambda obj: reverse_bts_to_str(obj.access_addr))
-	crcinit_s = property(lambda obj: reverse_bts_to_str(obj.crcinit))
-	crcinit_rev = property(lambda obj: reverse_bts(obj.crcinit))
-
-	def get_active_channels(self):
-		"""
-		return -- Complete mapping of all channels as list
-			including mapping incactive -> active like (1, 2, 3, ...)
-		"""
-		data_channels_ret = []
-		data_channels_active = []
-		channel_current = 0
-		active_total = 0
-
-		for bt in self.chanmap:
-			bit = 1
-			for _ in range(8):
-				if bt & bit != 0:
-					data_channels_ret.append(channel_current)
-					data_channels_active.append(channel_current)
-					active_total += 1
-				else:
-					data_channels_ret.append(None)
-				bit <<= 1
-				channel_current += 1
-
-				if channel_current >= 37:
-					break
-
-		for idx, channel in enumerate(data_channels_ret):
-			if channel is None:
-				data_channels_ret[idx] = data_channels_active[idx % active_total]
-		return data_channels_ret
-
-	def __get_crcinit_int(self):
-		return unpack_I(b"\x00" + self.crcinit)[0]
-
-	crcinit_int = property(__get_crcinit_int)
-
-	def __get_crcinit_rev_int(self):
-		return unpack_I(b"\x00" + self.crcinit_rev)[0]
-
-	crcinit_rev_int = property(__get_crcinit_rev_int)
-
-#
-# Data packets
-#
-
-
-class DataLLID0(pypacker.Packet):
-	pass
-
-
-class DataLLID1(pypacker.Packet):
-	pass
-
-
-class DataLLID2(pypacker.Packet):
-	pass
-
-
-# LLX-packets
-class LLTerminateInd(pypacker.Packet):
-	pass
-
-
-class LLEncReq(pypacker.Packet):
-	__hdr__ = (
-		("rand", "8s", b"\x00" * 8),
-		("encrdiv", "H", 0),
-		("masterdiv", "Q", 0),
-		("masterinit", "I", 0)
-	)
-
-
-class LLEncResp(pypacker.Packet):
-	__hdr__ = (
-		("slavediv", "8s", b"\x00" * 8),
-		("slaveinit", "I", 0)
-	)
-
-
-class LLStartEnc(pypacker.Packet):
-	pass
-
-
-class LLVersionInd(pypacker.Packet):
-	__hdr__ = (
-		("version", "B", 0),
-		("company", "H", 0),
-		("subcompany", "H", 0)
-	)
-
-
-class LLFeatureReq(pypacker.Packet):
-	pass
-
-
-class LLRejectInd(pypacker.Packet):
-	pass
 
 
 LLID3_TERMINATEIND	= 0x2
@@ -288,26 +96,6 @@ LLID3_STARTENC		= 0x5
 LLID3_FEATUREREQ	= 0x8
 LLID3_VERSIONIND	= 0xC
 LLID3_REJECTIND		= 0xD
-
-
-class DataLLID3(pypacker.Packet):
-	__hdr__ = (
-		("opcode", "B", 0),
-	)
-
-	__handler__ = {
-		LLID3_TERMINATEIND: LLTerminateInd,
-		LLID3_ENCREQ: LLEncReq,
-		LLID3_ENCRESP: LLEncResp,
-		LLID3_STARTENC: LLStartEnc,
-		LLID3_VERSIONIND: LLVersionInd,
-		LLID3_FEATUREREQ: LLFeatureReq,
-		LLID3_REJECTIND: LLRejectInd
-	}
-
-	def _dissect(self, buf):
-		return 1, buf[0]
-
 
 #
 # Base header
@@ -345,6 +133,7 @@ def _get_property_subtype_set(obj, val):
 	else:
 		obj.info = (obj.info & ~0x03) | val
 
+
 _subheader_btle_properties = [
 	["pdutype",
 	lambda _obj: _get_property_subtype_get(_obj),
@@ -372,19 +161,6 @@ class BTLE(pypacker.Packet):
 
 	__hdr_sub__ = _subheader_btle_properties
 
-	__handler__ = {
-		PDU_TYPE_ADV_IND: AdvInd,
-		PDU_TYPE_ADV_SCAN_IND: ScanRequest,
-		PDU_TYPE_ADV_NONCONN_IND: AdvNonconnInd,
-		PDU_TYPE_SCAN_REQ: ScanRequest,
-		PDU_TYPE_SCAN_RSP: ScanResponse,
-		PDU_TYPE_CONNECT_REQ: ConnRequest,
-		(PDU_TYPE_DATA_LLID0 + 1) << 8: DataLLID0,
-		(PDU_TYPE_DATA_LLID1 + 1) << 8: DataLLID1,
-		(PDU_TYPE_DATA_LLID2 + 1) << 8: DataLLID2,
-		(PDU_TYPE_DATA_LLID3 + 1) << 8: DataLLID3,
-	}
-
 	def _dissect(self, buf):
 		hlen = 6
 
@@ -410,6 +186,206 @@ class BTLE(pypacker.Packet):
 		return crc_btle_check(self.bin(), crc_init)
 
 	crc_ok = property(is_crc_ok)
+
+	class ConnRequest(pypacker.Packet):
+		__hdr__ = (
+			("init_addr", "6s", b"\xff" * 6),
+			("adv_addr", "6s", b"\xff" * 6),
+			("access_addr", "4s", b"\xff" * 6),
+			("crcinit", "3s", b"\xff" * 3),
+			("winsize", "B", 0),
+			("winoff", "H", 0),
+			("interval", "H", 0),
+			("latency", "H", 0),
+			("timeout", "H", 0),
+			("chanmap", "5s", b"\xff" * 5),
+			("hop_sleep", "B", 0)
+		)
+
+		init_addr_s = property(lambda obj: reverse_bts_to_str(obj.init_addr))
+		adv_addr_s = property(lambda obj: reverse_bts_to_str(obj.adv_addr))
+		access_addr_s = property(lambda obj: reverse_bts_to_str(obj.access_addr))
+		crcinit_s = property(lambda obj: reverse_bts_to_str(obj.crcinit))
+		crcinit_rev = property(lambda obj: reverse_bts(obj.crcinit))
+
+		def get_active_channels(self):
+			"""
+			return -- Complete mapping of all channels as list
+				including mapping incactive -> active like (1, 2, 3, ...)
+			"""
+			data_channels_ret = []
+			data_channels_active = []
+			channel_current = 0
+			active_total = 0
+
+			for bt in self.chanmap:
+				bit = 1
+				for _ in range(8):
+					if bt & bit != 0:
+						data_channels_ret.append(channel_current)
+						data_channels_active.append(channel_current)
+						active_total += 1
+					else:
+						data_channels_ret.append(None)
+					bit <<= 1
+					channel_current += 1
+
+					if channel_current >= 37:
+						break
+
+			for idx, channel in enumerate(data_channels_ret):
+				if channel is None:
+					data_channels_ret[idx] = data_channels_active[idx % active_total]
+			return data_channels_ret
+
+		def __get_crcinit_int(self):
+			return unpack_I(b"\x00" + self.crcinit)[0]
+
+		crcinit_int = property(__get_crcinit_int)
+
+		def __get_crcinit_rev_int(self):
+			return unpack_I(b"\x00" + self.crcinit_rev)[0]
+
+		crcinit_rev_int = property(__get_crcinit_rev_int)
+
+	class AdvData(pypacker.Packet):
+		__hdr__ = (
+			("len", "B", 0),
+			("type", "B", 0)
+		)
+
+	@staticmethod
+	def parse_advdata(bts):
+		off = 0
+		ret = []
+
+		while off < len(bts):
+			alen = bts[off]
+			pkt = BTLE.AdvData(len=alen, type=bts[off + 1], body_bytes=bts[off + 2: off + 1 + alen])
+			ret.append(pkt)
+			off += 1 + alen
+		return ret
+
+	class AdvInd(pypacker.Packet):
+		__hdr__ = (
+			("adv_addr", "6s", b"\xff" * 6),
+			("adv_data", None, triggerlist.TriggerList),
+		)
+
+		def _dissect(self, buf):
+			self.adv_data(buf[6:], BTLE.parse_advdata)
+			return len(buf)
+
+		adv_addr_s = property(lambda obj: reverse_bts_to_str(obj.adv_addr))
+		adv_data_s = property(lambda obj: reverse_bts_to_str(obj.adv_data))
+
+	class AdvNonconnInd(pypacker.Packet):
+		__hdr__ = (
+			("adv_addr", "6s", b"\xff" * 6),
+			("adv_data", None, triggerlist.TriggerList)
+		)
+
+		def _dissect(self, buf):
+			self.adv_data(buf[6:], BTLE.parse_advdata)
+			return len(buf)
+
+		adv_addr_s = property(lambda obj: reverse_bts_to_str(obj.adv_addr))
+		adv_data_s = property(lambda obj: reverse_bts_to_str(obj.adv_data))
+
+	class ScanRequest(pypacker.Packet):
+		__hdr__ = (
+			("scan_addr", "6s", b"\xff" * 6),
+			("adv_addr", "6s", b"\xff" * 6),
+		)
+
+		scan_addr_s = property(lambda obj: reverse_bts_to_str(obj.scan_addr))
+		adv_addr_s = property(lambda obj: reverse_bts_to_str(obj.adv_addr))
+
+	class ScanResponse(pypacker.Packet):
+		__hdr__ = (
+			("adv_addr", "6s", b"\xff" * 6),
+			("adv_data", None, triggerlist.TriggerList)
+		)
+
+		def _dissect(self, buf):
+			self.adv_data(buf[6:], BTLE.parse_advdata)
+			return len(buf)
+
+		adv_addr_s = property(lambda obj: reverse_bts_to_str(obj.adv_addr))
+		adv_data_s = property(lambda obj: reverse_bts_to_str(obj.adv_data))
+
+	class DataLLID0(pypacker.Packet):
+		pass
+
+	class DataLLID1(pypacker.Packet):
+		pass
+
+	class DataLLID2(pypacker.Packet):
+		pass
+
+	class DataLLID3(pypacker.Packet):
+		__hdr__ = (
+			("opcode", "B", 0),
+		)
+
+		def _dissect(self, buf):
+			return 1, buf[0]
+
+		class LLTerminateInd(pypacker.Packet):
+			pass
+
+		class LLEncReq(pypacker.Packet):
+			__hdr__ = (
+				("rand", "8s", b"\x00" * 8),
+				("encrdiv", "H", 0),
+				("masterdiv", "Q", 0),
+				("masterinit", "I", 0)
+			)
+
+		class LLEncResp(pypacker.Packet):
+			__hdr__ = (
+				("slavediv", "8s", b"\x00" * 8),
+				("slaveinit", "I", 0)
+			)
+
+		class LLStartEnc(pypacker.Packet):
+			pass
+
+		class LLVersionInd(pypacker.Packet):
+			__hdr__ = (
+				("version", "B", 0),
+				("company", "H", 0),
+				("subcompany", "H", 0)
+			)
+
+		class LLFeatureReq(pypacker.Packet):
+			pass
+
+		class LLRejectInd(pypacker.Packet):
+			pass
+
+		__handler__ = {
+			LLID3_TERMINATEIND: LLTerminateInd,
+			LLID3_ENCREQ: LLEncReq,
+			LLID3_ENCRESP: LLEncResp,
+			LLID3_STARTENC: LLStartEnc,
+			LLID3_VERSIONIND: LLVersionInd,
+			LLID3_FEATUREREQ: LLFeatureReq,
+			LLID3_REJECTIND: LLRejectInd
+		}
+
+	__handler__ = {
+		PDU_TYPE_ADV_IND: AdvInd,
+		PDU_TYPE_ADV_SCAN_IND: ScanRequest,
+		PDU_TYPE_ADV_NONCONN_IND: AdvNonconnInd,
+		PDU_TYPE_SCAN_REQ: ScanRequest,
+		PDU_TYPE_SCAN_RSP: ScanResponse,
+		PDU_TYPE_CONNECT_REQ: ConnRequest,
+		(PDU_TYPE_DATA_LLID0 + 1) << 8: DataLLID0,
+		(PDU_TYPE_DATA_LLID1 + 1) << 8: DataLLID1,
+		(PDU_TYPE_DATA_LLID2 + 1) << 8: DataLLID2,
+		(PDU_TYPE_DATA_LLID3 + 1) << 8: DataLLID3,
+	}
 
 
 # BTLE packet header

@@ -1,4 +1,6 @@
 #!/bin/bash
-gcc -fPIC -c checksum_native.c -o checksum_native_x86_64.o
-gcc -shared -ochecksum_native_x86_64.so checksum_native_x86_64.o
+FILE_OBJECT="checksum_native_x86_64.o"
+gcc -fPIC -c checksum_native.c -o $FILE_OBJECT
+gcc -shared -ochecksum_native_x86_64.so $FILE_OBJECT
+rm $FILE_OBJECT
 strip checksum_native_x86_64.so

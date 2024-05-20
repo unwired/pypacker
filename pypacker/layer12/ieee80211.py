@@ -95,13 +95,16 @@ for subfield_name, mask_off in _FRAMECTRL_SUBHEADERDATA.items():
 		subfield_name,
 		# lambda**2: avoid lexical closure, do not refer to value via reference
 		# Could be called in _dissect: used shadowed variable instead
-		(lambda mask, off:
-			(lambda _obj:
-			((_obj.framectl if _obj._unpacked is not None else _obj._framectl) & mask) >> off))(mask_off[0], mask_off[1]),
-		(lambda mask, off:
-			(lambda _obj, _val:
-				_obj.__setattr__("framectl",
-				((_obj.framectl if _obj._unpacked is not None else _obj._framectl) & ~mask) | (_val << off))))(mask_off[0], mask_off[1]),
+		( # pylint: disable=unnecessary-direct-lambda-call
+			lambda mask, off:
+			(lambda _obj: ((_obj.framectl if _obj._unpacked is not None else _obj._framectl) & mask) >> off)
+		)(mask_off[0], mask_off[1]),
+		( # pylint: disable=unnecessary-direct-lambda-call
+			lambda mask, off:
+			(lambda _obj, _val: setattr(_obj, "framectl", # pylint: disable=unnecessary-direct-lambda-call
+				((_obj.framectl if _obj._unpacked is not None else _obj._framectl) & ~mask) | (_val << off)))
+		)
+		(mask_off[0], mask_off[1]),
 	]
 	_subheader_properties.append(subheader)
 
@@ -367,7 +370,8 @@ class IEEE80211(pypacker.Packet):
 			("seq_frag", "H", 0),
 			("capa", "H", 0),
 			("interval", "H", 0),
-			("current_ap", "6s", b"\x00" * 6)
+			("current_ap", "6s", b"\x00" * 6),
+			("params", None, triggerlist.TriggerList)
 		)
 
 		dst_s = pypacker.get_property_mac("dst")
@@ -384,6 +388,10 @@ class IEEE80211(pypacker.Packet):
 
 		def reverse_address(self):
 			self.dst, self.src = self.src, self.dst
+
+		def _dissect(self, buf):
+			self.params(buf[30:], IEEE80211._unpack_ies)
+			return len(buf)
 
 	class Auth(pypacker.Packet):
 		"""Authentication request."""
@@ -600,10 +608,12 @@ class IEEE80211(pypacker.Packet):
 
 			if dstype == 0:
 				return self.addr3
-			elif dstype == 1:
+			if dstype == 1:
 				return self.addr1
-			elif dstype == 2:
+			if dstype == 2:
 				return self.addr2
+
+			return None
 
 		def __set_bssid(self, bssid):
 			dstype = self.from_to_ds
@@ -789,6 +799,7 @@ class IEEE80211(pypacker.Packet):
 		IE_HT_INFO: IE
 	}
 
+
 # Handler for IEEE80211
 # position in list = type-ID
 dicts			= [IEEE80211.m_decoder, IEEE80211.c_decoder, IEEE80211.d_decoder]
@@ -802,7 +813,7 @@ for pos, decoder_dict in enumerate(dicts):
 
 pypacker.Packet.load_handler(IEEE80211, decoder_dict_complete)
 
-# handler for Action
+# Handler for Action
 CATEGORY_BLOCK_ACK_FACTOR = IEEE80211.Action.CATEGORY_BLOCK_ACK * 4
 pypacker.Packet.load_handler(IEEE80211.Action,
 	{
