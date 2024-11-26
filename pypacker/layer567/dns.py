@@ -461,8 +461,8 @@ class DNS(pypacker.Packet):
 			# Compress by default
 			if self.queries._cached_bin is None or\
 				self.answers._cached_bin is None or\
-				self.authrr._cached_bin is None or\
-				self.addrr._cached_bin is None:
+				self.auths._cached_bin is None or\
+				self.addrecords._cached_bin is None:
 				# Something has changed in tl (element or in packet in tl) -> re-compress
 				# Start at 2nd element, avoids self-referencing of 1st to itself
 				ref_bts = self.header_bytes[:12]
